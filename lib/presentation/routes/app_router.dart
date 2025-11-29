@@ -3,11 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/config/supabase_config.dart';
+import '../../data/models/product.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/signup_screen.dart';
 import '../screens/home/home_screen.dart';
 import '../screens/products/store_selector_screen.dart';
 import '../screens/products/product_list_screen.dart';
+import '../screens/products/product_detail_screen.dart';
 import '../screens/lists/my_lists_screen.dart';
 import '../screens/lists/create_list_screen.dart';
 import '../screens/lists/list_detail_screen.dart';
@@ -22,6 +24,7 @@ class AppRoutes {
   static const String home = '/home';
   static const String stores = '/stores';
   static const String products = '/products';
+  static const String productDetail = '/product';
   static const String lists = '/lists';
   static const String profile = '/profile';
 }
@@ -146,6 +149,20 @@ final routerProvider = Provider<GoRouter>((ref) {
           return MaterialPage(
             key: state.pageKey,
             child: ProductListScreen(retailer: retailer),
+          );
+        },
+      ),
+
+      // Product detail route (protected) - NO bottom nav (fullscreen)
+      // Uses 'extra' to pass the Product object
+      GoRoute(
+        path: '/product/:retailer',
+        pageBuilder: (context, state) {
+          final retailer = state.pathParameters['retailer']!;
+          final product = state.extra as Product;
+          return MaterialPage(
+            key: state.pageKey,
+            child: ProductDetailScreen(product: product, retailer: retailer),
           );
         },
       ),

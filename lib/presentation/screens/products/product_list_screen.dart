@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/product.dart';
 import '../../providers/product_provider.dart';
@@ -360,7 +361,7 @@ class _ProductListScreenState extends ConsumerState<ProductListScreen> {
       padding: const EdgeInsets.all(16),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        childAspectRatio: 0.62, // Reduced from 0.68 to make cards taller
+        childAspectRatio: 0.62,
         crossAxisSpacing: 12,
         mainAxisSpacing: 12,
       ),
@@ -396,13 +397,24 @@ class _ProductCard extends ConsumerWidget {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
         onTap: () {
+          // Navigate to product detail screen
+          context.push('/product/$retailer', extra: product);
+        },
+        onLongPress: () {
+          // Quick add to list on long press
           _showAddToListDialog(context, ref, product, retailer);
         },
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Product Image
-            AspectRatio(aspectRatio: 1, child: _buildProductImage()),
+            // Product Image with Hero animation
+            AspectRatio(
+              aspectRatio: 1,
+              child: Hero(
+                tag: 'product-${product.index}',
+                child: _buildProductImage(),
+              ),
+            ),
 
             // Product Info
             Expanded(
@@ -458,7 +470,7 @@ class _ProductCard extends ConsumerWidget {
                             fontWeight: FontWeight.bold,
                             color: AppColors.error,
                           ),
-                          maxLines: 3, // Increased from 2 to 3
+                          maxLines: 3,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
