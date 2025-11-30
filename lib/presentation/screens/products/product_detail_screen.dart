@@ -6,6 +6,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../data/models/product.dart';
 import '../../providers/list_provider.dart';
+import '../../widgets/price_comparison_sheet.dart';
 
 /// Enum to categorize promotion types
 enum PromoType {
@@ -165,20 +166,54 @@ class ProductDetailScreen extends ConsumerWidget {
                   // Product info card
                   _buildProductInfoCard(promoType),
 
-                  const SizedBox(height: 100), // Space for FAB
+                  const SizedBox(height: 120), // Space for bottom buttons
                 ],
               ),
             ),
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showAddToListSheet(context, ref),
-        backgroundColor: AppColors.primary,
-        icon: const Icon(Icons.add_shopping_cart),
-        label: const Text('Add to List'),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              // Compare Prices button
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => showPriceComparisonSheet(context, product),
+                  icon: const Icon(Icons.compare_arrows),
+                  label: const Text('Compare'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    side: const BorderSide(color: AppColors.primary),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              // Add to List button
+              Expanded(
+                flex: 2,
+                child: ElevatedButton.icon(
+                  onPressed: () => _showAddToListSheet(context, ref),
+                  icon: const Icon(Icons.add_shopping_cart),
+                  label: const Text('Add to List'),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    backgroundColor: AppColors.primary,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }
 

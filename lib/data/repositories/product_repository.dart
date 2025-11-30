@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/config/supabase_config.dart';
 import '../../core/constants/app_constants.dart';
 import '../models/product.dart';
+import '../models/comparable_product.dart';
 
 /// Repository for product operations
 /// Handles fetching products from Supabase with pagination and filtering
@@ -182,5 +183,110 @@ class ProductRepository {
       );
       return 0;
     }
+  }
+
+  /// Find comparable products at other retailers for price comparison
+  ///
+  /// [productIndex]: The index of the product to compare
+  /// [similarityThreshold]: Minimum similarity score (0.0 - 1.0), default 0.4
+  ///
+  /// Returns a list of comparable products ordered by:
+  /// 1. Match type (EXACT > SIMILAR > FALLBACK)
+  /// 2. Similarity score (highest first)
+  /// 3. Price (cheapest first)
+  Future<List<ComparableProduct>> findComparableProducts({
+    required String productIndex,
+    double similarityThreshold = 0.4,
+  }) async {
+    try {
+      _logger.d('Finding comparable products for index: $productIndex');
+
+      final response = await _supabase.rpc(
+        'find_comparable_products',
+        params: {
+          'source_product_index': productIndex,
+          'similarity_threshold': similarityThreshold,
+        },
+      );
+
+      if (response == null) {
+        _logger.w('No comparable products found (null response)');
+        return [];
+      }
+
+      final comparisons = (response as List)
+          .map((json) => ComparableProduct.fromJson(json))
+          .toList();
+
+      _logger.i('✅ Found ${comparisons.length} comparable products');
+
+      // Log match breakdown for debugging
+      final exact = comparisons.where((c) => c.isExactMatch).length;
+      final similar = comparisons.where((c) => c.isSimilarMatch).length;
+      final fallback = comparisons.where((c) => c.isFallbackMatch).length;
+      _logger.d(
+        'Match breakdown - EXACT: $exact, SIMILAR: $similar, FALLBACK: $fallback',
+      );
+
+      return comparisons;
+    } catch (e, stackTrace) {
+      _logger.e(
+        'Error finding comparable products',
+        error: e,
+        stackTrace: stackTrace,
+      );
+      // Return empty list instead of throwing - comparison is non-critical
+      return [];
+    }
+  }
+
+  /// Group comparable products by retailer
+  ///
+  /// Useful for displaying "Best price at each store" view
+  Map<String, List<ComparableProduct>> groupByRetailer(
+    List<ComparableProduct> products,
+  ) {
+    final grouped = <String, List<ComparableProduct>>{};
+
+    for (final product in products) {
+      grouped.putIfAbsent(product.retailer, () => []);
+      grouped[product.retailer]!.add(product);
+    }
+
+    return grouped;
+  }
+
+  /// Get the best price for each retailer
+  ///
+  /// Returns a map of retailer -> cheapest ComparableProduct
+  Map<String, ComparableProduct> getBestPricePerRetailer(
+    List<ComparableProduct> products,
+  ) {
+    final best = <String, ComparableProduct>{};
+
+    for (final product in products) {
+      final existing = best[product.retailer];
+
+      if (existing == null) {
+        best[product.retailer] = product;
+      } else {
+        // Prefer exact matches, then by price
+        if (product.isExactMatch && !existing.isExactMatch) {
+          best[product.retailer] = product;
+        } else if (product.isExactMatch == existing.isExactMatch) {
+          // Same match type - compare prices
+          final productPrice = product.numericPrice;
+          final existingPrice = existing.numericPrice;
+
+          if (productPrice != null && existingPrice != null) {
+            if (productPrice < existingPrice) {
+              best[product.retailer] = product;
+            }
+          }
+        }
+      }
+    }
+
+    return best;
   }
 }
