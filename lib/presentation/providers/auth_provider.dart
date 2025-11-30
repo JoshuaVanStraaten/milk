@@ -41,7 +41,7 @@ final currentUserProfileProvider = FutureProvider<UserProfile?>((ref) async {
   );
 });
 
-/// Notifier for authentication actions (sign up, sign in, sign out)
+/// Notifier for authentication actions (sign up, sign in, sign out, Google OAuth)
 /// This is the main controller for auth operations
 class AuthNotifier extends StateNotifier<AsyncValue<UserProfile?>> {
   final AuthRepository _authRepository;
@@ -89,6 +89,39 @@ class AuthNotifier extends StateNotifier<AsyncValue<UserProfile?>> {
     }
   }
 
+  /// Sign in with Google OAuth
+  /// Note: This initiates the OAuth flow. The actual completion happens
+  /// via deep link callback, which triggers handleOAuthCallback()
+  Future<void> signInWithGoogle() async {
+    state = const AsyncValue.loading();
+
+    try {
+      await _authRepository.signInWithGoogle();
+      // Don't set state here - the OAuth redirect will handle it
+      // The auth state stream will update when the user returns
+    } catch (e, stackTrace) {
+      state = AsyncValue.error(e, stackTrace);
+    }
+  }
+
+  /// Handle OAuth callback after redirect
+  /// Call this when the app receives the OAuth deep link callback
+  Future<void> handleOAuthCallback() async {
+    state = const AsyncValue.loading();
+
+    try {
+      final profile = await _authRepository.handleOAuthCallback();
+
+      if (profile != null) {
+        state = AsyncValue.data(profile);
+      } else {
+        state = const AsyncValue.data(null);
+      }
+    } catch (e, stackTrace) {
+      state = AsyncValue.error(e, stackTrace);
+    }
+  }
+
   /// Sign out current user
   Future<void> signOut() async {
     state = const AsyncValue.loading();
@@ -100,10 +133,17 @@ class AuthNotifier extends StateNotifier<AsyncValue<UserProfile?>> {
       state = AsyncValue.error(e, stackTrace);
     }
   }
+
+  /// Clear any error state
+  void clearError() {
+    if (state.hasError) {
+      state = const AsyncValue.data(null);
+    }
+  }
 }
 
 /// Provider for AuthNotifier
-/// Use this in your UI to call signUp, signIn, signOut
+/// Use this in your UI to call signUp, signIn, signInWithGoogle, signOut
 final authNotifierProvider =
     StateNotifierProvider<AuthNotifier, AsyncValue<UserProfile?>>((ref) {
       final authRepository = ref.watch(authRepositoryProvider);

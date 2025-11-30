@@ -45,5 +45,17 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<!-- Deep Link URL Scheme for OAuth callback -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.example.milk</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.example.milk</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

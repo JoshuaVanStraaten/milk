@@ -75,6 +75,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
+  Future<void> _handleGoogleSignIn() async {
+    final authNotifier = ref.read(authNotifierProvider.notifier);
+
+    // Initiate Google OAuth flow
+    await authNotifier.signInWithGoogle();
+
+    // Note: The actual sign-in completion happens via deep link callback
+    // The router will handle navigation when auth state changes
+  }
+
   @override
   Widget build(BuildContext context) {
     // Watch auth state to show loading
@@ -93,18 +103,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               children: [
                 const SizedBox(height: 60),
 
-                // App Logo/Icon (placeholder - you can add an image later)
-                Container(
-                  height: 80,
-                  width: 80,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Icon(
-                    Icons.shopping_cart,
-                    size: 40,
-                    color: Colors.white,
+                // App Logo/Icon
+                Center(
+                  child: Container(
+                    height: 80,
+                    width: 80,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Icon(
+                      Icons.shopping_cart,
+                      size: 40,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
 
@@ -132,6 +144,35 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
                 const SizedBox(height: 40),
 
+                // Google Sign In Button
+                _GoogleSignInButton(
+                  onPressed: isLoading ? null : _handleGoogleSignIn,
+                  isLoading: isLoading,
+                ),
+
+                const SizedBox(height: 24),
+
+                // Divider
+                Row(
+                  children: [
+                    Expanded(child: Divider(color: AppColors.divider)),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Text(
+                        'or continue with email',
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w500,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                    Expanded(child: Divider(color: AppColors.divider)),
+                  ],
+                ),
+
+                const SizedBox(height: 24),
+
                 // Email Field
                 AppTextField(
                   label: 'Email',
@@ -156,7 +197,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
                 const SizedBox(height: 12),
 
-                // Forgot Password (placeholder for now)
+                // Forgot Password
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
@@ -179,26 +220,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   text: 'Sign In',
                   onPressed: isLoading ? null : _handleLogin,
                   isLoading: isLoading,
-                ),
-
-                const SizedBox(height: 24),
-
-                // Divider
-                Row(
-                  children: [
-                    Expanded(child: Divider(color: AppColors.divider)),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Text(
-                        'OR',
-                        style: TextStyle(
-                          color: AppColors.textSecondary,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                    Expanded(child: Divider(color: AppColors.divider)),
-                  ],
                 ),
 
                 const SizedBox(height: 24),
@@ -228,6 +249,74 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Google Sign In Button widget
+class _GoogleSignInButton extends StatelessWidget {
+  final VoidCallback? onPressed;
+  final bool isLoading;
+
+  const _GoogleSignInButton({required this.onPressed, this.isLoading = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton(
+      onPressed: onPressed,
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        side: BorderSide(color: AppColors.divider),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        backgroundColor: Colors.white,
+      ),
+      child: isLoading
+          ? const SizedBox(
+              height: 24,
+              width: 24,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Google logo
+                Image.network(
+                  'https://www.google.com/favicon.ico',
+                  height: 24,
+                  width: 24,
+                  errorBuilder: (context, error, stackTrace) {
+                    // Fallback if image fails to load
+                    return Container(
+                      height: 24,
+                      width: 24,
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Center(
+                        child: Text(
+                          'G',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(width: 12),
+                const Text(
+                  'Continue with Google',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ],
+            ),
     );
   }
 }

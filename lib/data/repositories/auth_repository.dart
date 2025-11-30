@@ -4,13 +4,12 @@ import '../../core/config/supabase_config.dart';
 import '../models/user_profile.dart';
 
 /// Repository for authentication operations
-/// Handles sign up, sign in, sign out, and user profile management
+/// Handles sign up, sign in, sign out, Google OAuth, and user profile management
 class AuthRepository {
   final SupabaseClient _supabase = SupabaseConfig.client;
   final Logger _logger = Logger();
 
   /// Sign up a new user with email and password
-  /// Assumes Supabase has a trigger to auto-create user profile, or creates it manually
   Future<UserProfile> signUp({
     required String email,
     required String password,
@@ -121,6 +120,85 @@ class AuthRepository {
         stackTrace: stackTrace,
       );
       throw Exception('Sign in failed: $e');
+    }
+  }
+
+  /// Sign in with Google OAuth
+  /// This initiates the OAuth flow - the actual sign-in completes via deep link callback
+  Future<void> signInWithGoogle() async {
+    try {
+      _logger.i('Initiating Google OAuth sign in');
+
+      await _supabase.auth.signInWithOAuth(
+        OAuthProvider.google,
+        redirectTo: 'com.example.milk://login-callback',
+        authScreenLaunchMode: LaunchMode.externalApplication,
+      );
+
+      _logger.i('✅ Google OAuth flow initiated');
+    } on AuthException catch (e) {
+      _logger.e('Auth error during Google sign in: ${e.message}');
+      throw Exception('Google sign in failed: ${e.message}');
+    } catch (e, stackTrace) {
+      _logger.e(
+        'Unexpected error during Google sign in',
+        error: e,
+        stackTrace: stackTrace,
+      );
+      throw Exception('Google sign in failed: $e');
+    }
+  }
+
+  /// Handle the OAuth callback and ensure user profile exists
+  /// Call this after the OAuth redirect returns to the app
+  Future<UserProfile?> handleOAuthCallback() async {
+    try {
+      final user = _supabase.auth.currentUser;
+
+      if (user == null) {
+        _logger.w('No user found after OAuth callback');
+        return null;
+      }
+
+      _logger.i('✅ OAuth callback - user authenticated: ${user.id}');
+
+      // Try to fetch existing profile
+      try {
+        final profile = await getUserProfile(user.id);
+        _logger.i('✅ Existing user profile found');
+        return profile;
+      } catch (e) {
+        // Profile doesn't exist, create one from OAuth data
+        _logger.d('Profile not found, creating from OAuth data');
+
+        final newProfile = UserProfile(
+          id: user.id,
+          createdAt: DateTime.now(),
+          emailAddress: user.email ?? '',
+          displayName:
+              user.userMetadata?['full_name'] as String? ??
+              user.userMetadata?['name'] as String? ??
+              user.email?.split('@').first,
+          mailingList: false,
+        );
+
+        try {
+          await _supabase.from('user_profiles').insert(newProfile.toJson());
+          _logger.i('✅ User profile created from OAuth data');
+          return newProfile;
+        } catch (insertError) {
+          // Race condition - try fetching again
+          _logger.w('Insert failed, fetching profile');
+          return await getUserProfile(user.id);
+        }
+      }
+    } catch (e, stackTrace) {
+      _logger.e(
+        'Error handling OAuth callback',
+        error: e,
+        stackTrace: stackTrace,
+      );
+      return null;
     }
   }
 

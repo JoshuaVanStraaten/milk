@@ -80,6 +80,16 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     }
   }
 
+  Future<void> _handleGoogleSignIn() async {
+    final authNotifier = ref.read(authNotifierProvider.notifier);
+
+    // Initiate Google OAuth flow
+    await authNotifier.signInWithGoogle();
+
+    // Note: The actual sign-in completion happens via deep link callback
+    // The router will handle navigation when auth state changes
+  }
+
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authNotifierProvider);
@@ -123,7 +133,36 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                   ),
                 ),
 
-                const SizedBox(height: 40),
+                const SizedBox(height: 32),
+
+                // Google Sign In Button
+                _GoogleSignInButton(
+                  onPressed: isLoading ? null : _handleGoogleSignIn,
+                  isLoading: isLoading,
+                ),
+
+                const SizedBox(height: 24),
+
+                // Divider
+                Row(
+                  children: [
+                    Expanded(child: Divider(color: AppColors.divider)),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Text(
+                        'or sign up with email',
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w500,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                    Expanded(child: Divider(color: AppColors.divider)),
+                  ],
+                ),
+
+                const SizedBox(height: 24),
 
                 // Display Name Field (Optional)
                 AppTextField(
@@ -184,7 +223,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
 
                 const SizedBox(height: 24),
 
-                // Terms and Conditions (placeholder)
+                // Terms and Conditions
                 Text(
                   'By signing up, you agree to our Terms of Service and Privacy Policy',
                   textAlign: TextAlign.center,
@@ -220,6 +259,74 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Google Sign In Button widget
+class _GoogleSignInButton extends StatelessWidget {
+  final VoidCallback? onPressed;
+  final bool isLoading;
+
+  const _GoogleSignInButton({required this.onPressed, this.isLoading = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton(
+      onPressed: onPressed,
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        side: BorderSide(color: AppColors.divider),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        backgroundColor: Colors.white,
+      ),
+      child: isLoading
+          ? const SizedBox(
+              height: 24,
+              width: 24,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Google logo
+                Image.network(
+                  'https://www.google.com/favicon.ico',
+                  height: 24,
+                  width: 24,
+                  errorBuilder: (context, error, stackTrace) {
+                    // Fallback if image fails to load
+                    return Container(
+                      height: 24,
+                      width: 24,
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Center(
+                        child: Text(
+                          'G',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(width: 12),
+                const Text(
+                  'Continue with Google',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ],
+            ),
     );
   }
 }
