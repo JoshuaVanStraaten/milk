@@ -9,8 +9,8 @@ class HomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Watch current user profile
     final userProfileAsync = ref.watch(currentUserProfileProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       appBar: AppBar(
@@ -33,7 +33,7 @@ class HomeScreen extends ConsumerWidget {
                   Container(
                     padding: const EdgeInsets.all(32),
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.1),
+                      color: AppColors.primary.withOpacity(isDark ? 0.2 : 0.1),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Column(
@@ -46,20 +46,24 @@ class HomeScreen extends ConsumerWidget {
                         const SizedBox(height: 16),
                         Text(
                           'Welcome${profile.displayName != null ? ", ${profile.displayName}" : ""}!',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
+                            color: isDark
+                                ? AppColors.textPrimaryDark
+                                : AppColors.textPrimary,
                           ),
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 8),
-                        const Text(
+                        Text(
                           'Start browsing products or manage your shopping lists',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 16,
-                            color: AppColors.textSecondary,
+                            color: isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textSecondary,
                           ),
                         ),
                       ],
@@ -74,6 +78,7 @@ class HomeScreen extends ConsumerWidget {
                     title: 'Browse Products',
                     subtitle: 'Find the best deals at your favorite stores',
                     color: AppColors.primary,
+                    isDark: isDark,
                     onTap: () {
                       context.go('/stores');
                     },
@@ -86,6 +91,7 @@ class HomeScreen extends ConsumerWidget {
                     title: 'My Shopping Lists',
                     subtitle: 'View and manage your shopping lists',
                     color: AppColors.secondary,
+                    isDark: isDark,
                     onTap: () {
                       context.go('/lists');
                     },
@@ -107,6 +113,7 @@ class _QuickActionCard extends StatelessWidget {
   final String title;
   final String subtitle;
   final Color color;
+  final bool isDark;
   final VoidCallback onTap;
 
   const _QuickActionCard({
@@ -114,6 +121,7 @@ class _QuickActionCard extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.color,
+    required this.isDark,
     required this.onTap,
   });
 
@@ -131,7 +139,7 @@ class _QuickActionCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
+                  color: color.withOpacity(isDark ? 0.2 : 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(icon, size: 32, color: color),
@@ -143,27 +151,33 @@ class _QuickActionCard extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
+                        color: isDark
+                            ? AppColors.textPrimaryDark
+                            : AppColors.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       subtitle,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
-                        color: AppColors.textSecondary,
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondary,
                       ),
                     ),
                   ],
                 ),
               ),
-              const Icon(
+              Icon(
                 Icons.arrow_forward_ios,
                 size: 16,
-                color: AppColors.textSecondary,
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondary,
               ),
             ],
           ),

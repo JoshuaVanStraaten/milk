@@ -81,6 +81,7 @@ class ProductDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final retailerColor = _getRetailerColor(retailer);
     final promoType = _getPromoType();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       body: CustomScrollView(
@@ -92,8 +93,8 @@ class ProductDetailScreen extends ConsumerWidget {
             backgroundColor: retailerColor,
             flexibleSpace: FlexibleSpaceBar(
               background: Container(
-                color: Colors.white,
-                child: _buildProductImage(),
+                color: isDark ? AppColors.surfaceDarkMode : Colors.white,
+                child: _buildProductImage(isDark),
               ),
             ),
             leading: IconButton(
@@ -124,17 +125,19 @@ class ProductDetailScreen extends ConsumerWidget {
                   // Product name
                   Text(
                     product.name,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
+                      color: isDark
+                          ? AppColors.textPrimaryDark
+                          : AppColors.textPrimary,
                     ),
                   ),
 
                   const SizedBox(height: 20),
 
                   // Price section
-                  _buildPriceSection(promoType),
+                  _buildPriceSection(promoType, isDark),
 
                   const SizedBox(height: 24),
 
@@ -142,14 +145,14 @@ class ProductDetailScreen extends ConsumerWidget {
                   if (product.hasPromotion &&
                       promoType != PromoType.none &&
                       promoType != PromoType.simplePrice) ...[
-                    _buildPromotionCard(),
+                    _buildPromotionCard(isDark),
                     const SizedBox(height: 16),
                   ],
 
                   // Multi-buy info card (only for buyXForY where we can calculate)
                   if (promoType == PromoType.buyXForY &&
                       product.multiBuyInfo != null) ...[
-                    _buildMultiBuyCard(),
+                    _buildMultiBuyCard(isDark),
                     const SizedBox(height: 16),
                   ],
 
@@ -157,14 +160,14 @@ class ProductDetailScreen extends ConsumerWidget {
                   if (promoType == PromoType.simplePrice &&
                       product.promotionValid != null &&
                       product.promotionValid!.isNotEmpty) ...[
-                    _buildValidityCard(),
+                    _buildValidityCard(isDark),
                     const SizedBox(height: 16),
                   ],
 
                   const SizedBox(height: 8),
 
                   // Product info card
-                  _buildProductInfoCard(promoType),
+                  _buildProductInfoCard(promoType, isDark),
 
                   const SizedBox(height: 120), // Space for bottom buttons
                 ],
@@ -217,16 +220,17 @@ class ProductDetailScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildProductImage() {
+  Widget _buildProductImage(bool isDark) {
+    final surfaceColor = isDark ? AppColors.surfaceDarkMode : Colors.white;
+    final iconColor = isDark
+        ? AppColors.textDisabledDark
+        : AppColors.textDisabled;
+
     if (product.imageUrl == null || product.imageUrl!.isEmpty) {
       return Container(
-        color: Colors.white,
-        child: const Center(
-          child: Icon(
-            Icons.image_not_supported,
-            size: 100,
-            color: AppColors.textDisabled,
-          ),
+        color: surfaceColor,
+        child: Center(
+          child: Icon(Icons.image_not_supported, size: 100, color: iconColor),
         ),
       );
     }
@@ -234,22 +238,18 @@ class ProductDetailScreen extends ConsumerWidget {
     return Hero(
       tag: 'product-${product.index}',
       child: Container(
-        color: Colors.white,
+        color: surfaceColor,
         child: CachedNetworkImage(
           imageUrl: product.imageUrl!,
           fit: BoxFit.contain,
           placeholder: (context, url) => Container(
-            color: Colors.white,
+            color: surfaceColor,
             child: const Center(child: CircularProgressIndicator()),
           ),
           errorWidget: (context, url, error) => Container(
-            color: Colors.white,
-            child: const Center(
-              child: Icon(
-                Icons.broken_image,
-                size: 100,
-                color: AppColors.textDisabled,
-              ),
+            color: surfaceColor,
+            child: Center(
+              child: Icon(Icons.broken_image, size: 100, color: iconColor),
             ),
           ),
         ),
@@ -283,28 +283,30 @@ class ProductDetailScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildPriceSection(PromoType promoType) {
+  Widget _buildPriceSection(PromoType promoType, bool isDark) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: isDark ? AppColors.surfaceDarkMode : AppColors.surface,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Price',
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w500,
-              color: AppColors.textSecondary,
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondary,
             ),
           ),
           const SizedBox(height: 8),
 
           // Price display based on promo type
-          _buildPriceDisplay(promoType),
+          _buildPriceDisplay(promoType, isDark),
 
           // Savings badge - only show when we can accurately calculate
           if (_canShowSavings() &&
@@ -318,7 +320,7 @@ class ProductDetailScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildPriceDisplay(PromoType promoType) {
+  Widget _buildPriceDisplay(PromoType promoType, bool isDark) {
     switch (promoType) {
       case PromoType.simplePrice:
         // Show promo price prominent, original struck through
@@ -340,10 +342,12 @@ class ProductDetailScreen extends ConsumerWidget {
                 padding: const EdgeInsets.only(bottom: 4),
                 child: Text(
                   product.price!,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w500,
-                    color: AppColors.textSecondary,
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondary,
                     decoration: TextDecoration.lineThrough,
                   ),
                 ),
@@ -414,7 +418,7 @@ class ProductDetailScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildPromotionCard() {
+  Widget _buildPromotionCard(bool isDark) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -457,14 +461,30 @@ class ProductDetailScreen extends ConsumerWidget {
                     color: AppColors.error,
                   ),
                 ),
+                if (product.promotionPrice != null &&
+                    product.promotionPrice!.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    product.promotionPrice!,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: isDark
+                          ? AppColors.textPrimaryDark
+                          : AppColors.textPrimary,
+                    ),
+                  ),
+                ],
                 if (product.promotionValid != null &&
                     product.promotionValid!.isNotEmpty) ...[
                   const SizedBox(height: 4),
                   Text(
                     product.promotionValid!,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
-                      color: AppColors.textSecondary,
+                      color: isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondary,
                     ),
                   ),
                 ],
@@ -476,7 +496,7 @@ class ProductDetailScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildValidityCard() {
+  Widget _buildValidityCard(bool isDark) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -522,9 +542,11 @@ class ProductDetailScreen extends ConsumerWidget {
                 const SizedBox(height: 4),
                 Text(
                   product.promotionValid!,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
-                    color: AppColors.textSecondary,
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondary,
                   ),
                 ),
               ],
@@ -535,7 +557,7 @@ class ProductDetailScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildMultiBuyCard() {
+  Widget _buildMultiBuyCard(bool isDark) {
     final multiBuy = product.multiBuyInfo!;
     final quantity = multiBuy['quantity']!.toInt();
     final totalPrice = multiBuy['totalPrice']!;
@@ -579,9 +601,11 @@ class ProductDetailScreen extends ConsumerWidget {
                 const SizedBox(height: 4),
                 Text(
                   'R${pricePerItem.toStringAsFixed(2)} each when you buy $quantity',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
-                    color: AppColors.textSecondary,
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondary,
                   ),
                 ),
               ],
@@ -592,7 +616,7 @@ class ProductDetailScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildProductInfoCard(PromoType promoType) {
+  Widget _buildProductInfoCard(PromoType promoType, bool isDark) {
     // Only show Valid field if there's a promotion AND the valid text is not empty
     final showValidField =
         product.hasPromotion &&
@@ -602,44 +626,45 @@ class ProductDetailScreen extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: isDark ? AppColors.surfaceDarkMode : AppColors.surface,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Product Information',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
+              color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
             ),
           ),
           const SizedBox(height: 16),
 
           // Regular Price
           if (product.price != null && product.price!.isNotEmpty)
-            _buildInfoRow('Regular Price', product.price!),
+            _buildInfoRow('Regular Price', product.price!, isDark),
 
           // Promotion - only show for non-simple promos with actual promo text
           if (product.hasPromotion &&
               promoType != PromoType.simplePrice &&
               product.promotionPrice != null &&
               product.promotionPrice!.isNotEmpty)
-            _buildInfoRow('Promotion', product.promotionPrice!),
+            _buildInfoRow('Promotion', product.promotionPrice!, isDark),
 
           // Retailer
-          _buildInfoRow('Retailer', retailer),
+          _buildInfoRow('Retailer', retailer, isDark),
 
           // Validity - only show if there's a promotion AND valid text is not empty
-          if (showValidField) _buildInfoRow('Valid', product.promotionValid!),
+          if (showValidField)
+            _buildInfoRow('Valid', product.promotionValid!, isDark),
         ],
       ),
     );
   }
 
-  Widget _buildInfoRow(String label, String value) {
+  Widget _buildInfoRow(String label, String value, bool isDark) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
@@ -649,19 +674,23 @@ class ProductDetailScreen extends ConsumerWidget {
             width: 100,
             child: Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
-                color: AppColors.textSecondary,
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondary,
               ),
             ),
           ),
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
-                color: AppColors.textPrimary,
+                color: isDark
+                    ? AppColors.textPrimaryDark
+                    : AppColors.textPrimary,
               ),
             ),
           ),
@@ -809,10 +838,14 @@ class _AddToListSheetState extends ConsumerState<_AddToListSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final surfaceColor = isDark ? AppColors.surfaceDarkMode : AppColors.surface;
+    final backgroundColor = isDark ? AppColors.backgroundDark : Colors.white;
+
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -831,7 +864,9 @@ class _AddToListSheetState extends ConsumerState<_AddToListSheet> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: AppColors.textDisabled,
+                  color: isDark
+                      ? AppColors.textDisabledDark
+                      : AppColors.textDisabled,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -850,7 +885,7 @@ class _AddToListSheetState extends ConsumerState<_AddToListSheet> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppColors.surface,
+                color: surfaceColor,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
@@ -866,14 +901,14 @@ class _AddToListSheetState extends ConsumerState<_AddToListSheet> {
                             errorWidget: (_, __, ___) => Container(
                               width: 60,
                               height: 60,
-                              color: AppColors.surface,
+                              color: surfaceColor,
                               child: const Icon(Icons.image_not_supported),
                             ),
                           )
                         : Container(
                             width: 60,
                             height: 60,
-                            color: AppColors.surface,
+                            color: surfaceColor,
                             child: const Icon(Icons.image_not_supported),
                           ),
                   ),
@@ -918,16 +953,18 @@ class _AddToListSheetState extends ConsumerState<_AddToListSheet> {
                   return Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: AppColors.surface,
+                      color: surfaceColor,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Column(
                       children: [
-                        const Text(
+                        Text(
                           'No lists yet',
                           style: TextStyle(
                             fontWeight: FontWeight.w500,
-                            color: AppColors.textSecondary,
+                            color: isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textSecondary,
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -947,7 +984,7 @@ class _AddToListSheetState extends ConsumerState<_AddToListSheet> {
                 return Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   decoration: BoxDecoration(
-                    color: AppColors.surface,
+                    color: surfaceColor,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: DropdownButton<String>(
@@ -955,6 +992,9 @@ class _AddToListSheetState extends ConsumerState<_AddToListSheet> {
                     hint: const Text('Select a list'),
                     isExpanded: true,
                     underline: const SizedBox(),
+                    dropdownColor: isDark
+                        ? AppColors.surfaceDarkMode
+                        : Colors.white,
                     items: lists.map<DropdownMenuItem<String>>((list) {
                       return DropdownMenuItem<String>(
                         value: list.shoppingListId,

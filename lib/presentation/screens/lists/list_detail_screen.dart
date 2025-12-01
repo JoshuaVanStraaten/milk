@@ -20,6 +20,7 @@ class _ListDetailScreenState extends ConsumerState<ListDetailScreen> {
   Widget build(BuildContext context) {
     final listAsync = ref.watch(listByIdProvider(widget.listId));
     final itemsState = ref.watch(realtimeListItemsProvider(widget.listId));
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       appBar: AppBar(
@@ -57,12 +58,12 @@ class _ListDetailScreenState extends ConsumerState<ListDetailScreen> {
           return Column(
             children: [
               // List Header
-              _ListHeader(list: list),
+              _ListHeader(list: list, isDark: isDark),
 
               const Divider(height: 1),
 
               // Items List with real-time state
-              Expanded(child: _buildItemsList(itemsState)),
+              Expanded(child: _buildItemsList(itemsState, isDark)),
             ],
           );
         },
@@ -73,9 +74,24 @@ class _ListDetailScreenState extends ConsumerState<ListDetailScreen> {
             children: [
               const Icon(Icons.error_outline, size: 64, color: AppColors.error),
               const SizedBox(height: 16),
-              const Text('Error loading list'),
+              Text(
+                'Error loading list',
+                style: TextStyle(
+                  color: isDark
+                      ? AppColors.textPrimaryDark
+                      : AppColors.textPrimary,
+                ),
+              ),
               const SizedBox(height: 8),
-              Text('$error', style: const TextStyle(fontSize: 12)),
+              Text(
+                '$error',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondary,
+                ),
+              ),
               const SizedBox(height: 16),
               ElevatedButton(
                 onPressed: () => context.pop(),
@@ -95,7 +111,7 @@ class _ListDetailScreenState extends ConsumerState<ListDetailScreen> {
     );
   }
 
-  Widget _buildItemsList(RealtimeListItemsState itemsState) {
+  Widget _buildItemsList(RealtimeListItemsState itemsState, bool isDark) {
     // Error state
     if (itemsState.error != null && itemsState.items.isEmpty) {
       return Center(
@@ -104,9 +120,24 @@ class _ListDetailScreenState extends ConsumerState<ListDetailScreen> {
           children: [
             const Icon(Icons.error_outline, size: 64, color: AppColors.error),
             const SizedBox(height: 16),
-            const Text('Error loading items'),
+            Text(
+              'Error loading items',
+              style: TextStyle(
+                color: isDark
+                    ? AppColors.textPrimaryDark
+                    : AppColors.textPrimary,
+              ),
+            ),
             const SizedBox(height: 8),
-            Text(itemsState.error!, style: const TextStyle(fontSize: 12)),
+            Text(
+              itemsState.error!,
+              style: TextStyle(
+                fontSize: 12,
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondary,
+              ),
+            ),
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: () {
@@ -128,7 +159,7 @@ class _ListDetailScreenState extends ConsumerState<ListDetailScreen> {
 
     // Empty state
     if (itemsState.items.isEmpty) {
-      return _buildEmptyState(context);
+      return _buildEmptyState(context, isDark);
     }
 
     // Items list
@@ -148,7 +179,7 @@ class _ListDetailScreenState extends ConsumerState<ListDetailScreen> {
     );
   }
 
-  Widget _buildEmptyState(BuildContext context) {
+  Widget _buildEmptyState(BuildContext context, bool isDark) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32.0),
@@ -158,21 +189,30 @@ class _ListDetailScreenState extends ConsumerState<ListDetailScreen> {
             Icon(
               Icons.shopping_basket_outlined,
               size: 80,
-              color: AppColors.textDisabled,
+              color: isDark
+                  ? AppColors.textDisabledDark
+                  : AppColors.textDisabled,
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'No items yet',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
+                color: isDark
+                    ? AppColors.textPrimaryDark
+                    : AppColors.textPrimary,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               'Add items to your shopping list',
-              style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
+              style: TextStyle(
+                fontSize: 14,
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondary,
+              ),
             ),
           ],
         ),
@@ -375,8 +415,9 @@ class _ListDetailScreenState extends ConsumerState<ListDetailScreen> {
 
 class _ListHeader extends StatelessWidget {
   final dynamic list;
+  final bool isDark;
 
-  const _ListHeader({required this.list});
+  const _ListHeader({required this.list, required this.isDark});
 
   @override
   Widget build(BuildContext context) {
@@ -387,13 +428,13 @@ class _ListHeader extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.all(20),
-      color: listColor.withOpacity(0.1),
+      color: listColor.withOpacity(isDark ? 0.2 : 0.1),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: listColor.withOpacity(0.2),
+              color: listColor.withOpacity(isDark ? 0.3 : 0.2),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(Icons.shopping_cart, color: listColor, size: 28),
@@ -405,9 +446,11 @@ class _ListHeader extends StatelessWidget {
               children: [
                 Text(
                   list.storeName,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
-                    color: AppColors.textSecondary,
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondary,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -436,6 +479,8 @@ class _ListItemTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Dismissible(
       key: Key(item.itemId),
       direction: DismissDirection.endToStart,
@@ -481,8 +526,12 @@ class _ListItemTile extends ConsumerWidget {
                       ? TextDecoration.lineThrough
                       : null,
                   color: item.completedItem
-                      ? AppColors.textSecondary
-                      : AppColors.textPrimary,
+                      ? (isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondary)
+                      : (isDark
+                            ? AppColors.textPrimaryDark
+                            : AppColors.textPrimary),
                 ),
               ),
               subtitle: Column(
@@ -493,12 +542,22 @@ class _ListItemTile extends ConsumerWidget {
                     children: [
                       Text(
                         'Qty: ${item.itemQuantity.toStringAsFixed(0)}',
-                        style: const TextStyle(fontSize: 13),
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textSecondary,
+                        ),
                       ),
                       const SizedBox(width: 8),
                       Text(
                         '× R${item.effectivePrice.toStringAsFixed(2)}',
-                        style: const TextStyle(fontSize: 13),
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textSecondary,
+                        ),
                       ),
                       if (item.hasSpecialPrice) ...[
                         const SizedBox(width: 8),
@@ -530,7 +589,9 @@ class _ListItemTile extends ConsumerWidget {
                       item.itemRetailer!,
                       style: TextStyle(
                         fontSize: 12,
-                        color: AppColors.textSecondary,
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondary,
                       ),
                     ),
                   ],
@@ -541,7 +602,9 @@ class _ListItemTile extends ConsumerWidget {
                         Icon(
                           Icons.note,
                           size: 14,
-                          color: AppColors.textSecondary,
+                          color: isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textSecondary,
                         ),
                         const SizedBox(width: 4),
                         Expanded(
@@ -550,7 +613,9 @@ class _ListItemTile extends ConsumerWidget {
                             style: TextStyle(
                               fontSize: 12,
                               fontStyle: FontStyle.italic,
-                              color: AppColors.textSecondary,
+                              color: isDark
+                                  ? AppColors.textSecondaryDark
+                                  : AppColors.textSecondary,
                             ),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
@@ -574,7 +639,13 @@ class _ListItemTile extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  Icon(Icons.edit, size: 16, color: AppColors.textSecondary),
+                  Icon(
+                    Icons.edit,
+                    size: 16,
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondary,
+                  ),
                 ],
               ),
             ),
@@ -728,6 +799,9 @@ class _EditItemSheetState extends ConsumerState<_EditItemSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final surfaceColor = isDark ? AppColors.surfaceDarkMode : AppColors.surface;
+
     return Padding(
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -840,22 +914,26 @@ class _EditItemSheetState extends ConsumerState<_EditItemSheet> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: AppColors.surface,
+                    color: surfaceColor,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.store,
                         size: 20,
-                        color: AppColors.textSecondary,
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondary,
                       ),
                       const SizedBox(width: 8),
                       Text(
                         widget.item.itemRetailer!,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14,
-                          color: AppColors.textSecondary,
+                          color: isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textSecondary,
                         ),
                       ),
                     ],
@@ -869,7 +947,7 @@ class _EditItemSheetState extends ConsumerState<_EditItemSheet> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.1),
+                  color: AppColors.primary.withOpacity(isDark ? 0.2 : 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(

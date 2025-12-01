@@ -58,6 +58,7 @@ class _CreateListScreenState extends ConsumerState<CreateListScreen> {
   Widget build(BuildContext context) {
     final listState = ref.watch(listNotifierProvider);
     final isLoading = listState.isLoading;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Create Shopping List')),
@@ -81,12 +82,14 @@ class _CreateListScreenState extends ConsumerState<CreateListScreen> {
               const SizedBox(height: 24),
 
               // Store Selector
-              const Text(
+              Text(
                 'Select Store',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
+                  color: isDark
+                      ? AppColors.textPrimaryDark
+                      : AppColors.textPrimary,
                 ),
               ),
               const SizedBox(height: 8),
@@ -94,18 +97,33 @@ class _CreateListScreenState extends ConsumerState<CreateListScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 decoration: BoxDecoration(
-                  color: AppColors.surface,
+                  color: isDark ? AppColors.surfaceDarkMode : AppColors.surface,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: DropdownButton<String>(
                   value: _selectedStore,
                   isExpanded: true,
                   underline: const SizedBox(),
-                  icon: const Icon(Icons.arrow_drop_down),
+                  icon: Icon(
+                    Icons.arrow_drop_down,
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondary,
+                  ),
+                  dropdownColor: isDark
+                      ? AppColors.surfaceDarkMode
+                      : Colors.white,
                   items: AppConstants.retailers.map((String store) {
                     return DropdownMenuItem<String>(
                       value: store,
-                      child: Text(store),
+                      child: Text(
+                        store,
+                        style: TextStyle(
+                          color: isDark
+                              ? AppColors.textPrimaryDark
+                              : AppColors.textPrimary,
+                        ),
+                      ),
                     );
                   }).toList(),
                   onChanged: (String? newValue) {
@@ -121,12 +139,14 @@ class _CreateListScreenState extends ConsumerState<CreateListScreen> {
               const SizedBox(height: 24),
 
               // Color Selector
-              const Text(
+              Text(
                 'Choose Color',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
+                  color: isDark
+                      ? AppColors.textPrimaryDark
+                      : AppColors.textPrimary,
                 ),
               ),
               const SizedBox(height: 12),
@@ -153,7 +173,9 @@ class _CreateListScreenState extends ConsumerState<CreateListScreen> {
                         shape: BoxShape.circle,
                         border: Border.all(
                           color: isSelected
-                              ? AppColors.textPrimary
+                              ? (isDark
+                                    ? AppColors.textPrimaryDark
+                                    : AppColors.textPrimary)
                               : Colors.transparent,
                           width: 3,
                         ),

@@ -8,6 +8,8 @@ class StoreSelectorScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       appBar: AppBar(title: const Text('Select Store')),
       body: Padding(
@@ -18,20 +20,27 @@ class StoreSelectorScreen extends StatelessWidget {
             const SizedBox(height: 16),
 
             // Header
-            const Text(
+            Text(
               'Browse Products',
               style: TextStyle(
                 fontSize: 28,
                 fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
+                color: isDark
+                    ? AppColors.textPrimaryDark
+                    : AppColors.textPrimary,
               ),
             ),
 
             const SizedBox(height: 8),
 
-            const Text(
+            Text(
               'Select a store to view products and specials',
-              style: TextStyle(fontSize: 16, color: AppColors.textSecondary),
+              style: TextStyle(
+                fontSize: 16,
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondary,
+              ),
             ),
 
             const SizedBox(height: 32),
@@ -42,13 +51,13 @@ class StoreSelectorScreen extends StatelessWidget {
                 crossAxisCount: 2,
                 crossAxisSpacing: 16,
                 mainAxisSpacing: 16,
-                childAspectRatio:
-                    1.0, // Changed from 1.2 to 1.0 for more height
+                childAspectRatio: 1.0,
                 children: [
                   _StoreCard(
                     storeName: AppConstants.pickNPay,
                     color: AppColors.pickNPay,
                     icon: Icons.shopping_cart,
+                    isDark: isDark,
                     onTap: () {
                       context.push('/products/${AppConstants.pickNPay}');
                     },
@@ -57,6 +66,7 @@ class StoreSelectorScreen extends StatelessWidget {
                     storeName: AppConstants.woolworths,
                     color: AppColors.woolworths,
                     icon: Icons.store,
+                    isDark: isDark,
                     onTap: () {
                       context.push('/products/${AppConstants.woolworths}');
                     },
@@ -65,6 +75,7 @@ class StoreSelectorScreen extends StatelessWidget {
                     storeName: AppConstants.shoprite,
                     color: AppColors.shoprite,
                     icon: Icons.shopping_basket,
+                    isDark: isDark,
                     onTap: () {
                       context.push('/products/${AppConstants.shoprite}');
                     },
@@ -73,6 +84,7 @@ class StoreSelectorScreen extends StatelessWidget {
                     storeName: AppConstants.checkers,
                     color: AppColors.checkers,
                     icon: Icons.local_grocery_store,
+                    isDark: isDark,
                     onTap: () {
                       context.push('/products/${AppConstants.checkers}');
                     },
@@ -91,12 +103,14 @@ class _StoreCard extends StatelessWidget {
   final String storeName;
   final Color color;
   final IconData icon;
+  final bool isDark;
   final VoidCallback onTap;
 
   const _StoreCard({
     required this.storeName,
     required this.color,
     required this.icon,
+    required this.isDark,
     required this.onTap,
   });
 
@@ -109,13 +123,16 @@ class _StoreCard extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
         child: Container(
-          padding: const EdgeInsets.all(16), // Reduced from 20
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [color.withOpacity(0.1), color.withOpacity(0.05)],
+              colors: [
+                color.withOpacity(isDark ? 0.3 : 0.1),
+                color.withOpacity(isDark ? 0.15 : 0.05),
+              ],
             ),
           ),
           child: Column(
@@ -123,29 +140,28 @@ class _StoreCard extends StatelessWidget {
             children: [
               // Store Icon
               Container(
-                padding: const EdgeInsets.all(14), // Reduced from 16
+                padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.2),
+                  color: color.withOpacity(isDark ? 0.3 : 0.2),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(
-                  icon,
-                  size: 36, // Reduced from 40
-                  color: color,
-                ),
+                child: Icon(icon, size: 36, color: color),
               ),
 
-              const SizedBox(height: 12), // Reduced from 16
+              const SizedBox(height: 12),
+
               // Store Name
               Text(
                 storeName,
                 textAlign: TextAlign.center,
-                maxLines: 2, // Allow 2 lines for longer names
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 15, // Reduced from 16
+                style: TextStyle(
+                  fontSize: 15,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
+                  color: isDark
+                      ? AppColors.textPrimaryDark
+                      : AppColors.textPrimary,
                 ),
               ),
             ],

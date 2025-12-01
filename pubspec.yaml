@@ -41,6 +41,7 @@ dependencies:
   # State Management - Riverpod
   flutter_riverpod: ^2.5.1
   riverpod_annotation: ^2.3.5
+  shared_preferences: ^2.2.2
 
   # Routing - go_router
   go_router: ^14.0.0

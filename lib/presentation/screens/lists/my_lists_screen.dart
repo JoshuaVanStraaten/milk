@@ -11,6 +11,7 @@ class MyListsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final listsAsync = ref.watch(userListsProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       appBar: AppBar(
@@ -28,7 +29,7 @@ class MyListsScreen extends ConsumerWidget {
       body: listsAsync.when(
         data: (lists) {
           if (lists.isEmpty) {
-            return _buildEmptyState(context);
+            return _buildEmptyState(context, isDark);
           }
 
           return RefreshIndicator(
@@ -40,7 +41,7 @@ class MyListsScreen extends ConsumerWidget {
               itemCount: lists.length,
               itemBuilder: (context, index) {
                 final list = lists[index];
-                return _ListCard(list: list);
+                return _ListCard(list: list, isDark: isDark);
               },
             ),
           );
@@ -52,11 +53,24 @@ class MyListsScreen extends ConsumerWidget {
             children: [
               const Icon(Icons.error_outline, size: 64, color: AppColors.error),
               const SizedBox(height: 16),
-              Text('Error loading lists', style: TextStyle(fontSize: 18)),
+              Text(
+                'Error loading lists',
+                style: TextStyle(
+                  fontSize: 18,
+                  color: isDark
+                      ? AppColors.textPrimaryDark
+                      : AppColors.textPrimary,
+                ),
+              ),
               const SizedBox(height: 8),
               Text(
                 '$error',
-                style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
+                style: TextStyle(
+                  fontSize: 14,
+                  color: isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondary,
+                ),
               ),
               const SizedBox(height: 16),
               ElevatedButton(
@@ -76,7 +90,7 @@ class MyListsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildEmptyState(BuildContext context) {
+  Widget _buildEmptyState(BuildContext context, bool isDark) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32.0),
@@ -86,7 +100,7 @@ class MyListsScreen extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.all(32),
               decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.1),
+                color: AppColors.primary.withOpacity(isDark ? 0.2 : 0.1),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
@@ -96,19 +110,26 @@ class MyListsScreen extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 24),
-            const Text(
+            Text(
               'No Shopping Lists Yet',
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
+                color: isDark
+                    ? AppColors.textPrimaryDark
+                    : AppColors.textPrimary,
               ),
             ),
             const SizedBox(height: 12),
             Text(
               'Create your first shopping list and start saving!',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 16, color: AppColors.textSecondary),
+              style: TextStyle(
+                fontSize: 16,
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondary,
+              ),
             ),
             const SizedBox(height: 32),
             ElevatedButton.icon(
@@ -133,8 +154,9 @@ class MyListsScreen extends ConsumerWidget {
 
 class _ListCard extends ConsumerWidget {
   final dynamic list;
+  final bool isDark;
 
-  const _ListCard({required this.list});
+  const _ListCard({required this.list, required this.isDark});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -173,18 +195,22 @@ class _ListCard extends ConsumerWidget {
                   children: [
                     Text(
                       list.listName,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
+                        color: isDark
+                            ? AppColors.textPrimaryDark
+                            : AppColors.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       list.storeName,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
-                        color: AppColors.textSecondary,
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondary,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -201,10 +227,12 @@ class _ListCard extends ConsumerWidget {
               ),
 
               // Arrow icon
-              const Icon(
+              Icon(
                 Icons.arrow_forward_ios,
                 size: 16,
-                color: AppColors.textSecondary,
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondary,
               ),
             ],
           ),

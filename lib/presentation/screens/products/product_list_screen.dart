@@ -118,6 +118,8 @@ class _ProductListScreenState extends ConsumerState<ProductListScreen> {
   }
 
   Widget _buildFilterChips(ProductListState state) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       height: 50,
@@ -154,9 +156,11 @@ class _ProductListScreenState extends ConsumerState<ProductListScreen> {
               padding: const EdgeInsets.only(left: 8),
               child: Text(
                 '${_getActiveFilterCount(state)} active',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12,
-                  color: AppColors.textSecondary,
+                  color: isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondary,
                 ),
               ),
             ),
@@ -297,6 +301,8 @@ class _ProductListScreenState extends ConsumerState<ProductListScreen> {
   }
 
   Widget _buildBody(ProductListState state) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     // Error state
     if (state.error != null && state.products.isEmpty) {
       return Center(
@@ -307,12 +313,22 @@ class _ProductListScreenState extends ConsumerState<ProductListScreen> {
             const SizedBox(height: 16),
             Text(
               'Failed to load products',
-              style: TextStyle(fontSize: 18, color: AppColors.textPrimary),
+              style: TextStyle(
+                fontSize: 18,
+                color: isDark
+                    ? AppColors.textPrimaryDark
+                    : AppColors.textPrimary,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
               state.error!,
-              style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
+              style: TextStyle(
+                fontSize: 14,
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondary,
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
@@ -343,12 +359,19 @@ class _ProductListScreenState extends ConsumerState<ProductListScreen> {
             Icon(
               Icons.shopping_basket_outlined,
               size: 64,
-              color: AppColors.textDisabled,
+              color: isDark
+                  ? AppColors.textDisabledDark
+                  : AppColors.textDisabled,
             ),
             const SizedBox(height: 16),
             Text(
               'No products found',
-              style: TextStyle(fontSize: 18, color: AppColors.textPrimary),
+              style: TextStyle(
+                fontSize: 18,
+                color: isDark
+                    ? AppColors.textPrimaryDark
+                    : AppColors.textPrimary,
+              ),
             ),
           ],
         ),
@@ -392,6 +415,8 @@ class _ProductCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Card(
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -412,7 +437,7 @@ class _ProductCard extends ConsumerWidget {
               aspectRatio: 1,
               child: Hero(
                 tag: 'product-${product.index}',
-                child: _buildProductImage(),
+                child: _buildProductImage(context, isDark),
               ),
             ),
 
@@ -430,10 +455,12 @@ class _ProductCard extends ConsumerWidget {
                         product.name,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
-                          color: AppColors.textPrimary,
+                          color: isDark
+                              ? AppColors.textPrimaryDark
+                              : AppColors.textPrimary,
                           height: 1.2,
                         ),
                       ),
@@ -449,7 +476,9 @@ class _ProductCard extends ConsumerWidget {
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
                           color: product.hasPromotion
-                              ? AppColors.textSecondary
+                              ? (isDark
+                                    ? AppColors.textSecondaryDark
+                                    : AppColors.textSecondary)
                               : AppColors.primary,
                           decoration: product.hasPromotion
                               ? TextDecoration.lineThrough
@@ -485,16 +514,17 @@ class _ProductCard extends ConsumerWidget {
     );
   }
 
-  Widget _buildProductImage() {
+  Widget _buildProductImage(BuildContext context, bool isDark) {
+    final surfaceColor = isDark ? AppColors.surfaceDarkMode : AppColors.surface;
+    final iconColor = isDark
+        ? AppColors.textDisabledDark
+        : AppColors.textDisabled;
+
     if (product.imageUrl == null || product.imageUrl!.isEmpty) {
       return Container(
-        color: AppColors.surface,
-        child: const Center(
-          child: Icon(
-            Icons.image_not_supported,
-            size: 48,
-            color: AppColors.textDisabled,
-          ),
+        color: surfaceColor,
+        child: Center(
+          child: Icon(Icons.image_not_supported, size: 48, color: iconColor),
         ),
       );
     }
@@ -503,17 +533,13 @@ class _ProductCard extends ConsumerWidget {
       imageUrl: product.imageUrl!,
       fit: BoxFit.cover,
       placeholder: (context, url) => Container(
-        color: AppColors.surface,
+        color: surfaceColor,
         child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
       ),
       errorWidget: (context, url, error) => Container(
-        color: AppColors.surface,
-        child: const Center(
-          child: Icon(
-            Icons.broken_image,
-            size: 48,
-            color: AppColors.textDisabled,
-          ),
+        color: surfaceColor,
+        child: Center(
+          child: Icon(Icons.broken_image, size: 48, color: iconColor),
         ),
       ),
     );
@@ -613,7 +639,7 @@ class _AddToListSheetState extends ConsumerState<_AddToListSheet> {
           : _noteController.text.trim(),
       itemRetailer: widget.retailer,
       itemSpecialPrice: specialPrice,
-      multiBuyInfo: multiBuyInfo, // Pass the multi-buy info
+      multiBuyInfo: multiBuyInfo,
     );
 
     if (mounted && item != null) {
@@ -629,6 +655,12 @@ class _AddToListSheetState extends ConsumerState<_AddToListSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final surfaceColor = isDark ? AppColors.surfaceDarkMode : AppColors.surface;
+    final textSecondaryColor = isDark
+        ? AppColors.textSecondaryDark
+        : AppColors.textSecondary;
+
     return Padding(
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -660,14 +692,14 @@ class _AddToListSheetState extends ConsumerState<_AddToListSheet> {
                         errorWidget: (_, __, ___) => Container(
                           width: 60,
                           height: 60,
-                          color: AppColors.surface,
+                          color: surfaceColor,
                           child: const Icon(Icons.image_not_supported),
                         ),
                       )
                     : Container(
                         width: 60,
                         height: 60,
-                        color: AppColors.surface,
+                        color: surfaceColor,
                         child: const Icon(Icons.image_not_supported),
                       ),
               ),
@@ -711,13 +743,13 @@ class _AddToListSheetState extends ConsumerState<_AddToListSheet> {
                 return Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: AppColors.surface,
+                    color: surfaceColor,
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Text(
+                  child: Text(
                     'No lists yet. Create a list first!',
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: AppColors.textSecondary),
+                    style: TextStyle(color: textSecondaryColor),
                   ),
                 );
               }
@@ -725,7 +757,7 @@ class _AddToListSheetState extends ConsumerState<_AddToListSheet> {
               return Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 decoration: BoxDecoration(
-                  color: AppColors.surface,
+                  color: surfaceColor,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: DropdownButton<String>(
@@ -733,6 +765,9 @@ class _AddToListSheetState extends ConsumerState<_AddToListSheet> {
                   hint: const Text('Select a list'),
                   isExpanded: true,
                   underline: const SizedBox(),
+                  dropdownColor: isDark
+                      ? AppColors.surfaceDarkMode
+                      : Colors.white,
                   items: lists.map<DropdownMenuItem<String>>((list) {
                     return DropdownMenuItem<String>(
                       value: list.shoppingListId,
