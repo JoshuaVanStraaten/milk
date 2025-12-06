@@ -4,6 +4,9 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../providers/list_provider.dart';
+import '../../widgets/skeleton_loaders.dart';
+import '../../widgets/animations.dart';
+import '../../widgets/common/empty_states.dart';
 
 class MyListsScreen extends ConsumerWidget {
   const MyListsScreen({super.key});
@@ -41,45 +44,16 @@ class MyListsScreen extends ConsumerWidget {
               itemCount: lists.length,
               itemBuilder: (context, index) {
                 final list = lists[index];
-                return _ListCard(list: list, isDark: isDark);
+                return AnimatedListItem(
+                  index: index,
+                  child: _ListCard(list: list),
+                );
               },
             ),
           );
         },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stack) => Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.error_outline, size: 64, color: AppColors.error),
-              const SizedBox(height: 16),
-              Text(
-                'Error loading lists',
-                style: TextStyle(
-                  fontSize: 18,
-                  color: isDark
-                      ? AppColors.textPrimaryDark
-                      : AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '$error',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: isDark
-                      ? AppColors.textSecondaryDark
-                      : AppColors.textSecondary,
-                ),
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () => ref.invalidate(userListsProvider),
-                child: const Text('Retry'),
-              ),
-            ],
-          ),
-        ),
+        loading: () => const ListCardsSkeleton(),
+        error: (error, stack) => _buildErrorState(context, ref, error, isDark),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
@@ -91,59 +65,51 @@ class MyListsScreen extends ConsumerWidget {
   }
 
   Widget _buildEmptyState(BuildContext context, bool isDark) {
+    return EmptyState(
+      type: EmptyStateType.noLists,
+      actionLabel: 'Create Shopping List',
+      onAction: () => context.push('/lists/create'),
+    );
+  }
+
+  Widget _buildErrorState(
+    BuildContext context,
+    WidgetRef ref,
+    Object error,
+    bool isDark,
+  ) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              padding: const EdgeInsets.all(32),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(isDark ? 0.2 : 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.shopping_cart_outlined,
-                size: 80,
-                color: AppColors.primary,
-              ),
-            ),
-            const SizedBox(height: 24),
+            const Icon(Icons.error_outline, size: 64, color: AppColors.error),
+            const SizedBox(height: 16),
             Text(
-              'No Shopping Lists Yet',
+              'Error loading lists',
               style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
+                fontSize: 18,
                 color: isDark
                     ? AppColors.textPrimaryDark
                     : AppColors.textPrimary,
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             Text(
-              'Create your first shopping list and start saving!',
-              textAlign: TextAlign.center,
+              '$error',
               style: TextStyle(
-                fontSize: 16,
+                fontSize: 14,
                 color: isDark
                     ? AppColors.textSecondaryDark
                     : AppColors.textSecondary,
               ),
+              textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 32),
-            ElevatedButton.icon(
-              onPressed: () {
-                context.push('/lists/create');
-              },
-              icon: const Icon(Icons.add),
-              label: const Text('Create Shopping List'),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 16,
-                ),
-              ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () => ref.invalidate(userListsProvider),
+              child: const Text('Retry'),
             ),
           ],
         ),
@@ -154,12 +120,12 @@ class MyListsScreen extends ConsumerWidget {
 
 class _ListCard extends ConsumerWidget {
   final dynamic list;
-  final bool isDark;
 
-  const _ListCard({required this.list, required this.isDark});
+  const _ListCard({required this.list});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final colorValue =
         AppConstants.listColors[list.listColour] ??
         AppConstants.listColors['Green']!;
@@ -169,6 +135,7 @@ class _ListCard extends ConsumerWidget {
       margin: const EdgeInsets.only(bottom: 12),
       child: InkWell(
         onTap: () {
+          AppHaptics.lightTap();
           context.push('/lists/${list.shoppingListId}');
         },
         borderRadius: BorderRadius.circular(12),

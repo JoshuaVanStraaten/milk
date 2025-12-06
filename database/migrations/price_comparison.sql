@@ -301,78 +301,72 @@ RETURNS TABLE(
     product_promotion_price TEXT,
     product_image_url TEXT,
     retailer TEXT,
-    match_type TEXT,  -- 'EXACT', 'SIMILAR', or 'FALLBACK'
+    match_type TEXT,
     similarity_score DECIMAL,
-    price_difference DECIMAL,  -- Positive = more expensive, Negative = cheaper
+    price_difference DECIMAL,
     size_value DECIMAL,
     size_unit TEXT
 ) AS $$
 DECLARE
     source_record RECORD;
-    source_price DECIMAL;
+    source_base_price DECIMAL;
 BEGIN
     -- Get the source product details
     SELECT
-        p."index",
+        p.index,
         p.name,
         p.brand,
         p.size_value,
         p.size_unit,
         p.normalized_name,
-        p."Retailer",
-        -- Extract numeric price for comparison
-        COALESCE(
-            NULLIF(regexp_replace(p."promotionPrice", '[^0-9.]', '', 'g'), ''),
-            NULLIF(regexp_replace(p.price, '[^0-9.]', '', 'g'), '')
-        )::DECIMAL AS numeric_price
+        p.retailer,
+        -- Extract BASE price only (not promo) for fair comparison
+        (regexp_match(p.price, 'R\s*(\d+\.?\d*)'))[1]::DECIMAL AS base_price
     INTO source_record
     FROM "Products" p
-    WHERE p."index" = source_product_index;
+    WHERE p.index = source_product_index;
 
     -- If product not found or not parsed, return empty
     IF source_record IS NULL OR source_record.normalized_name IS NULL THEN
         RETURN;
     END IF;
 
-    source_price := source_record.numeric_price;
+    source_base_price := source_record.base_price;
 
     RETURN QUERY
     WITH comparable AS (
         SELECT
-            p."index" AS p_index,
+            p.index AS p_index,
             p.name AS p_name,
             p.price AS p_price,
-            p."promotionPrice" AS p_promo_price,
-            p."imageUrl" AS p_image_url,
-            p."Retailer" AS p_retailer,
+            p.promotion_price AS p_promo_price,
+            p.image_url AS p_image_url,
+            p.retailer AS p_retailer,
             p.brand AS p_brand,
             p.size_value AS p_size_value,
             p.size_unit AS p_size_unit,
             p.normalized_name AS p_normalized_name,
             -- Calculate similarity score
             similarity(p.normalized_name, source_record.normalized_name) AS name_similarity,
-            -- Calculate best price
-            COALESCE(
-                NULLIF(regexp_replace(p."promotionPrice", '[^0-9.]', '', 'g'), ''),
-                NULLIF(regexp_replace(p.price, '[^0-9.]', '', 'g'), '')
-            )::DECIMAL AS p_numeric_price
+            -- Extract BASE price only for comparison (not promo)
+            (regexp_match(p.price, 'R\s*(\d+\.?\d*)'))[1]::DECIMAL AS p_base_price
         FROM "Products" p
         WHERE
             -- Different retailer
-            p."Retailer" != source_record."Retailer"
+            p.retailer != source_record.retailer
             -- Must be parsed
             AND p.parsed_at IS NOT NULL
             -- Pre-filter: same brand OR similar name (using index)
             AND (
                 p.brand = source_record.brand
-                OR p.normalized_name % source_record.normalized_name  -- Uses pg_trgm index
+                OR p.normalized_name % source_record.normalized_name
             )
     )
     SELECT
         c.p_index,
         c.p_name,
         c.p_price,
-        c.p_promo_price,
+        c.p_promo_price,  -- Still return promo for display purposes
         c.p_image_url,
         c.p_retailer,
         -- Determine match type
@@ -388,10 +382,10 @@ BEGIN
             ELSE 'FALLBACK'
         END AS match_type,
         ROUND(c.name_similarity::DECIMAL, 3) AS similarity_score,
-        -- Price difference (positive = more expensive than source)
+        -- Price difference based on BASE prices (positive = more expensive)
         CASE
-            WHEN source_price IS NOT NULL AND c.p_numeric_price IS NOT NULL
-            THEN ROUND(c.p_numeric_price - source_price, 2)
+            WHEN source_base_price IS NOT NULL AND c.p_base_price IS NOT NULL
+            THEN ROUND(c.p_base_price - source_base_price, 2)
             ELSE NULL
         END AS price_diff,
         c.p_size_value,
@@ -413,9 +407,9 @@ BEGIN
         END,
         -- Then by similarity score
         c.name_similarity DESC,
-        -- Then by price (cheapest first)
-        c.p_numeric_price ASC NULLS LAST
-    LIMIT 20;  -- Limit results to top 20
+        -- Then by base price (cheapest first)
+        c.p_base_price ASC NULLS LAST
+    LIMIT 20;
 END;
 $$ LANGUAGE plpgsql STABLE;
 

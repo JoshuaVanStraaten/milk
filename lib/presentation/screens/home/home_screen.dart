@@ -3,12 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../providers/auth_provider.dart';
+import '../../widgets/skeleton_loaders.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Watch current user profile
     final userProfileAsync = ref.watch(currentUserProfileProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -21,7 +23,14 @@ class HomeScreen extends ConsumerWidget {
         child: userProfileAsync.when(
           data: (profile) {
             if (profile == null) {
-              return const Text('No user profile found');
+              return Text(
+                'No user profile found',
+                style: TextStyle(
+                  color: isDark
+                      ? AppColors.textPrimaryDark
+                      : AppColors.textPrimary,
+                ),
+              );
             }
 
             return SingleChildScrollView(
@@ -100,9 +109,51 @@ class HomeScreen extends ConsumerWidget {
               ),
             );
           },
-          loading: () => const CircularProgressIndicator(),
-          error: (error, stack) => Text('Error: $error'),
+          loading: () => const HomeScreenSkeleton(),
+          error: (error, stack) =>
+              _buildErrorState(context, ref, error, isDark),
         ),
+      ),
+    );
+  }
+
+  Widget _buildErrorState(
+    BuildContext context,
+    WidgetRef ref,
+    Object error,
+    bool isDark,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.all(32.0),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.error_outline, size: 64, color: AppColors.error),
+          const SizedBox(height: 16),
+          Text(
+            'Error loading profile',
+            style: TextStyle(
+              fontSize: 18,
+              color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '$error',
+            style: TextStyle(
+              fontSize: 14,
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondary,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: () => ref.invalidate(currentUserProfileProvider),
+            child: const Text('Retry'),
+          ),
+        ],
       ),
     );
   }

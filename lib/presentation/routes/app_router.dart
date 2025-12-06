@@ -16,6 +16,7 @@ import '../screens/lists/list_detail_screen.dart';
 import '../screens/profile/profile_screen.dart';
 import '../screens/main/main_shell_screen.dart';
 import '../providers/auth_provider.dart';
+import 'page_transitions.dart';
 
 /// Route names for easy reference
 class AppRoutes {
@@ -27,7 +28,6 @@ class AppRoutes {
   static const String productDetail = '/product';
   static const String lists = '/lists';
   static const String profile = '/profile';
-  static const String authCallback = '/auth-callback';
 }
 
 /// Router notifier that listens to auth state changes
@@ -65,20 +65,14 @@ final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: AppRoutes.login,
     debugLogDiagnostics: true,
-    refreshListenable: notifier,
-
+    refreshListenable:
+        notifier, // THIS IS KEY - router rebuilds when notifier changes
     // Redirect logic - protect routes that require authentication
     redirect: (context, state) {
       final isAuthenticated = SupabaseConfig.isAuthenticated;
       final isGoingToAuth =
           state.matchedLocation == AppRoutes.login ||
           state.matchedLocation == AppRoutes.signup;
-      final isAuthCallback = state.matchedLocation == AppRoutes.authCallback;
-
-      // Allow auth callback to proceed (OAuth redirect)
-      if (isAuthCallback) {
-        return null;
-      }
 
       // If not authenticated and trying to access protected route, go to login
       if (!isAuthenticated && !isGoingToAuth) {
@@ -95,34 +89,31 @@ final routerProvider = Provider<GoRouter>((ref) {
     },
 
     routes: [
+      // ===== AUTH ROUTES (fade transitions) =====
+
       // Login route
       GoRoute(
         path: AppRoutes.login,
         pageBuilder: (context, state) =>
-            MaterialPage(key: state.pageKey, child: const LoginScreen()),
+            AppPageTransitions.fade(state: state, child: const LoginScreen()),
       ),
 
       // Signup route
       GoRoute(
         path: AppRoutes.signup,
-        pageBuilder: (context, state) =>
-            MaterialPage(key: state.pageKey, child: const SignupScreen()),
-      ),
-
-      // OAuth callback route - handles deep link return from Google
-      GoRoute(
-        path: AppRoutes.authCallback,
-        pageBuilder: (context, state) => MaterialPage(
-          key: state.pageKey,
-          child: const _AuthCallbackScreen(),
+        pageBuilder: (context, state) => AppPageTransitions.slideFromRight(
+          state: state,
+          child: const SignupScreen(),
         ),
       ),
+
+      // ===== MAIN TAB ROUTES (fade for tab switches) =====
 
       // Home route (protected) - with bottom nav
       GoRoute(
         path: AppRoutes.home,
-        pageBuilder: (context, state) => MaterialPage(
-          key: state.pageKey,
+        pageBuilder: (context, state) => AppPageTransitions.fade(
+          state: state,
           child: const MainShellScreen(currentIndex: 0, child: HomeScreen()),
         ),
       ),
@@ -130,8 +121,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       // Store selector route (protected) - with bottom nav
       GoRoute(
         path: '/stores',
-        pageBuilder: (context, state) => MaterialPage(
-          key: state.pageKey,
+        pageBuilder: (context, state) => AppPageTransitions.fade(
+          state: state,
           child: const MainShellScreen(
             currentIndex: 1,
             child: StoreSelectorScreen(),
@@ -142,8 +133,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       // Lists route (protected) - with bottom nav
       GoRoute(
         path: AppRoutes.lists,
-        pageBuilder: (context, state) => MaterialPage(
-          key: state.pageKey,
+        pageBuilder: (context, state) => AppPageTransitions.fade(
+          state: state,
           child: const MainShellScreen(currentIndex: 2, child: MyListsScreen()),
         ),
       ),
@@ -151,19 +142,21 @@ final routerProvider = Provider<GoRouter>((ref) {
       // Profile route (protected) - with bottom nav
       GoRoute(
         path: AppRoutes.profile,
-        pageBuilder: (context, state) => MaterialPage(
-          key: state.pageKey,
+        pageBuilder: (context, state) => AppPageTransitions.fade(
+          state: state,
           child: const MainShellScreen(currentIndex: 3, child: ProfileScreen()),
         ),
       ),
+
+      // ===== DETAIL ROUTES (slide transitions) =====
 
       // Product list route (protected) - NO bottom nav (fullscreen)
       GoRoute(
         path: '/products/:retailer',
         pageBuilder: (context, state) {
           final retailer = state.pathParameters['retailer']!;
-          return MaterialPage(
-            key: state.pageKey,
+          return AppPageTransitions.slideFromRight(
+            state: state,
             child: ProductListScreen(retailer: retailer),
           );
         },
@@ -176,8 +169,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         pageBuilder: (context, state) {
           final retailer = state.pathParameters['retailer']!;
           final product = state.extra as Product;
-          return MaterialPage(
-            key: state.pageKey,
+          return AppPageTransitions.slideUp(
+            state: state,
             child: ProductDetailScreen(product: product, retailer: retailer),
           );
         },
@@ -186,8 +179,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       // Create list route (protected) - NO bottom nav
       GoRoute(
         path: '/lists/create',
-        pageBuilder: (context, state) =>
-            MaterialPage(key: state.pageKey, child: const CreateListScreen()),
+        pageBuilder: (context, state) => AppPageTransitions.slideUp(
+          state: state,
+          child: const CreateListScreen(),
+        ),
       ),
 
       // List detail route (protected) - NO bottom nav
@@ -195,8 +190,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/lists/:listId',
         pageBuilder: (context, state) {
           final listId = state.pathParameters['listId']!;
-          return MaterialPage(
-            key: state.pageKey,
+          return AppPageTransitions.slideFromRight(
+            state: state,
             child: ListDetailScreen(listId: listId),
           );
         },
@@ -209,58 +204,3 @@ final routerProvider = Provider<GoRouter>((ref) {
     ),
   );
 });
-
-/// Auth callback screen - handles OAuth redirect
-/// Shows a loading indicator while processing the OAuth callback
-class _AuthCallbackScreen extends ConsumerStatefulWidget {
-  const _AuthCallbackScreen();
-
-  @override
-  ConsumerState<_AuthCallbackScreen> createState() =>
-      _AuthCallbackScreenState();
-}
-
-class _AuthCallbackScreenState extends ConsumerState<_AuthCallbackScreen> {
-  @override
-  void initState() {
-    super.initState();
-    _handleCallback();
-  }
-
-  Future<void> _handleCallback() async {
-    // Give Supabase a moment to process the OAuth tokens from the URL
-    await Future.delayed(const Duration(milliseconds: 500));
-
-    // Handle the OAuth callback
-    final authNotifier = ref.read(authNotifierProvider.notifier);
-    await authNotifier.handleOAuthCallback();
-
-    // Navigate to home if authenticated, otherwise back to login
-    if (mounted) {
-      if (SupabaseConfig.isAuthenticated) {
-        context.go(AppRoutes.home);
-      } else {
-        context.go(AppRoutes.login);
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 24),
-            Text(
-              'Completing sign in...',
-              style: TextStyle(fontSize: 16, color: Colors.grey),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

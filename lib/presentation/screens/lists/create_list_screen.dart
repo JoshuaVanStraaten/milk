@@ -7,6 +7,8 @@ import '../../../core/utils/validators.dart';
 import '../../providers/list_provider.dart';
 import '../../widgets/common/app_button.dart';
 import '../../widgets/common/app_text_field.dart';
+import '../../widgets/animations.dart';
+import '../../widgets/common/app_snackbar.dart';
 
 class CreateListScreen extends ConsumerStatefulWidget {
   const CreateListScreen({super.key});
@@ -33,6 +35,8 @@ class _CreateListScreenState extends ConsumerState<CreateListScreen> {
       return;
     }
 
+    AppHaptics.mediumTap();
+
     final listNotifier = ref.read(listNotifierProvider.notifier);
 
     final list = await listNotifier.createList(
@@ -42,12 +46,8 @@ class _CreateListScreenState extends ConsumerState<CreateListScreen> {
     );
 
     if (mounted && list != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Created list: ${list.listName}'),
-          backgroundColor: AppColors.success,
-        ),
-      );
+      AppHaptics.success();
+      AppSnackbar.success(context, message: 'Created list: ${list.listName}');
 
       // Navigate to list detail
       context.go('/lists/${list.shoppingListId}');
@@ -83,13 +83,23 @@ class _CreateListScreenState extends ConsumerState<CreateListScreen> {
 
               // Store Selector
               Text(
-                'Select Store',
+                'Primary Store',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                   color: isDark
                       ? AppColors.textPrimaryDark
                       : AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'You can add items from any store to this list',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondary,
                 ),
               ),
               const SizedBox(height: 8),
@@ -104,30 +114,19 @@ class _CreateListScreenState extends ConsumerState<CreateListScreen> {
                   value: _selectedStore,
                   isExpanded: true,
                   underline: const SizedBox(),
-                  icon: Icon(
-                    Icons.arrow_drop_down,
-                    color: isDark
-                        ? AppColors.textSecondaryDark
-                        : AppColors.textSecondary,
-                  ),
+                  icon: const Icon(Icons.arrow_drop_down),
                   dropdownColor: isDark
                       ? AppColors.surfaceDarkMode
-                      : Colors.white,
+                      : AppColors.surface,
                   items: AppConstants.retailers.map((String store) {
                     return DropdownMenuItem<String>(
                       value: store,
-                      child: Text(
-                        store,
-                        style: TextStyle(
-                          color: isDark
-                              ? AppColors.textPrimaryDark
-                              : AppColors.textPrimary,
-                        ),
-                      ),
+                      child: Text(store),
                     );
                   }).toList(),
                   onChanged: (String? newValue) {
                     if (newValue != null) {
+                      AppHaptics.selection();
                       setState(() {
                         _selectedStore = newValue;
                       });
@@ -161,11 +160,13 @@ class _CreateListScreenState extends ConsumerState<CreateListScreen> {
 
                   return GestureDetector(
                     onTap: () {
+                      AppHaptics.selection();
                       setState(() {
                         _selectedColor = colorName;
                       });
                     },
-                    child: Container(
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
                       width: 50,
                       height: 50,
                       decoration: BoxDecoration(
@@ -173,16 +174,26 @@ class _CreateListScreenState extends ConsumerState<CreateListScreen> {
                         shape: BoxShape.circle,
                         border: Border.all(
                           color: isSelected
-                              ? (isDark
-                                    ? AppColors.textPrimaryDark
-                                    : AppColors.textPrimary)
+                              ? (isDark ? Colors.white : AppColors.textPrimary)
                               : Colors.transparent,
                           width: 3,
                         ),
+                        boxShadow: isSelected
+                            ? [
+                                BoxShadow(
+                                  color: Color(colorValue).withOpacity(0.4),
+                                  blurRadius: 8,
+                                  spreadRadius: 2,
+                                ),
+                              ]
+                            : null,
                       ),
-                      child: isSelected
-                          ? const Icon(Icons.check, color: Colors.white)
-                          : null,
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 200),
+                        child: isSelected
+                            ? const Icon(Icons.check, color: Colors.white)
+                            : const SizedBox(),
+                      ),
                     ),
                   );
                 }).toList(),

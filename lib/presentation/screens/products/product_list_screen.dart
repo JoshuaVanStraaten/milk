@@ -6,6 +6,10 @@ import '../../../core/theme/app_colors.dart';
 import '../../../data/models/product.dart';
 import '../../providers/product_provider.dart';
 import '../../providers/list_provider.dart';
+import '../../widgets/skeleton_loaders.dart';
+import '../../widgets/animations.dart';
+import '../../widgets/common/app_snackbar.dart';
+import '../../widgets/common/empty_states.dart';
 
 class ProductListScreen extends ConsumerStatefulWidget {
   final String retailer;
@@ -32,6 +36,9 @@ class _ProductListScreenState extends ConsumerState<ProductListScreen> {
         ref.read(productListProvider(widget.retailer).notifier).loadMore();
       }
     });
+
+    // Prefetch user lists so they're ready when "Add to List" is tapped
+    ref.read(userListsProvider);
   }
 
   @override
@@ -347,34 +354,34 @@ class _ProductListScreenState extends ConsumerState<ProductListScreen> {
 
     // Loading initial products
     if (state.isLoading && state.products.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
+      return const ProductGridSkeleton();
     }
 
-    // Empty state
+    // Empty state - check if it's a search with no results
     if (state.products.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.shopping_basket_outlined,
-              size: 64,
-              color: isDark
-                  ? AppColors.textDisabledDark
-                  : AppColors.textDisabled,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'No products found',
-              style: TextStyle(
-                fontSize: 18,
-                color: isDark
-                    ? AppColors.textPrimaryDark
-                    : AppColors.textPrimary,
-              ),
-            ),
-          ],
-        ),
+      final isSearching =
+          state.searchQuery.isNotEmpty || state.showPromotionsOnly;
+
+      return EmptyState(
+        type: isSearching
+            ? EmptyStateType.noSearchResults
+            : EmptyStateType.noProducts,
+        actionLabel: isSearching ? 'Clear Filters' : null,
+        onAction: isSearching
+            ? () {
+                final notifier = ref.read(
+                  productListProvider(widget.retailer).notifier,
+                );
+                // Clear search
+                if (state.searchQuery.isNotEmpty) {
+                  notifier.search('');
+                }
+                // Turn off promotions filter if active
+                if (state.showPromotionsOnly) {
+                  notifier.togglePromotionsFilter();
+                }
+              }
+            : null,
       );
     }
 
@@ -390,18 +397,16 @@ class _ProductListScreenState extends ConsumerState<ProductListScreen> {
       ),
       itemCount: state.products.length + (state.hasMore ? 1 : 0),
       itemBuilder: (context, index) {
-        // Loading indicator at the end
+        // Loading indicator at the end - show skeleton card
         if (index >= state.products.length) {
-          return const Center(
-            child: Padding(
-              padding: EdgeInsets.all(16.0),
-              child: CircularProgressIndicator(),
-            ),
-          );
+          return const ShimmerEffect(child: ProductCardSkeleton());
         }
 
         final product = state.products[index];
-        return _ProductCard(product: product, retailer: widget.retailer);
+        return AnimatedListItem(
+          index: index % 10, // Reset stagger every 10 items for pagination
+          child: _ProductCard(product: product, retailer: widget.retailer),
+        );
       },
     );
   }
@@ -422,10 +427,12 @@ class _ProductCard extends ConsumerWidget {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
         onTap: () {
+          AppHaptics.lightTap();
           // Navigate to product detail screen
           context.push('/product/$retailer', extra: product);
         },
         onLongPress: () {
+          AppHaptics.mediumTap();
           // Quick add to list on long press
           _showAddToListDialog(context, ref, product, retailer);
         },
@@ -553,29 +560,18 @@ void _showAddToListDialog(
   Product product,
   String retailer,
 ) {
-  final listsAsync = ref.read(userListsProvider);
-
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
-    builder: (context) => _AddToListSheet(
-      product: product,
-      retailer: retailer,
-      listsAsync: listsAsync,
-    ),
+    builder: (context) => _AddToListSheet(product: product, retailer: retailer),
   );
 }
 
 class _AddToListSheet extends ConsumerStatefulWidget {
   final Product product;
   final String retailer;
-  final AsyncValue listsAsync;
 
-  const _AddToListSheet({
-    required this.product,
-    required this.retailer,
-    required this.listsAsync,
-  });
+  const _AddToListSheet({required this.product, required this.retailer});
 
   @override
   ConsumerState<_AddToListSheet> createState() => _AddToListSheetState();
@@ -595,9 +591,7 @@ class _AddToListSheetState extends ConsumerState<_AddToListSheet> {
 
   Future<void> _handleAddToList() async {
     if (_selectedListId == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Please select a list')));
+      AppSnackbar.warning(context, message: 'Please select a list');
       return;
     }
 
@@ -643,12 +637,13 @@ class _AddToListSheetState extends ConsumerState<_AddToListSheet> {
     );
 
     if (mounted && item != null) {
+      // Refresh the realtime provider for this list
+      ref.read(realtimeListItemsProvider(_selectedListId!).notifier).refresh();
+
       Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Added ${widget.product.name} to list'),
-          backgroundColor: AppColors.success,
-        ),
+      AppSnackbar.success(
+        context,
+        message: 'Added ${widget.product.name} to list',
       );
     }
   }
@@ -661,7 +656,14 @@ class _AddToListSheetState extends ConsumerState<_AddToListSheet> {
         ? AppColors.textSecondaryDark
         : AppColors.textSecondary;
 
-    return Padding(
+    // Watch the lists provider reactively - this fixes the first-load issue
+    final listsAsync = ref.watch(userListsProvider);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.backgroundDark : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
         left: 24,
@@ -672,9 +674,13 @@ class _AddToListSheetState extends ConsumerState<_AddToListSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
+          Text(
             'Add to Shopping List',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+            ),
           ),
           const SizedBox(height: 20),
 
@@ -710,9 +716,12 @@ class _AddToListSheetState extends ConsumerState<_AddToListSheet> {
                   children: [
                     Text(
                       widget.product.name,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
+                        color: isDark
+                            ? AppColors.textPrimaryDark
+                            : AppColors.textPrimary,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
@@ -736,8 +745,8 @@ class _AddToListSheetState extends ConsumerState<_AddToListSheet> {
 
           const SizedBox(height: 20),
 
-          // List selector
-          widget.listsAsync.when(
+          // List selector - now uses watched provider
+          listsAsync.when(
             data: (lists) {
               if (lists.isEmpty) {
                 return Container(

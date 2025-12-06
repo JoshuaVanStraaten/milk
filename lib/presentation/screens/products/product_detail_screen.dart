@@ -7,6 +7,8 @@ import '../../../core/constants/app_constants.dart';
 import '../../../data/models/product.dart';
 import '../../providers/list_provider.dart';
 import '../../widgets/price_comparison_sheet.dart';
+import '../../widgets/common/app_snackbar.dart';
+import '../../widgets/animations.dart';
 
 /// Enum to categorize promotion types
 enum PromoType {
@@ -93,7 +95,7 @@ class ProductDetailScreen extends ConsumerWidget {
             backgroundColor: retailerColor,
             flexibleSpace: FlexibleSpaceBar(
               background: Container(
-                color: isDark ? AppColors.surfaceDarkMode : Colors.white,
+                color: Colors.white,
                 child: _buildProductImage(isDark),
               ),
             ),
@@ -221,16 +223,15 @@ class ProductDetailScreen extends ConsumerWidget {
   }
 
   Widget _buildProductImage(bool isDark) {
-    final surfaceColor = isDark ? AppColors.surfaceDarkMode : Colors.white;
-    final iconColor = isDark
-        ? AppColors.textDisabledDark
-        : AppColors.textDisabled;
-
     if (product.imageUrl == null || product.imageUrl!.isEmpty) {
       return Container(
-        color: surfaceColor,
+        color: Colors.white,
         child: Center(
-          child: Icon(Icons.image_not_supported, size: 100, color: iconColor),
+          child: Icon(
+            Icons.image_not_supported,
+            size: 100,
+            color: isDark ? AppColors.textDisabledDark : AppColors.textDisabled,
+          ),
         ),
       );
     }
@@ -238,18 +239,24 @@ class ProductDetailScreen extends ConsumerWidget {
     return Hero(
       tag: 'product-${product.index}',
       child: Container(
-        color: surfaceColor,
+        color: Colors.white,
         child: CachedNetworkImage(
           imageUrl: product.imageUrl!,
           fit: BoxFit.contain,
           placeholder: (context, url) => Container(
-            color: surfaceColor,
+            color: Colors.white,
             child: const Center(child: CircularProgressIndicator()),
           ),
           errorWidget: (context, url, error) => Container(
-            color: surfaceColor,
+            color: Colors.white,
             child: Center(
-              child: Icon(Icons.broken_image, size: 100, color: iconColor),
+              child: Icon(
+                Icons.broken_image,
+                size: 100,
+                color: isDark
+                    ? AppColors.textDisabledDark
+                    : AppColors.textDisabled,
+              ),
             ),
           ),
         ),
@@ -461,20 +468,6 @@ class ProductDetailScreen extends ConsumerWidget {
                     color: AppColors.error,
                   ),
                 ),
-                if (product.promotionPrice != null &&
-                    product.promotionPrice!.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    product.promotionPrice!,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: isDark
-                          ? AppColors.textPrimaryDark
-                          : AppColors.textPrimary,
-                    ),
-                  ),
-                ],
                 if (product.promotionValid != null &&
                     product.promotionValid!.isNotEmpty) ...[
                   const SizedBox(height: 4),
@@ -761,9 +754,7 @@ class _AddToListSheetState extends ConsumerState<_AddToListSheet> {
 
   Future<void> _handleAddToList() async {
     if (_selectedListId == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Please select a list')));
+      AppSnackbar.warning(context, message: 'Please select a list');
       return;
     }
 
@@ -818,20 +809,19 @@ class _AddToListSheetState extends ConsumerState<_AddToListSheet> {
       // Pop the bottom sheet
       Navigator.pop(context);
 
-      // Show snackbar using the ScaffoldMessenger (it finds the nearest Scaffold)
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Added $productName to list'),
-          backgroundColor: AppColors.success,
-          action: SnackBarAction(
-            label: 'View List',
-            textColor: Colors.white,
-            onPressed: () {
-              // Use the captured router instance
-              router.push('/lists/$listId');
-            },
-          ),
-        ),
+      // Refresh the realtime list items provider so the list shows updated items
+      // The realtimeListItemsProvider is a StateNotifier, so we need to call refresh()
+      ref.read(realtimeListItemsProvider(listId!).notifier).refresh();
+      ref.invalidate(listByIdProvider(listId!));
+
+      AppHaptics.success();
+      AppSnackbar.success(
+        context,
+        message: 'Added $productName to list',
+        actionLabel: 'View List',
+        onAction: () {
+          router.push('/lists/$listId');
+        },
       );
     }
   }
@@ -839,12 +829,10 @@ class _AddToListSheetState extends ConsumerState<_AddToListSheet> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final surfaceColor = isDark ? AppColors.surfaceDarkMode : AppColors.surface;
-    final backgroundColor = isDark ? AppColors.backgroundDark : Colors.white;
 
     return Container(
       decoration: BoxDecoration(
-        color: backgroundColor,
+        color: isDark ? AppColors.backgroundDark : Colors.white,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: EdgeInsets.only(
@@ -874,9 +862,15 @@ class _AddToListSheetState extends ConsumerState<_AddToListSheet> {
 
             const SizedBox(height: 20),
 
-            const Text(
+            Text(
               'Add to Shopping List',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: isDark
+                    ? AppColors.textPrimaryDark
+                    : AppColors.textPrimary,
+              ),
             ),
 
             const SizedBox(height: 20),
@@ -885,7 +879,7 @@ class _AddToListSheetState extends ConsumerState<_AddToListSheet> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: surfaceColor,
+                color: isDark ? AppColors.surfaceDarkMode : AppColors.surface,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
@@ -901,14 +895,18 @@ class _AddToListSheetState extends ConsumerState<_AddToListSheet> {
                             errorWidget: (_, __, ___) => Container(
                               width: 60,
                               height: 60,
-                              color: surfaceColor,
+                              color: isDark
+                                  ? AppColors.surfaceDarkMode
+                                  : AppColors.surface,
                               child: const Icon(Icons.image_not_supported),
                             ),
                           )
                         : Container(
                             width: 60,
                             height: 60,
-                            color: surfaceColor,
+                            color: isDark
+                                ? AppColors.surfaceDarkMode
+                                : AppColors.surface,
                             child: const Icon(Icons.image_not_supported),
                           ),
                   ),
@@ -953,7 +951,9 @@ class _AddToListSheetState extends ConsumerState<_AddToListSheet> {
                   return Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: surfaceColor,
+                      color: isDark
+                          ? AppColors.surfaceDarkMode
+                          : AppColors.surface,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Column(
@@ -984,7 +984,9 @@ class _AddToListSheetState extends ConsumerState<_AddToListSheet> {
                 return Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   decoration: BoxDecoration(
-                    color: surfaceColor,
+                    color: isDark
+                        ? AppColors.surfaceDarkMode
+                        : AppColors.surface,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: DropdownButton<String>(
@@ -992,9 +994,6 @@ class _AddToListSheetState extends ConsumerState<_AddToListSheet> {
                     hint: const Text('Select a list'),
                     isExpanded: true,
                     underline: const SizedBox(),
-                    dropdownColor: isDark
-                        ? AppColors.surfaceDarkMode
-                        : Colors.white,
                     items: lists.map<DropdownMenuItem<String>>((list) {
                       return DropdownMenuItem<String>(
                         value: list.shoppingListId,

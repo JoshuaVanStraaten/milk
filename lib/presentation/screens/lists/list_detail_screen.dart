@@ -5,6 +5,10 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/list_item.dart';
 import '../../providers/list_provider.dart';
+import '../../widgets/skeleton_loaders.dart';
+import '../../widgets/animations.dart';
+import '../../widgets/common/app_snackbar.dart';
+import '../../widgets/common/empty_states.dart';
 
 class ListDetailScreen extends ConsumerStatefulWidget {
   final String listId;
@@ -67,7 +71,7 @@ class _ListDetailScreenState extends ConsumerState<ListDetailScreen> {
             ],
           );
         },
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const ListDetailSkeleton(),
         error: (error, stack) => Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -154,7 +158,7 @@ class _ListDetailScreenState extends ConsumerState<ListDetailScreen> {
 
     // Loading state
     if (itemsState.isLoading && itemsState.items.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
+      return const ListItemsSkeleton();
     }
 
     // Empty state
@@ -162,61 +166,180 @@ class _ListDetailScreenState extends ConsumerState<ListDetailScreen> {
       return _buildEmptyState(context, isDark);
     }
 
-    // Items list
+    // Group items by retailer
+    final groupedItems = _groupItemsByRetailer(itemsState.items);
+    final retailers = groupedItems.keys.toList();
+
+    // If only one retailer (or no retailer info), show flat list (but still sorted)
+    if (retailers.length <= 1) {
+      // Get the sorted items from the first (only) group
+      final sortedItems = retailers.isNotEmpty
+          ? groupedItems[retailers.first]!
+          : <ListItem>[];
+
+      return RefreshIndicator(
+        onRefresh: () async {
+          ref.read(realtimeListItemsProvider(widget.listId).notifier).refresh();
+          ref.invalidate(listByIdProvider(widget.listId));
+        },
+        child: _AnimatedItemList(items: sortedItems, listId: widget.listId),
+      );
+    }
+
+    // Multiple retailers - show grouped list
+    // Build a flat list of entries (headers + items)
+    final List<_GroupedListEntry> entries = [];
+    for (final retailer in retailers) {
+      final items = groupedItems[retailer]!;
+      // Add header entry
+      entries.add(
+        _GroupedListEntry(
+          id: 'header_$retailer',
+          isHeader: true,
+          retailer: retailer,
+          itemCount: items.length,
+        ),
+      );
+      // Add item entries
+      for (final item in items) {
+        entries.add(
+          _GroupedListEntry(id: item.itemId, isHeader: false, item: item),
+        );
+      }
+    }
+
     return RefreshIndicator(
       onRefresh: () async {
         ref.read(realtimeListItemsProvider(widget.listId).notifier).refresh();
         ref.invalidate(listByIdProvider(widget.listId));
       },
-      child: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: itemsState.items.length,
-        itemBuilder: (context, index) {
-          final item = itemsState.items[index];
-          return _ListItemTile(item: item, listId: widget.listId);
-        },
+      child: _AnimatedGroupedList(
+        entries: entries,
+        listId: widget.listId,
+        isDark: isDark,
+        buildHeader: _buildRetailerHeader,
       ),
     );
   }
 
-  Widget _buildEmptyState(BuildContext context, bool isDark) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.shopping_basket_outlined,
-              size: 80,
-              color: isDark
-                  ? AppColors.textDisabledDark
-                  : AppColors.textDisabled,
+  /// Group items by retailer, with null/empty retailers grouped as "Custom Items"
+  /// Within each group, unchecked items appear first, checked items at the bottom
+  Map<String, List<ListItem>> _groupItemsByRetailer(List<ListItem> items) {
+    final Map<String, List<ListItem>> grouped = {};
+
+    for (final item in items) {
+      final retailer = (item.itemRetailer?.isNotEmpty ?? false)
+          ? item.itemRetailer!
+          : 'Custom Items';
+
+      if (!grouped.containsKey(retailer)) {
+        grouped[retailer] = [];
+      }
+      grouped[retailer]!.add(item);
+    }
+
+    // Sort items within each group: unchecked first, then checked
+    for (final retailer in grouped.keys) {
+      grouped[retailer]!.sort((a, b) {
+        // Unchecked items (false) come before checked items (true)
+        if (a.completedItem != b.completedItem) {
+          return a.completedItem ? 1 : -1;
+        }
+        // Keep original order for items with same completion status
+        return 0;
+      });
+    }
+
+    // Sort retailers: known stores first (alphabetically), then "Custom Items" last
+    final sortedKeys = grouped.keys.toList()
+      ..sort((a, b) {
+        if (a == 'Custom Items') return 1;
+        if (b == 'Custom Items') return -1;
+        return a.compareTo(b);
+      });
+
+    return Map.fromEntries(
+      sortedKeys.map((key) => MapEntry(key, grouped[key]!)),
+    );
+  }
+
+  /// Build a retailer section header
+  Widget _buildRetailerHeader(String retailer, int itemCount, bool isDark) {
+    final Color retailerColor = _getRetailerColor(retailer);
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 16, bottom: 8),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: retailerColor.withOpacity(isDark ? 0.2 : 0.1),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: retailerColor.withOpacity(0.3)),
             ),
-            const SizedBox(height: 16),
-            Text(
-              'No items yet',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-                color: isDark
-                    ? AppColors.textPrimaryDark
-                    : AppColors.textPrimary,
-              ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.store, size: 16, color: retailerColor),
+                const SizedBox(width: 6),
+                Text(
+                  retailer,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: retailerColor,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              'Add items to your shopping list',
+          ),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.surfaceDarkMode : AppColors.surface,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              '$itemCount ${itemCount == 1 ? 'item' : 'items'}',
               style: TextStyle(
-                fontSize: 14,
+                fontSize: 12,
                 color: isDark
                     ? AppColors.textSecondaryDark
                     : AppColors.textSecondary,
               ),
             ),
-          ],
-        ),
+          ),
+          const Expanded(child: SizedBox()),
+        ],
       ),
+    );
+  }
+
+  /// Get color for retailer
+  Color _getRetailerColor(String retailer) {
+    switch (retailer) {
+      case 'Pick n Pay':
+        return AppColors.pickNPay;
+      case 'Woolworths':
+        return AppColors.woolworths;
+      case 'Shoprite':
+        return AppColors.shoprite;
+      case 'Checkers':
+        return AppColors.checkers;
+      case 'Custom Items':
+        return AppColors.primary;
+      default:
+        return AppColors.textSecondary;
+    }
+  }
+
+  Widget _buildEmptyState(BuildContext context, bool isDark) {
+    return EmptyState(
+      type: EmptyStateType.emptyList,
+      actionLabel: 'Browse Products',
+      onAction: () => context.push('/stores'),
     );
   }
 
@@ -494,159 +617,174 @@ class _ListItemTile extends ConsumerWidget {
         child: const Icon(Icons.delete, color: Colors.white),
       ),
       onDismissed: (direction) {
+        // Haptic feedback on dismiss
+        AppHaptics.warning();
         // Use realtime provider for deletion
         ref
             .read(realtimeListItemsProvider(listId).notifier)
             .deleteItem(item.itemId);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('${item.itemName} removed')));
+        AppSnackbar.success(context, message: '${item.itemName} removed');
       },
-      child: Card(
-        margin: const EdgeInsets.only(bottom: 8),
-        child: InkWell(
-          onTap: () => _showEditItemDialog(context, ref),
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8.0),
-            child: ListTile(
-              leading: Checkbox(
-                value: item.completedItem,
-                onChanged: (value) {
-                  // Use realtime provider for toggle with optimistic update
-                  ref
-                      .read(realtimeListItemsProvider(listId).notifier)
-                      .toggleItemCompletion(item);
-                },
-              ),
-              title: Text(
-                item.itemName,
-                style: TextStyle(
-                  decoration: item.completedItem
-                      ? TextDecoration.lineThrough
-                      : null,
-                  color: item.completedItem
-                      ? (isDark
-                            ? AppColors.textSecondaryDark
-                            : AppColors.textSecondary)
-                      : (isDark
-                            ? AppColors.textPrimaryDark
-                            : AppColors.textPrimary),
-                ),
-              ),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Text(
-                        'Qty: ${item.itemQuantity.toStringAsFixed(0)}',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: isDark
-                              ? AppColors.textSecondaryDark
-                              : AppColors.textSecondary,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '× R${item.effectivePrice.toStringAsFixed(2)}',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: isDark
-                              ? AppColors.textSecondaryDark
-                              : AppColors.textSecondary,
-                        ),
-                      ),
-                      if (item.hasSpecialPrice) ...[
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.error.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: const Text(
-                            'PROMO',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.error,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+        child: Card(
+          key: ValueKey(item.itemId),
+          margin: const EdgeInsets.only(bottom: 8),
+          // Subtle opacity change for completed items
+          child: AnimatedOpacity(
+            duration: const Duration(milliseconds: 200),
+            opacity: item.completedItem ? 0.7 : 1.0,
+            child: InkWell(
+              onTap: () {
+                AppHaptics.lightTap();
+                _showEditItemDialog(context, ref);
+              },
+              borderRadius: BorderRadius.circular(12),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8.0),
+                child: ListTile(
+                  leading: AnimatedCheckbox(
+                    value: item.completedItem,
+                    onChanged: (value) {
+                      // Use realtime provider for toggle with optimistic update
+                      ref
+                          .read(realtimeListItemsProvider(listId).notifier)
+                          .toggleItemCompletion(item);
+                    },
                   ),
-                  if (item.itemRetailer != null &&
-                      item.itemRetailer!.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      item.itemRetailer!,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: isDark
-                            ? AppColors.textSecondaryDark
-                            : AppColors.textSecondary,
-                      ),
+                  title: AnimatedDefaultTextStyle(
+                    duration: const Duration(milliseconds: 200),
+                    style: TextStyle(
+                      decoration: item.completedItem
+                          ? TextDecoration.lineThrough
+                          : null,
+                      color: item.completedItem
+                          ? (isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textSecondary)
+                          : (isDark
+                                ? AppColors.textPrimaryDark
+                                : AppColors.textPrimary),
                     ),
-                  ],
-                  if (item.itemNote != null && item.itemNote!.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.note,
-                          size: 14,
-                          color: isDark
-                              ? AppColors.textSecondaryDark
-                              : AppColors.textSecondary,
-                        ),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            item.itemNote!,
+                    child: Text(item.itemName),
+                  ),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Text(
+                            'Qty: ${item.itemQuantity.toStringAsFixed(0)}',
                             style: TextStyle(
-                              fontSize: 12,
-                              fontStyle: FontStyle.italic,
+                              fontSize: 13,
                               color: isDark
                                   ? AppColors.textSecondaryDark
                                   : AppColors.textSecondary,
                             ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '× R${item.effectivePrice.toStringAsFixed(2)}',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: isDark
+                                  ? AppColors.textSecondaryDark
+                                  : AppColors.textSecondary,
+                            ),
+                          ),
+                          if (item.hasSpecialPrice) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.error.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text(
+                                'PROMO',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.error,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      if (item.itemRetailer != null &&
+                          item.itemRetailer!.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          item.itemRetailer!,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textSecondary,
                           ),
                         ),
                       ],
-                    ),
-                  ],
-                ],
-              ),
-              trailing: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    'R${item.itemTotalPrice.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.primary,
-                    ),
+                      if (item.itemNote != null &&
+                          item.itemNote!.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.note,
+                              size: 14,
+                              color: isDark
+                                  ? AppColors.textSecondaryDark
+                                  : AppColors.textSecondary,
+                            ),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                item.itemNote!,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontStyle: FontStyle.italic,
+                                  color: isDark
+                                      ? AppColors.textSecondaryDark
+                                      : AppColors.textSecondary,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
                   ),
-                  const SizedBox(height: 4),
-                  Icon(
-                    Icons.edit,
-                    size: 16,
-                    color: isDark
-                        ? AppColors.textSecondaryDark
-                        : AppColors.textSecondary,
+                  trailing: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        'R${item.itemTotalPrice.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Icon(
+                        Icons.edit,
+                        size: 16,
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondary,
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
           ),
@@ -1176,6 +1314,232 @@ class _AddItemSheetState extends ConsumerState<_AddItemSheet> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Helper class for grouped list entries (headers and items)
+class _GroupedListEntry {
+  final String id;
+  final bool isHeader;
+  final String? retailer;
+  final int? itemCount;
+  final ListItem? item;
+
+  _GroupedListEntry({
+    required this.id,
+    required this.isHeader,
+    this.retailer,
+    this.itemCount,
+    this.item,
+  });
+}
+
+/// Animated list that smoothly reorders items when their positions change
+class _AnimatedItemList extends StatefulWidget {
+  final List<ListItem> items;
+  final String listId;
+
+  const _AnimatedItemList({required this.items, required this.listId});
+
+  @override
+  State<_AnimatedItemList> createState() => _AnimatedItemListState();
+}
+
+class _AnimatedItemListState extends State<_AnimatedItemList>
+    with TickerProviderStateMixin {
+  final GlobalKey<AnimatedListState> _listKey = GlobalKey<AnimatedListState>();
+  late List<ListItem> _items;
+
+  @override
+  void initState() {
+    super.initState();
+    _items = List.from(widget.items);
+  }
+
+  @override
+  void didUpdateWidget(_AnimatedItemList oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _updateList(widget.items);
+  }
+
+  void _updateList(List<ListItem> newItems) {
+    // Find items that need to be removed and added
+    final oldIds = _items.map((e) => e.itemId).toSet();
+    final newIds = newItems.map((e) => e.itemId).toSet();
+
+    // Items to remove (in old but not in new)
+    final toRemove = oldIds.difference(newIds);
+
+    // Items to add (in new but not in old)
+    final toAdd = newIds.difference(oldIds);
+
+    // Remove items with animation
+    for (final id in toRemove) {
+      final index = _items.indexWhere((item) => item.itemId == id);
+      if (index != -1) {
+        final removedItem = _items.removeAt(index);
+        _listKey.currentState?.removeItem(
+          index,
+          (context, animation) => _buildRemovedItem(removedItem, animation),
+          duration: const Duration(milliseconds: 300),
+        );
+      }
+    }
+
+    // Update the items list to match new order
+    _items = List.from(newItems);
+
+    // For reordering, we rebuild the list
+    // The AnimatedList handles this smoothly with the keys
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  Widget _buildRemovedItem(ListItem item, Animation<double> animation) {
+    return SizeTransition(
+      sizeFactor: animation,
+      child: FadeTransition(
+        opacity: animation,
+        child: _ListItemTile(item: item, listId: widget.listId),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Use a regular ListView with AnimatedSwitcher for each item
+    // This gives us smooth transitions when items reorder
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: widget.items.length,
+      itemBuilder: (context, index) {
+        final item = widget.items[index];
+        return _AnimatedListItem(
+          key: ValueKey(item.itemId),
+          item: item,
+          listId: widget.listId,
+        );
+      },
+    );
+  }
+}
+
+/// Individual list item with slide animation when position changes
+class _AnimatedListItem extends StatefulWidget {
+  final ListItem item;
+  final String listId;
+
+  const _AnimatedListItem({
+    super.key,
+    required this.item,
+    required this.listId,
+  });
+
+  @override
+  State<_AnimatedListItem> createState() => _AnimatedListItemState();
+}
+
+class _AnimatedListItemState extends State<_AnimatedListItem>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<Offset> _slideAnimation;
+  late Animation<double> _fadeAnimation;
+  bool _isFirstBuild = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 400),
+      vsync: this,
+    );
+
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.3),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
+
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_isFirstBuild) {
+      _isFirstBuild = false;
+      // Animate in on first build
+      _controller.forward();
+    }
+  }
+
+  @override
+  void didUpdateWidget(_AnimatedListItem oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // If completion status changed, animate
+    if (oldWidget.item.completedItem != widget.item.completedItem) {
+      _controller.reset();
+      _controller.forward();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SlideTransition(
+      position: _slideAnimation,
+      child: FadeTransition(
+        opacity: _fadeAnimation,
+        child: _ListItemTile(item: widget.item, listId: widget.listId),
+      ),
+    );
+  }
+}
+
+/// Animated list for multiple retailers (grouped list)
+class _AnimatedGroupedList extends StatelessWidget {
+  final List<_GroupedListEntry> entries;
+  final String listId;
+  final bool isDark;
+  final Widget Function(String retailer, int itemCount, bool isDark)
+  buildHeader;
+
+  const _AnimatedGroupedList({
+    required this.entries,
+    required this.listId,
+    required this.isDark,
+    required this.buildHeader,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: entries.length,
+      itemBuilder: (context, index) {
+        final entry = entries[index];
+
+        // Headers don't need animation
+        if (entry.isHeader) {
+          return buildHeader(entry.retailer!, entry.itemCount!, isDark);
+        }
+
+        // Items get animated
+        return _AnimatedListItem(
+          key: ValueKey(entry.id),
+          item: entry.item!,
+          listId: listId,
+        );
+      },
     );
   }
 }
