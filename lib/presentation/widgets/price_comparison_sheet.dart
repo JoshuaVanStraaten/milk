@@ -351,6 +351,8 @@ class _PriceComparisonSheetState extends ConsumerState<PriceComparisonSheet> {
                       fontWeight: FontWeight.w500,
                       color: AppColors.error,
                     ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ],
@@ -518,6 +520,7 @@ class _PriceComparisonSheetState extends ConsumerState<PriceComparisonSheet> {
                   if (comparison.hasPromotion) ...[
                     const SizedBox(height: 4),
                     Container(
+                      constraints: const BoxConstraints(maxWidth: 100),
                       padding: const EdgeInsets.symmetric(
                         horizontal: 6,
                         vertical: 2,
@@ -533,6 +536,9 @@ class _PriceComparisonSheetState extends ConsumerState<PriceComparisonSheet> {
                           fontWeight: FontWeight.w600,
                           color: AppColors.error,
                         ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.right,
                       ),
                     ),
                   ],

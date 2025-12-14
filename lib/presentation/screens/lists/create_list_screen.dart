@@ -50,7 +50,7 @@ class _CreateListScreenState extends ConsumerState<CreateListScreen> {
       AppSnackbar.success(context, message: 'Created list: ${list.listName}');
 
       // Navigate to list detail
-      context.go('/lists/${list.shoppingListId}');
+      context.pushReplacement('/lists/${list.shoppingListId}');
     }
   }
 

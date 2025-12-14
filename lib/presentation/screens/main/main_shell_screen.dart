@@ -16,19 +16,14 @@ class MainShellScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Scaffold(
       body: child,
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: currentIndex,
         onTap: (index) => _onItemTapped(context, index),
         type: BottomNavigationBarType.fixed,
-        backgroundColor: isDark ? AppColors.surfaceDarkMode : Colors.white,
         selectedItemColor: AppColors.primary,
-        unselectedItemColor: isDark
-            ? AppColors.textSecondaryDark
-            : AppColors.textSecondary,
+        unselectedItemColor: AppColors.textSecondary,
         selectedFontSize: 12,
         unselectedFontSize: 12,
         items: const [

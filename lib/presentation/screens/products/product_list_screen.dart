@@ -9,6 +9,7 @@ import '../../providers/list_provider.dart';
 import '../../widgets/skeleton_loaders.dart';
 import '../../widgets/animations.dart';
 import '../../widgets/common/app_snackbar.dart';
+import '../../../data/services/connectivity_service.dart';
 import '../../widgets/common/empty_states.dart';
 
 class ProductListScreen extends ConsumerStatefulWidget {
@@ -308,47 +309,43 @@ class _ProductListScreenState extends ConsumerState<ProductListScreen> {
   }
 
   Widget _buildBody(ProductListState state) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    // final isDark = Theme.of(context).brightness == Brightness.dark;
 
     // Error state
     if (state.error != null && state.products.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error_outline, size: 64, color: AppColors.error),
-            const SizedBox(height: 16),
-            Text(
-              'Failed to load products',
-              style: TextStyle(
-                fontSize: 18,
-                color: isDark
-                    ? AppColors.textPrimaryDark
-                    : AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              state.error!,
-              style: TextStyle(
-                fontSize: 14,
-                color: isDark
-                    ? AppColors.textSecondaryDark
-                    : AppColors.textSecondary,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () {
-                ref
-                    .read(productListProvider(widget.retailer).notifier)
-                    .refresh();
-              },
-              child: const Text('Retry'),
-            ),
-          ],
-        ),
+      final connectivity = ref.read(connectivityServiceProvider);
+      final isOffline = connectivity.isOffline;
+
+      // Check if error is network-related
+      final isNetworkError =
+          state.error!.contains('SocketException') ||
+          state.error!.contains('ClientException') ||
+          state.error!.contains('host lookup') ||
+          state.error!.contains('Failed host lookup') ||
+          state.error!.contains('Network is unreachable') ||
+          state.error!.contains('Connection refused');
+
+      if (isOffline || isNetworkError) {
+        // Show offline-friendly empty state
+        return EmptyState(
+          type: EmptyStateType.offline,
+          actionLabel: 'Retry',
+          onAction: () {
+            ref.read(productListProvider(widget.retailer).notifier).refresh();
+          },
+          customMessage:
+              'Products will be available when you\'re back online. '
+              'Try browsing your saved shopping lists instead.',
+        );
+      }
+
+      // Generic error state for other errors
+      return EmptyState(
+        type: EmptyStateType.error,
+        actionLabel: 'Retry',
+        onAction: () {
+          ref.read(productListProvider(widget.retailer).notifier).refresh();
+        },
       );
     }
 
