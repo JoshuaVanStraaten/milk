@@ -1,4 +1,4 @@
-# Savvy Grocery 🛒
+# Milk 🛒
 
 A South African grocery comparison and shopping list app built with Flutter and Supabase. Compare prices across major retailers, create smart shopping lists, and generate AI-powered recipes with automatic ingredient matching.
 
@@ -71,8 +71,8 @@ A South African grocery comparison and shopping list app built with Flutter and 
 1. **Clone the repository**
 
    ```bash
-   git clone https://github.com/YOUR_USERNAME/savvy-grocery.git
-   cd savvy-grocery
+   git clone https://github.com/JoshuaVanStraaten/milk.git
+   cd milk
    ```
 
 2. **Install dependencies**
@@ -189,7 +189,6 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 **Joshua van Straaten**
 
-- GitHub: [@joshuavanstraaten](https://github.com/joshuavanstraaten)
 - Location: South Africa 🇿🇦
 
 ---
