@@ -105,6 +105,19 @@ class HomeScreen extends ConsumerWidget {
                       context.go('/lists');
                     },
                   ),
+
+                  const SizedBox(height: 16),
+
+                  _QuickActionCard(
+                    icon: Icons.auto_awesome,
+                    title: 'AI Recipes',
+                    subtitle: 'Generate recipes and create shopping lists',
+                    color: const Color(0xFF9C27B0), // Purple for AI
+                    isDark: isDark,
+                    onTap: () {
+                      context.push('/recipes');
+                    },
+                  ),
                 ],
               ),
             );

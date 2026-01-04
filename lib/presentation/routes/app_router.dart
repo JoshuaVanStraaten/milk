@@ -15,6 +15,7 @@ import '../screens/lists/create_list_screen.dart';
 import '../screens/lists/list_detail_screen.dart';
 import '../screens/profile/profile_screen.dart';
 import '../screens/main/main_shell_screen.dart';
+import '../screens/recipes/recipe_screen.dart';
 import '../providers/auth_provider.dart';
 import 'page_transitions.dart';
 
@@ -26,6 +27,7 @@ class AppRoutes {
   static const String stores = '/stores';
   static const String products = '/products';
   static const String productDetail = '/product';
+  static const String recipes = '/recipes';
   static const String lists = '/lists';
   static const String profile = '/profile';
 }
@@ -109,7 +111,7 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       // ===== MAIN TAB ROUTES (fade for tab switches) =====
 
-      // Home route (protected) - with bottom nav
+      // Home route (protected) - with bottom nav - index 0
       GoRoute(
         path: AppRoutes.home,
         pageBuilder: (context, state) => AppPageTransitions.fade(
@@ -118,7 +120,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         ),
       ),
 
-      // Store selector route (protected) - with bottom nav
+      // Store selector route (protected) - with bottom nav - index 1
       GoRoute(
         path: '/stores',
         pageBuilder: (context, state) => AppPageTransitions.fade(
@@ -130,21 +132,30 @@ final routerProvider = Provider<GoRouter>((ref) {
         ),
       ),
 
-      // Lists route (protected) - with bottom nav
+      // Recipes route (protected) - with bottom nav - index 2
+      GoRoute(
+        path: AppRoutes.recipes,
+        pageBuilder: (context, state) => AppPageTransitions.fade(
+          state: state,
+          child: const MainShellScreen(currentIndex: 2, child: RecipeScreen()),
+        ),
+      ),
+
+      // Lists route (protected) - with bottom nav - index 3
       GoRoute(
         path: AppRoutes.lists,
         pageBuilder: (context, state) => AppPageTransitions.fade(
           state: state,
-          child: const MainShellScreen(currentIndex: 2, child: MyListsScreen()),
+          child: const MainShellScreen(currentIndex: 3, child: MyListsScreen()),
         ),
       ),
 
-      // Profile route (protected) - with bottom nav
+      // Profile route (protected) - with bottom nav - index 4
       GoRoute(
         path: AppRoutes.profile,
         pageBuilder: (context, state) => AppPageTransitions.fade(
           state: state,
-          child: const MainShellScreen(currentIndex: 3, child: ProfileScreen()),
+          child: const MainShellScreen(currentIndex: 4, child: ProfileScreen()),
         ),
       ),
 

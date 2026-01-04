@@ -38,6 +38,11 @@ class MainShellScreen extends StatelessWidget {
             label: 'Browse',
           ),
           BottomNavigationBarItem(
+            icon: Icon(Icons.auto_awesome_outlined),
+            activeIcon: Icon(Icons.auto_awesome),
+            label: 'Recipes',
+          ),
+          BottomNavigationBarItem(
             icon: Icon(Icons.list_alt_outlined),
             activeIcon: Icon(Icons.list_alt),
             label: 'Lists',
@@ -61,9 +66,12 @@ class MainShellScreen extends StatelessWidget {
         context.go('/stores');
         break;
       case 2:
-        context.go('/lists');
+        context.go('/recipes');
         break;
       case 3:
+        context.go('/lists');
+        break;
+      case 4:
         context.go('/profile');
         break;
     }
