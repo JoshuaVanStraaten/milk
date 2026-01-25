@@ -7,6 +7,7 @@ import '../models/comparable_product.dart';
 
 /// Repository for product operations
 /// Handles fetching products from Supabase with pagination and filtering
+/// All queries now require a province parameter for regional filtering
 class ProductRepository {
   final SupabaseClient _supabase = SupabaseConfig.client;
   final Logger _logger = Logger();
@@ -14,15 +15,19 @@ class ProductRepository {
   /// Fetch products for a specific retailer with pagination
   ///
   /// [retailer]: Store name (e.g., "Pick n Pay")
+  /// [province]: Province to filter by (required)
   /// [page]: Page number (0-indexed)
   /// [limit]: Number of products per page
   Future<List<Product>> getProductsByRetailer({
     required String retailer,
+    required String province,
     int page = 0,
     int limit = AppConstants.productsPerPage,
   }) async {
     try {
-      _logger.d('Fetching products for $retailer (page: $page, limit: $limit)');
+      _logger.d(
+        'Fetching products for $retailer in $province (page: $page, limit: $limit)',
+      );
 
       final startIndex = page * limit;
       final endIndex = startIndex + limit - 1;
@@ -31,18 +36,21 @@ class ProductRepository {
           .from('Products')
           .select()
           .eq('retailer', retailer)
+          .eq('province', province)
           .range(startIndex, endIndex);
 
       final products = (response as List)
           .map((json) => Product.fromJson(json))
           .toList();
 
-      _logger.i('✅ Fetched ${products.length} products for $retailer');
+      _logger.i(
+        '✅ Fetched ${products.length} products for $retailer in $province',
+      );
 
       return products;
     } catch (e, stackTrace) {
       _logger.e(
-        'Error fetching products for $retailer',
+        'Error fetching products for $retailer in $province',
         error: e,
         stackTrace: stackTrace,
       );
@@ -53,21 +61,24 @@ class ProductRepository {
   /// Search products by name across all retailers or specific retailer
   ///
   /// [query]: Search term
+  /// [province]: Province to filter by (required)
   /// [retailer]: Optional - filter by retailer
   /// [limit]: Max results to return
   Future<List<Product>> searchProducts({
     required String query,
+    required String province,
     String? retailer,
     int limit = 50,
   }) async {
     try {
       _logger.d(
-        'Searching products: "$query" ${retailer != null ? "in $retailer" : ""}',
+        'Searching products: "$query" in $province ${retailer != null ? "at $retailer" : ""}',
       );
 
       var queryBuilder = _supabase
           .from('Products')
           .select()
+          .eq('province', province)
           .ilike('name', '%$query%'); // Case-insensitive search
 
       // Filter by retailer if specified
@@ -81,7 +92,9 @@ class ProductRepository {
           .map((json) => Product.fromJson(json))
           .toList();
 
-      _logger.i('✅ Found ${products.length} products matching "$query"');
+      _logger.i(
+        '✅ Found ${products.length} products matching "$query" in $province',
+      );
 
       return products;
     } catch (e, stackTrace) {
@@ -91,13 +104,21 @@ class ProductRepository {
   }
 
   /// Get products on promotion for a specific retailer
+  ///
+  /// [retailer]: Store name
+  /// [province]: Province to filter by (required)
+  /// [page]: Page number (0-indexed)
+  /// [limit]: Number of products per page
   Future<List<Product>> getPromotionProducts({
     required String retailer,
+    required String province,
     int page = 0,
     int limit = 50,
   }) async {
     try {
-      _logger.d('Fetching promotion products for $retailer (page: $page)');
+      _logger.d(
+        'Fetching promotion products for $retailer in $province (page: $page)',
+      );
 
       final startIndex = page * limit;
 
@@ -107,6 +128,7 @@ class ProductRepository {
           .from('Products')
           .select()
           .eq('retailer', retailer)
+          .eq('province', province)
           .not('promotion_price', 'is', null)
           .range(startIndex, startIndex + fetchLimit - 1);
 
@@ -121,7 +143,7 @@ class ProductRepository {
           .toList();
 
       _logger.i(
-        '✅ Fetched ${promoProducts.length} promotion products for $retailer',
+        '✅ Fetched ${promoProducts.length} promotion products for $retailer in $province',
       );
 
       return promoProducts;
@@ -136,6 +158,7 @@ class ProductRepository {
   }
 
   /// Get a single product by index
+  /// Note: Product index is unique across all provinces
   Future<Product> getProductByIndex(String index) async {
     try {
       _logger.d('Fetching product: $index');
@@ -162,10 +185,19 @@ class ProductRepository {
   }
 
   /// Get total count of products for a retailer (useful for pagination)
-  Future<int> getProductCount({String? retailer}) async {
+  ///
+  /// [retailer]: Optional - filter by retailer
+  /// [province]: Province to filter by (required)
+  Future<int> getProductCount({
+    String? retailer,
+    required String province,
+  }) async {
     try {
       // Build the query with filter first, then add count
-      var query = _supabase.from('Products').select('index');
+      var query = _supabase
+          .from('Products')
+          .select('index')
+          .eq('province', province);
 
       if (retailer != null) {
         query = query.eq('retailer', retailer);
@@ -188,6 +220,7 @@ class ProductRepository {
   /// Find comparable products at other retailers for price comparison
   ///
   /// [productIndex]: The index of the product to compare
+  /// [province]: Province to filter by (required)
   /// [similarityThreshold]: Minimum similarity score (0.0 - 1.0), default 0.4
   ///
   /// Returns a list of comparable products ordered by:
@@ -196,15 +229,19 @@ class ProductRepository {
   /// 3. Price (cheapest first)
   Future<List<ComparableProduct>> findComparableProducts({
     required String productIndex,
+    required String province,
     double similarityThreshold = 0.4,
   }) async {
     try {
-      _logger.d('Finding comparable products for index: $productIndex');
+      _logger.d(
+        'Finding comparable products for index: $productIndex in $province',
+      );
 
       final response = await _supabase.rpc(
         'find_comparable_products',
         params: {
           'source_product_index': productIndex,
+          'target_province': province,
           'similarity_threshold': similarityThreshold,
         },
       );
@@ -236,6 +273,92 @@ class ProductRepository {
         stackTrace: stackTrace,
       );
       // Return empty list instead of throwing - comparison is non-critical
+      return [];
+    }
+  }
+
+  /// Get products by category
+  ///
+  /// [category]: Product category
+  /// [province]: Province to filter by (required)
+  /// [retailer]: Optional - filter by retailer
+  /// [limit]: Max results to return
+  Future<List<Product>> getProductsByCategory({
+    required String category,
+    required String province,
+    String? retailer,
+    int limit = 50,
+  }) async {
+    try {
+      _logger.d('Fetching products in category: $category for $province');
+
+      var queryBuilder = _supabase
+          .from('Products')
+          .select()
+          .eq('province', province)
+          .eq('category', category);
+
+      if (retailer != null) {
+        queryBuilder = queryBuilder.eq('retailer', retailer);
+      }
+
+      final response = await queryBuilder.order('name').limit(limit);
+
+      final products = (response as List)
+          .map((json) => Product.fromJson(json))
+          .toList();
+
+      _logger.i('✅ Fetched ${products.length} products in $category');
+
+      return products;
+    } catch (e, stackTrace) {
+      _logger.e(
+        'Error fetching products by category',
+        error: e,
+        stackTrace: stackTrace,
+      );
+      throw Exception('Failed to fetch products: $e');
+    }
+  }
+
+  /// Get all unique categories for a province
+  ///
+  /// [province]: Province to get categories for
+  /// [retailer]: Optional - filter by retailer
+  Future<List<String>> getCategories({
+    required String province,
+    String? retailer,
+  }) async {
+    try {
+      _logger.d('Fetching categories for $province');
+
+      var queryBuilder = _supabase
+          .from('Products')
+          .select('category')
+          .eq('province', province)
+          .not('category', 'is', null);
+
+      if (retailer != null) {
+        queryBuilder = queryBuilder.eq('retailer', retailer);
+      }
+
+      final response = await queryBuilder;
+
+      // Extract unique categories
+      final categories =
+          (response as List)
+              .map((json) => json['category'] as String?)
+              .where((c) => c != null && c.isNotEmpty)
+              .cast<String>()
+              .toSet()
+              .toList()
+            ..sort();
+
+      _logger.i('✅ Found ${categories.length} categories');
+
+      return categories;
+    } catch (e, stackTrace) {
+      _logger.e('Error fetching categories', error: e, stackTrace: stackTrace);
       return [];
     }
   }

@@ -16,11 +16,14 @@ import '../screens/lists/list_detail_screen.dart';
 import '../screens/profile/profile_screen.dart';
 import '../screens/main/main_shell_screen.dart';
 import '../screens/recipes/recipe_screen.dart';
+import '../screens/onboarding/onboarding_screen.dart';
 import '../providers/auth_provider.dart';
+import '../providers/province_provider.dart';
 import 'page_transitions.dart';
 
 /// Route names for easy reference
 class AppRoutes {
+  static const String onboarding = '/onboarding';
   static const String login = '/login';
   static const String signup = '/signup';
   static const String home = '/home';
@@ -46,6 +49,11 @@ class RouterNotifier extends ChangeNotifier {
           // Notify router to re-evaluate redirects when auth state changes
           notifyListeners();
         });
+
+    // Also listen to province changes (for onboarding)
+    _ref.listen(provinceProvider, (previous, next) {
+      notifyListeners();
+    });
   }
 
   @override
@@ -75,14 +83,33 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isGoingToAuth =
           state.matchedLocation == AppRoutes.login ||
           state.matchedLocation == AppRoutes.signup;
+      final isGoingToOnboarding = state.matchedLocation == AppRoutes.onboarding;
+
+      // Check onboarding status
+      final provinceState = ref.read(provinceProvider);
+      final needsOnboarding = !provinceState.hasCompletedOnboarding;
 
       // If not authenticated and trying to access protected route, go to login
       if (!isAuthenticated && !isGoingToAuth) {
         return AppRoutes.login;
       }
 
-      // If authenticated and trying to access auth screens, go to home
+      // If authenticated and trying to access auth screens
       if (isAuthenticated && isGoingToAuth) {
+        // Check if user needs onboarding
+        if (needsOnboarding) {
+          return AppRoutes.onboarding;
+        }
+        return AppRoutes.home;
+      }
+
+      // If authenticated but hasn't completed onboarding
+      if (isAuthenticated && needsOnboarding && !isGoingToOnboarding) {
+        return AppRoutes.onboarding;
+      }
+
+      // If on onboarding but already completed it, go to home
+      if (isAuthenticated && !needsOnboarding && isGoingToOnboarding) {
         return AppRoutes.home;
       }
 
@@ -91,6 +118,15 @@ final routerProvider = Provider<GoRouter>((ref) {
     },
 
     routes: [
+      // ===== ONBOARDING ROUTE =====
+      GoRoute(
+        path: AppRoutes.onboarding,
+        pageBuilder: (context, state) => AppPageTransitions.fade(
+          state: state,
+          child: const OnboardingScreen(),
+        ),
+      ),
+
       // ===== AUTH ROUTES (fade transitions) =====
 
       // Login route

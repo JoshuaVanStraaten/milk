@@ -4,7 +4,8 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../data/models/recipe.dart';
 import '../../data/repositories/recipe_repository.dart';
-import '../../data/services/gemini_service.dart';
+import '../../data/services/gemini_service.dart'; // RecipeSuggestion & GeminiException
+import 'province_provider.dart';
 
 // =============================================================================
 // SERVICE PROVIDERS
@@ -37,28 +38,41 @@ class RecipeGenerationState {
   final bool isLoading;
   final Recipe? generatedRecipe;
   final String? error;
+  final String? errorTitle; // For popup dialog title
   final RecipeGenerationStep currentStep;
+  final String?
+  matchedProvince; // Track which province ingredients were matched for
 
   const RecipeGenerationState({
     this.isLoading = false,
     this.generatedRecipe,
     this.error,
+    this.errorTitle,
     this.currentStep = RecipeGenerationStep.input,
+    this.matchedProvince,
   });
 
   RecipeGenerationState copyWith({
     bool? isLoading,
     Recipe? generatedRecipe,
     String? error,
+    String? errorTitle,
     RecipeGenerationStep? currentStep,
+    String? matchedProvince,
+    bool clearError = false,
   }) {
     return RecipeGenerationState(
       isLoading: isLoading ?? this.isLoading,
       generatedRecipe: generatedRecipe ?? this.generatedRecipe,
-      error: error,
+      error: clearError ? null : (error ?? this.error),
+      errorTitle: clearError ? null : (errorTitle ?? this.errorTitle),
       currentStep: currentStep ?? this.currentStep,
+      matchedProvince: matchedProvince ?? this.matchedProvince,
     );
   }
+
+  /// Whether there's an error to show in a popup
+  bool get hasError => error != null;
 }
 
 enum RecipeGenerationStep {
@@ -74,9 +88,18 @@ enum RecipeGenerationStep {
 class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
   final GeminiService _geminiService;
   final RecipeRepository _repository;
+  final Ref _ref;
 
-  RecipeGenerationNotifier(this._geminiService, this._repository)
+  RecipeGenerationNotifier(this._geminiService, this._repository, this._ref)
     : super(const RecipeGenerationState());
+
+  /// Get current province from provider
+  String get _currentProvince => _ref.read(selectedProvinceProvider);
+
+  /// Clear the current error (call after showing popup)
+  void clearError() {
+    state = state.copyWith(clearError: true);
+  }
 
   /// Generate a recipe from user request
   /// [autoMatch] - If true, automatically match ingredients to products after generation
@@ -90,7 +113,7 @@ class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
   }) async {
     state = state.copyWith(
       isLoading: true,
-      error: null,
+      clearError: true,
       currentStep: RecipeGenerationStep.generating,
     );
 
@@ -103,7 +126,7 @@ class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
 
       state = state.copyWith(generatedRecipe: recipe);
 
-      // Auto-match ingredients to products
+      // Auto-match ingredients to products in current province
       if (autoMatch) {
         await _autoMatchIngredients(preferredRetailer: preferredRetailer);
       }
@@ -111,12 +134,22 @@ class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
       state = state.copyWith(
         isLoading: false,
         currentStep: RecipeGenerationStep.review,
+        matchedProvince: _currentProvince,
+      );
+    } on GeminiException catch (e) {
+      debugPrint('Gemini error generating recipe: $e');
+      state = state.copyWith(
+        isLoading: false,
+        error: e.userFriendlyMessage,
+        errorTitle: e.errorTitle,
+        currentStep: RecipeGenerationStep.input,
       );
     } catch (e) {
       debugPrint('Error generating recipe: $e');
       state = state.copyWith(
         isLoading: false,
         error: 'Failed to generate recipe. Please try again.',
+        errorTitle: 'Request Failed',
         currentStep: RecipeGenerationStep.input,
       );
     }
@@ -126,6 +159,7 @@ class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
   Future<void> _autoMatchIngredients({String? preferredRetailer}) async {
     if (state.generatedRecipe == null) return;
 
+    final province = _currentProvince;
     final ingredients = List<RecipeIngredient>.from(
       state.generatedRecipe!.ingredients,
     );
@@ -134,9 +168,10 @@ class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
       final ingredient = ingredients[i];
 
       try {
-        // Search for matching products
+        // Search for matching products in the current province
         final matches = await _repository.findMatchingProducts(
           ingredientName: ingredient.ingredientName,
+          province: province,
           retailer: preferredRetailer,
           maxResults: 5,
         );
@@ -189,6 +224,7 @@ class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
       generatedRecipe: state.generatedRecipe!.copyWith(
         ingredients: ingredients,
       ),
+      matchedProvince: province,
     );
   }
 
@@ -259,7 +295,7 @@ class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
     );
   }
 
-  /// Save recipe to database
+  /// Save the generated recipe
   Future<Recipe?> saveRecipe() async {
     if (state.generatedRecipe == null) return null;
 
@@ -271,14 +307,21 @@ class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
       return savedRecipe;
     } catch (e) {
       debugPrint('Error saving recipe: $e');
-      state = state.copyWith(isLoading: false, error: 'Failed to save recipe.');
+      state = state.copyWith(
+        isLoading: false,
+        error: 'Failed to save recipe.',
+        errorTitle: 'Save Failed',
+      );
       return null;
     }
   }
 
-  /// Export to shopping list
-  /// Uses the current matched ingredients (no re-matching)
-  Future<String?> exportToShoppingList({required String listName}) async {
+  /// Export recipe to shopping list
+  Future<String?> exportToShoppingList({
+    required String listName,
+    String? storeName,
+    bool saveRecipe = false,
+  }) async {
     if (state.generatedRecipe == null) return null;
 
     state = state.copyWith(
@@ -287,28 +330,34 @@ class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
     );
 
     try {
-      // Determine the primary store from matched ingredients
-      final matchedRetailers = state.generatedRecipe!.ingredients
-          .where((i) => i.matchedRetailer != null)
-          .map((i) => i.matchedRetailer!)
-          .toList();
+      // Save recipe first if requested
+      if (saveRecipe) {
+        await this.saveRecipe();
+      }
 
-      String storeName = 'Multiple Stores';
-      if (matchedRetailers.isNotEmpty) {
-        // Get most common retailer
-        final retailerCounts = <String, int>{};
-        for (final retailer in matchedRetailers) {
-          retailerCounts[retailer] = (retailerCounts[retailer] ?? 0) + 1;
+      // Determine store name from matched ingredients
+      if (storeName == null || storeName.isEmpty) {
+        final matchedRetailers = state.generatedRecipe!.ingredients
+            .where((i) => i.matchedRetailer != null)
+            .map((i) => i.matchedRetailer!)
+            .toList();
+
+        if (matchedRetailers.isNotEmpty) {
+          // Use most common retailer
+          final retailerCounts = <String, int>{};
+          for (final r in matchedRetailers) {
+            retailerCounts[r] = (retailerCounts[r] ?? 0) + 1;
+          }
+          storeName = retailerCounts.entries
+              .reduce((a, b) => a.value > b.value ? a : b)
+              .key;
         }
-        storeName = retailerCounts.entries
-            .reduce((a, b) => a.value > b.value ? a : b)
-            .key;
       }
 
       final listId = await _repository.exportToShoppingList(
         recipe: state.generatedRecipe!,
         listName: listName,
-        storeName: storeName,
+        storeName: storeName ?? 'Mixed Stores',
       );
 
       state = state.copyWith(
@@ -322,6 +371,7 @@ class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
       state = state.copyWith(
         isLoading: false,
         error: 'Failed to create shopping list.',
+        errorTitle: 'Export Failed',
       );
       return null;
     }
@@ -357,7 +407,7 @@ final recipeGenerationProvider =
     ) {
       final geminiService = ref.watch(geminiServiceProvider);
       final repository = ref.watch(recipeRepositoryProvider);
-      return RecipeGenerationNotifier(geminiService, repository);
+      return RecipeGenerationNotifier(geminiService, repository, ref);
     });
 
 // =============================================================================
@@ -393,11 +443,15 @@ class IngredientMatchingState {
 class IngredientMatchingNotifier
     extends StateNotifier<IngredientMatchingState> {
   final RecipeRepository _repository;
+  final Ref _ref;
 
-  IngredientMatchingNotifier(this._repository)
+  IngredientMatchingNotifier(this._repository, this._ref)
     : super(const IngredientMatchingState());
 
-  /// Search for matching products
+  /// Get current province from provider
+  String get _currentProvince => _ref.read(selectedProvinceProvider);
+
+  /// Search for matching products in current province
   Future<void> searchMatches({
     required String ingredientName,
     String? retailer,
@@ -407,6 +461,7 @@ class IngredientMatchingNotifier
     try {
       final matches = await _repository.findMatchingProducts(
         ingredientName: ingredientName,
+        province: _currentProvince,
         retailer: retailer,
       );
 
@@ -433,7 +488,7 @@ final ingredientMatchingProvider =
       ref,
     ) {
       final repository = ref.watch(recipeRepositoryProvider);
-      return IngredientMatchingNotifier(repository);
+      return IngredientMatchingNotifier(repository, ref);
     });
 
 // =============================================================================
@@ -460,10 +515,12 @@ final recipeByIdProvider = FutureProvider.family<Recipe, String>((
 // =============================================================================
 
 /// State for ingredient-based recipe suggestions
+/// Note: RecipeSuggestion is imported from gemini_service.dart
 class RecipeSuggestionsState {
   final bool isLoading;
   final List<RecipeSuggestion> suggestions;
   final String? error;
+  final String? errorTitle;
   final List<String> ingredients; // Preserve ingredients for back navigation
   final String? mealType; // Preserve meal type selection
 
@@ -471,6 +528,7 @@ class RecipeSuggestionsState {
     this.isLoading = false,
     this.suggestions = const [],
     this.error,
+    this.errorTitle,
     this.ingredients = const [],
     this.mealType,
   });
@@ -479,17 +537,23 @@ class RecipeSuggestionsState {
     bool? isLoading,
     List<RecipeSuggestion>? suggestions,
     String? error,
+    String? errorTitle,
     List<String>? ingredients,
     String? mealType,
+    bool clearError = false,
   }) {
     return RecipeSuggestionsState(
       isLoading: isLoading ?? this.isLoading,
       suggestions: suggestions ?? this.suggestions,
-      error: error,
+      error: clearError ? null : (error ?? this.error),
+      errorTitle: clearError ? null : (errorTitle ?? this.errorTitle),
       ingredients: ingredients ?? this.ingredients,
       mealType: mealType ?? this.mealType,
     );
   }
+
+  /// Whether there's an error to show in a popup
+  bool get hasError => error != null;
 }
 
 /// Recipe suggestions notifier
@@ -499,6 +563,11 @@ class RecipeSuggestionsNotifier extends StateNotifier<RecipeSuggestionsState> {
   RecipeSuggestionsNotifier(this._geminiService)
     : super(const RecipeSuggestionsState());
 
+  /// Clear the current error (call after showing popup)
+  void clearError() {
+    state = state.copyWith(clearError: true);
+  }
+
   /// Get recipe suggestions from available ingredients
   Future<void> getSuggestions({
     required List<String> ingredients,
@@ -507,6 +576,7 @@ class RecipeSuggestionsNotifier extends StateNotifier<RecipeSuggestionsState> {
     if (ingredients.isEmpty) {
       state = state.copyWith(
         error: 'Please enter at least one ingredient.',
+        errorTitle: 'Missing Ingredients',
         suggestions: [],
       );
       return;
@@ -515,7 +585,7 @@ class RecipeSuggestionsNotifier extends StateNotifier<RecipeSuggestionsState> {
     // Store ingredients and mealType for back navigation
     state = state.copyWith(
       isLoading: true,
-      error: null,
+      clearError: true,
       ingredients: ingredients,
       mealType: mealType,
     );
@@ -527,11 +597,20 @@ class RecipeSuggestionsNotifier extends StateNotifier<RecipeSuggestionsState> {
       );
 
       state = state.copyWith(isLoading: false, suggestions: suggestions);
+    } on GeminiException catch (e) {
+      debugPrint('Gemini error getting suggestions: $e');
+      state = state.copyWith(
+        isLoading: false,
+        error: e.userFriendlyMessage,
+        errorTitle: e.errorTitle,
+        suggestions: [],
+      );
     } catch (e) {
       debugPrint('Error getting suggestions: $e');
       state = state.copyWith(
         isLoading: false,
         error: 'Failed to get recipe suggestions.',
+        errorTitle: 'Request Failed',
         suggestions: [],
       );
     }
@@ -539,7 +618,7 @@ class RecipeSuggestionsNotifier extends StateNotifier<RecipeSuggestionsState> {
 
   /// Clear suggestions but keep ingredients (for back navigation)
   void clearSuggestions() {
-    state = state.copyWith(suggestions: [], error: null);
+    state = state.copyWith(suggestions: [], clearError: true);
   }
 
   /// Clear everything including ingredients

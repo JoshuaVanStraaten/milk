@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/recipe.dart';
 
 /// Repository for recipe-related database operations
+/// Updated to support province-based filtering for ingredient matching
 class RecipeRepository {
   final SupabaseClient _supabase;
 
@@ -152,8 +153,14 @@ class RecipeRepository {
   }
 
   /// Find matching products for an ingredient
+  ///
+  /// [ingredientName]: The ingredient to search for
+  /// [province]: Province to filter by (required)
+  /// [retailer]: Optional - filter by specific retailer
+  /// [maxResults]: Maximum number of results to return
   Future<List<IngredientProductMatch>> findMatchingProducts({
     required String ingredientName,
+    required String province,
     String? retailer,
     int maxResults = 10,
   }) async {
@@ -167,6 +174,7 @@ class RecipeRepository {
         'find_matching_products_for_ingredient',
         params: {
           'ingredient_search': ingredientName,
+          'target_province': province,
           'target_retailer': targetRetailer,
           'similarity_threshold': 0.3,
           'max_results': maxResults,
@@ -187,6 +195,10 @@ class RecipeRepository {
   }
 
   /// Export recipe ingredients to a shopping list
+  ///
+  /// [recipe]: The recipe to export
+  /// [listName]: Name for the shopping list
+  /// [storeName]: Store name for the list
   Future<String> exportToShoppingList({
     required Recipe recipe,
     required String listName,

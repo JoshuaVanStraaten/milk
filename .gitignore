@@ -85,6 +85,12 @@ app.*.map.json
 **/ios/ServiceDefinitions.json
 **/ios/Runner/GeneratedPluginRegistrant.*
 
+# Windows related
+windows/flutter/generated_*
+
+# Linux related
+linux/flutter/generated_*
+
 # Web related
 lib/generated_plugin_registrant.dart
 

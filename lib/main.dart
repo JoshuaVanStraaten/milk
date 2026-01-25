@@ -13,7 +13,7 @@ void main() async {
   // Ensure Flutter is initialized
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize SharedPreferences for theme persistence
+  // Initialize SharedPreferences for theme and province persistence
   final sharedPreferences = await SharedPreferences.getInstance();
 
   // Initialize Hive for offline storage
@@ -31,6 +31,7 @@ void main() async {
     ProviderScope(
       overrides: [
         // Provide the SharedPreferences instance
+        // This is used by both themeProvider and provinceProvider
         sharedPreferencesProvider.overrideWithValue(sharedPreferences),
         // Provide the initialized connectivity service
         connectivityServiceProvider.overrideWithValue(connectivityService),
@@ -172,8 +173,9 @@ class _GlobalOfflineBannerState extends ConsumerState<_GlobalOfflineBanner>
 
         // Schedule the visibility update after build
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted)
+          if (mounted) {
             _updateVisibility(isOffline: isOffline, syncStatus: syncStatus);
+          }
         });
 
         // Determine banner content

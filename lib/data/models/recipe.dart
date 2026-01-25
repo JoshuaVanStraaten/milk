@@ -1,11 +1,10 @@
-import 'package:flutter/foundation.dart';
+import 'package:uuid/uuid.dart';
 
-/// Represents a recipe with ingredients and instructions
+/// Recipe model for AI-generated and saved recipes
 class Recipe {
   final String? recipeId;
   final String? userId;
   final DateTime? createdAt;
-  final DateTime? updatedAt;
   final String recipeName;
   final String? recipeDescription;
   final int servings;
@@ -19,14 +18,12 @@ class Recipe {
   final List<String> dietaryTags;
   final bool aiGenerated;
   final String? originalPrompt;
-  final String? imageUrl;
   final List<RecipeIngredient> ingredients;
 
   Recipe({
     this.recipeId,
     this.userId,
     this.createdAt,
-    this.updatedAt,
     required this.recipeName,
     this.recipeDescription,
     this.servings = 4,
@@ -38,22 +35,53 @@ class Recipe {
     this.cuisineType,
     this.mealType,
     this.dietaryTags = const [],
-    this.aiGenerated = true,
+    this.aiGenerated = false,
     this.originalPrompt,
-    this.imageUrl,
     this.ingredients = const [],
   });
 
-  /// Create from Supabase JSON response
+  /// Create Recipe from Supabase JSON response
   factory Recipe.fromJson(Map<String, dynamic> json) {
+    // Parse ingredients from nested Recipe_Ingredients
+    List<RecipeIngredient> ingredientsList = [];
+    if (json['Recipe_Ingredients'] != null) {
+      ingredientsList = (json['Recipe_Ingredients'] as List)
+          .map((i) => RecipeIngredient.fromJson(i as Map<String, dynamic>))
+          .toList();
+      // Sort by display_order
+      ingredientsList.sort(
+        (a, b) => (a.displayOrder ?? 0).compareTo(b.displayOrder ?? 0),
+      );
+    }
+
+    // Parse instructions from JSON array or string
+    List<String> instructions = [];
+    if (json['instructions'] != null) {
+      if (json['instructions'] is List) {
+        instructions = (json['instructions'] as List)
+            .map((e) => e.toString())
+            .toList();
+      } else if (json['instructions'] is String) {
+        // Try to parse as JSON array string
+        instructions = [json['instructions'] as String];
+      }
+    }
+
+    // Parse dietary tags
+    List<String> dietaryTags = [];
+    if (json['dietary_tags'] != null) {
+      if (json['dietary_tags'] is List) {
+        dietaryTags = (json['dietary_tags'] as List)
+            .map((e) => e.toString())
+            .toList();
+      }
+    }
+
     return Recipe(
       recipeId: json['recipe_id'] as String?,
       userId: json['user_id'] as String?,
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'] as String)
-          : null,
-      updatedAt: json['updated_at'] != null
-          ? DateTime.parse(json['updated_at'] as String)
           : null,
       recipeName: json['recipe_name'] as String? ?? 'Untitled Recipe',
       recipeDescription: json['recipe_description'] as String?,
@@ -62,32 +90,20 @@ class Recipe {
       cookTimeMinutes: json['cook_time_minutes'] as int?,
       totalTimeMinutes: json['total_time_minutes'] as int?,
       difficulty: json['difficulty'] as String?,
-      instructions: json['instructions'] != null
-          ? List<String>.from(json['instructions'] as List)
-          : [],
+      instructions: instructions,
       cuisineType: json['cuisine_type'] as String?,
       mealType: json['meal_type'] as String?,
-      dietaryTags: json['dietary_tags'] != null
-          ? List<String>.from(json['dietary_tags'] as List)
-          : [],
-      aiGenerated: json['ai_generated'] as bool? ?? true,
+      dietaryTags: dietaryTags,
+      aiGenerated: json['ai_generated'] as bool? ?? false,
       originalPrompt: json['original_prompt'] as String?,
-      imageUrl: json['image_url'] as String?,
-      ingredients: json['Recipe_Ingredients'] != null
-          ? (json['Recipe_Ingredients'] as List)
-                .map(
-                  (e) => RecipeIngredient.fromJson(e as Map<String, dynamic>),
-                )
-                .toList()
-          : [],
+      ingredients: ingredientsList,
     );
   }
 
-  /// Convert to JSON for Supabase insert/update
+  /// Convert Recipe to JSON for Supabase insert
   Map<String, dynamic> toJson() {
     return {
       if (recipeId != null) 'recipe_id': recipeId,
-      if (userId != null) 'user_id': userId,
       'recipe_name': recipeName,
       'recipe_description': recipeDescription,
       'servings': servings,
@@ -101,7 +117,8 @@ class Recipe {
       'dietary_tags': dietaryTags,
       'ai_generated': aiGenerated,
       'original_prompt': originalPrompt,
-      'image_url': imageUrl,
+      'created_at':
+          createdAt?.toIso8601String() ?? DateTime.now().toIso8601String(),
     };
   }
 
@@ -110,7 +127,6 @@ class Recipe {
     String? recipeId,
     String? userId,
     DateTime? createdAt,
-    DateTime? updatedAt,
     String? recipeName,
     String? recipeDescription,
     int? servings,
@@ -124,14 +140,12 @@ class Recipe {
     List<String>? dietaryTags,
     bool? aiGenerated,
     String? originalPrompt,
-    String? imageUrl,
     List<RecipeIngredient>? ingredients,
   }) {
     return Recipe(
       recipeId: recipeId ?? this.recipeId,
       userId: userId ?? this.userId,
       createdAt: createdAt ?? this.createdAt,
-      updatedAt: updatedAt ?? this.updatedAt,
       recipeName: recipeName ?? this.recipeName,
       recipeDescription: recipeDescription ?? this.recipeDescription,
       servings: servings ?? this.servings,
@@ -145,12 +159,11 @@ class Recipe {
       dietaryTags: dietaryTags ?? this.dietaryTags,
       aiGenerated: aiGenerated ?? this.aiGenerated,
       originalPrompt: originalPrompt ?? this.originalPrompt,
-      imageUrl: imageUrl ?? this.imageUrl,
       ingredients: ingredients ?? this.ingredients,
     );
   }
 
-  /// Formatted total time string
+  /// Total time formatted as string (returns empty string if null)
   String get formattedTotalTime {
     if (totalTimeMinutes == null) return '';
     if (totalTimeMinutes! < 60) return '${totalTimeMinutes}min';
@@ -160,33 +173,50 @@ class Recipe {
     return '${hours}h ${minutes}min';
   }
 
-  /// Formatted prep time string
+  /// Prep time formatted
   String get formattedPrepTime {
     if (prepTimeMinutes == null) return '';
-    return '${prepTimeMinutes}min prep';
+    if (prepTimeMinutes! < 60) return '${prepTimeMinutes}min';
+    final hours = prepTimeMinutes! ~/ 60;
+    final minutes = prepTimeMinutes! % 60;
+    if (minutes == 0) return '${hours}h';
+    return '${hours}h ${minutes}min';
   }
 
-  /// Formatted cook time string
+  /// Cook time formatted
   String get formattedCookTime {
     if (cookTimeMinutes == null) return '';
-    return '${cookTimeMinutes}min cook';
+    if (cookTimeMinutes! < 60) return '${cookTimeMinutes}min';
+    final hours = cookTimeMinutes! ~/ 60;
+    final minutes = cookTimeMinutes! % 60;
+    if (minutes == 0) return '${hours}h';
+    return '${hours}h ${minutes}min';
   }
 
   /// Calculate estimated total price from matched ingredients
+  /// Returns 0.0 if no ingredients are matched (NON-NULLABLE for safe comparisons)
   double get estimatedTotalPrice {
-    return ingredients
-        .where((i) => i.matchedProductPrice != null)
-        .fold(0.0, (sum, i) => sum + i.matchedProductPrice!);
+    final matchedIngredients = ingredients.where((i) => i.isMatched).toList();
+    if (matchedIngredients.isEmpty) return 0.0;
+
+    return matchedIngredients.fold<double>(
+      0.0,
+      (sum, ingredient) => sum + (ingredient.matchedProductPrice ?? 0.0),
+    );
   }
 
-  /// Count of ingredients with product matches
-  int get matchedIngredientsCount {
-    return ingredients.where((i) => i.matchedProductIndex != null).length;
-  }
+  /// Count of matched ingredients
+  int get matchedIngredientsCount =>
+      ingredients.where((i) => i.isMatched).length;
 
-  /// Count of ingredients without product matches
-  int get unmatchedIngredientsCount {
-    return ingredients.where((i) => i.matchedProductIndex == null).length;
+  /// Count of unmatched ingredients
+  int get unmatchedIngredientsCount =>
+      ingredients.where((i) => !i.isMatched).length;
+
+  /// Percentage of ingredients matched
+  int get matchedPercentage {
+    if (ingredients.isEmpty) return 0;
+    return ((matchedIngredientsCount / ingredients.length) * 100).round();
   }
 
   @override
@@ -200,7 +230,7 @@ class Recipe {
   int get hashCode => recipeId.hashCode;
 }
 
-/// Represents an ingredient in a recipe
+/// Individual ingredient in a recipe
 class RecipeIngredient {
   final String? ingredientId;
   final String? recipeId;
@@ -214,10 +244,10 @@ class RecipeIngredient {
   final String? matchedProductName;
   final double? matchedProductPrice;
   final String? matchedRetailer;
-  final int displayOrder;
+  final int? displayOrder;
 
   RecipeIngredient({
-    this.ingredientId,
+    String? ingredientId,
     this.recipeId,
     this.createdAt,
     required this.ingredientName,
@@ -229,10 +259,10 @@ class RecipeIngredient {
     this.matchedProductName,
     this.matchedProductPrice,
     this.matchedRetailer,
-    this.displayOrder = 0,
-  });
+    this.displayOrder,
+  }) : ingredientId = ingredientId ?? const Uuid().v4();
 
-  /// Create from Supabase JSON response
+  /// Create RecipeIngredient from Supabase JSON
   factory RecipeIngredient.fromJson(Map<String, dynamic> json) {
     return RecipeIngredient(
       ingredientId: json['ingredient_id'] as String?,
@@ -249,15 +279,14 @@ class RecipeIngredient {
       matchedProductName: json['matched_product_name'] as String?,
       matchedProductPrice: (json['matched_product_price'] as num?)?.toDouble(),
       matchedRetailer: json['matched_retailer'] as String?,
-      displayOrder: json['display_order'] as int? ?? 0,
+      displayOrder: json['display_order'] as int?,
     );
   }
 
-  /// Convert to JSON for Supabase insert/update
+  /// Convert to JSON for Supabase insert
   Map<String, dynamic> toJson() {
     return {
-      if (ingredientId != null) 'ingredient_id': ingredientId,
-      if (recipeId != null) 'recipe_id': recipeId,
+      'ingredient_id': ingredientId,
       'ingredient_name': ingredientName,
       'quantity': quantity,
       'unit': unit,
@@ -272,7 +301,7 @@ class RecipeIngredient {
   }
 
   /// Create a copy with updated fields
-  /// Use [clearMatch] = true to explicitly clear all match-related fields
+  /// Use [clearMatch: true] to explicitly clear the match fields
   RecipeIngredient copyWith({
     String? ingredientId,
     String? recipeId,
@@ -358,6 +387,7 @@ class RecipeIngredient {
 }
 
 /// Represents a product match candidate for an ingredient
+/// Used when searching for products to match to recipe ingredients
 class IngredientProductMatch {
   final String productIndex;
   final String productName;
@@ -381,15 +411,29 @@ class IngredientProductMatch {
     this.sizeUnit,
   });
 
+  /// Create from Supabase RPC response
+  /// Note: Field names match the SQL function output:
+  /// - index, name, price, promotion_price, image_url, retailer, similarity_score, size_value, size_unit
   factory IngredientProductMatch.fromJson(Map<String, dynamic> json) {
     return IngredientProductMatch(
-      productIndex: json['product_index'] as String,
-      productName: json['product_name'] as String,
-      productPrice: json['product_price'] as String?,
-      productPromotionPrice: json['product_promotion_price'] as String?,
-      productImageUrl: json['product_image_url'] as String?,
-      retailer: json['retailer'] as String,
-      similarityScore: (json['similarity_score'] as num).toDouble(),
+      // SQL returns 'index', not 'product_index'
+      productIndex: json['index'] as String? ?? '',
+      // SQL returns 'name', not 'product_name'
+      productName: json['name'] as String? ?? '',
+      // SQL returns 'price', not 'product_price'
+      productPrice: json['price'] as String?,
+      // SQL returns 'promotion_price', not 'product_promotion_price'
+      productPromotionPrice: json['promotion_price'] as String?,
+      // SQL returns 'image_url', not 'product_image_url'
+      productImageUrl: json['image_url'] as String?,
+      // retailer matches
+      retailer: json['retailer'] as String? ?? '',
+      // SQL returns 'similarity_score', handle both names for safety
+      similarityScore:
+          (json['similarity_score'] as num?)?.toDouble() ??
+          (json['sim_score'] as num?)?.toDouble() ??
+          0.0,
+      // size_value and size_unit match
       sizeValue: (json['size_value'] as num?)?.toDouble(),
       sizeUnit: json['size_unit'] as String?,
     );
@@ -408,9 +452,16 @@ class IngredientProductMatch {
   /// Formatted size string
   String? get formattedSize {
     if (sizeValue == null || sizeUnit == null) return null;
-    return '${sizeValue!.toStringAsFixed(sizeValue! == sizeValue!.roundToDouble() ? 0 : 1)}${sizeUnit}';
+    return '${sizeValue!.toStringAsFixed(sizeValue! == sizeValue!.roundToDouble() ? 0 : 1)}$sizeUnit';
   }
 
   /// Similarity as percentage
   String get similarityPercentage => '${(similarityScore * 100).toInt()}%';
+
+  /// Check if product has a promotion
+  bool get hasPromotion =>
+      productPromotionPrice != null && productPromotionPrice!.isNotEmpty;
 }
+
+// NOTE: RecipeSuggestion is ONLY defined in gemini_service.dart
+// Do NOT add it here to avoid duplicate class conflicts

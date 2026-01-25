@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/theme_provider.dart';
+import '../../providers/province_provider.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -11,6 +13,7 @@ class ProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final userProfileAsync = ref.watch(currentUserProfileProvider);
     final themeState = ref.watch(themeProvider);
+    final provinceState = ref.watch(provinceProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
@@ -84,6 +87,27 @@ class ProfileScreen extends ConsumerWidget {
 
                 // Settings Section Header
                 _SectionHeader(title: 'Settings', isDark: isDark),
+
+                const SizedBox(height: 12),
+
+                // Province Selector (NEW)
+                _ProvinceSelector(
+                  currentProvince: provinceState.selectedProvince,
+                  onProvinceChanged: (province) async {
+                    final success = await ref
+                        .read(provinceProvider.notifier)
+                        .setProvince(province);
+                    if (!success && context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('$province is coming soon!'),
+                          backgroundColor: AppColors.secondary,
+                        ),
+                      );
+                    }
+                  },
+                  isDark: isDark,
+                ),
 
                 const SizedBox(height: 12),
 
@@ -197,6 +221,242 @@ class _SectionHeader extends StatelessWidget {
           fontWeight: FontWeight.w600,
           color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
           letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+}
+
+/// Province selector widget
+class _ProvinceSelector extends StatelessWidget {
+  final String currentProvince;
+  final Function(String) onProvinceChanged;
+  final bool isDark;
+
+  const _ProvinceSelector({
+    required this.currentProvince,
+    required this.onProvinceChanged,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final provinceInfo = AppConstants.getProvinceInfo(currentProvince);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.surfaceDarkMode : AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.location_on_outlined,
+                  color: AppColors.primary,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Province',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: isDark
+                            ? AppColors.textPrimaryDark
+                            : AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Prices shown for your selected region',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          // Province dropdown
+          InkWell(
+            onTap: () => _showProvinceSelector(context),
+            borderRadius: BorderRadius.circular(10),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.backgroundDark : AppColors.background,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: isDark ? AppColors.dividerDark : AppColors.divider,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Text(provinceInfo.icon, style: const TextStyle(fontSize: 20)),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      currentProvince,
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: isDark
+                            ? AppColors.textPrimaryDark
+                            : AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                  Icon(
+                    Icons.arrow_drop_down,
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondary,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showProvinceSelector(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: isDark ? AppColors.surfaceDarkMode : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Handle bar
+            Center(
+              child: Container(
+                margin: const EdgeInsets.only(top: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.grey[700] : Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+
+            // Title
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                'Select Province',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: isDark
+                      ? AppColors.textPrimaryDark
+                      : AppColors.textPrimary,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+
+            // Province list
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: AppConstants.allProvinces.length,
+                itemBuilder: (context, index) {
+                  final province = AppConstants.allProvinces[index];
+                  final info = AppConstants.getProvinceInfo(province);
+                  final isSelected = province == currentProvince;
+
+                  return ListTile(
+                    leading: Text(
+                      info.icon,
+                      style: TextStyle(
+                        fontSize: 24,
+                        color: info.isAvailable ? null : Colors.grey,
+                      ),
+                    ),
+                    title: Text(
+                      province,
+                      style: TextStyle(
+                        color: info.isAvailable
+                            ? (isDark
+                                  ? AppColors.textPrimaryDark
+                                  : AppColors.textPrimary)
+                            : Colors.grey,
+                        fontWeight: isSelected
+                            ? FontWeight.bold
+                            : FontWeight.normal,
+                      ),
+                    ),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (!info.isAvailable)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.secondary.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text(
+                              'Coming Soon',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.secondary,
+                              ),
+                            ),
+                          ),
+                        if (isSelected)
+                          const Padding(
+                            padding: EdgeInsets.only(left: 8),
+                            child: Icon(Icons.check, color: AppColors.primary),
+                          ),
+                      ],
+                    ),
+                    enabled: info.isAvailable,
+                    onTap: info.isAvailable
+                        ? () {
+                            onProvinceChanged(province);
+                            Navigator.pop(context);
+                          }
+                        : null,
+                  );
+                },
+              ),
+            ),
+
+            const SizedBox(height: 16),
+          ],
         ),
       ),
     );

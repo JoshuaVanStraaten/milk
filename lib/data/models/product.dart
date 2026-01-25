@@ -1,4 +1,5 @@
 /// Product model matching the Products table in Supabase
+/// Updated to include province and new scraped fields
 class Product {
   final String index; // Primary key (text-based unique identifier)
   final String name;
@@ -8,6 +9,15 @@ class Product {
   final String? imageUrl;
   final String? promotionValid;
 
+  // New fields from updated schema
+  final String province; // Required - province the product belongs to
+  final String? brand; // Extracted brand name
+  final double? sizeValue; // Extracted size number (e.g., 500)
+  final String? sizeUnit; // Size unit (e.g., "g", "ml", "kg")
+  final String? normalizedName; // Lowercase, cleaned name for search
+  final DateTime? parsedAt; // When the product was last scraped
+  final String? category; // Product category
+
   Product({
     required this.index,
     required this.name,
@@ -16,18 +26,34 @@ class Product {
     required this.retailer,
     this.imageUrl,
     this.promotionValid,
+    required this.province,
+    this.brand,
+    this.sizeValue,
+    this.sizeUnit,
+    this.normalizedName,
+    this.parsedAt,
+    this.category,
   });
 
   /// Create Product from Supabase JSON response
   factory Product.fromJson(Map<String, dynamic> json) {
     return Product(
       index: json['index'] as String,
-      name: json['name'] as String,
+      name: json['name'] as String? ?? '',
       price: json['price'] as String?,
       promotionPrice: json['promotion_price'] as String?,
-      retailer: json['retailer'] as String,
+      retailer: json['retailer'] as String? ?? '',
       imageUrl: json['image_url'] as String?,
       promotionValid: json['promotion_valid'] as String?,
+      province: json['province'] as String? ?? '',
+      brand: json['brand'] as String?,
+      sizeValue: (json['size_value'] as num?)?.toDouble(),
+      sizeUnit: json['size_unit'] as String?,
+      normalizedName: json['normalized_name'] as String?,
+      parsedAt: json['parsed_at'] != null
+          ? DateTime.tryParse(json['parsed_at'] as String)
+          : null,
+      category: json['category'] as String?,
     );
   }
 
@@ -41,7 +67,49 @@ class Product {
       'retailer': retailer,
       'image_url': imageUrl,
       'promotion_valid': promotionValid,
+      'province': province,
+      'brand': brand,
+      'size_value': sizeValue,
+      'size_unit': sizeUnit,
+      'normalized_name': normalizedName,
+      'parsed_at': parsedAt?.toIso8601String(),
+      'category': category,
     };
+  }
+
+  /// Create a copy with updated fields
+  Product copyWith({
+    String? index,
+    String? name,
+    String? price,
+    String? promotionPrice,
+    String? retailer,
+    String? imageUrl,
+    String? promotionValid,
+    String? province,
+    String? brand,
+    double? sizeValue,
+    String? sizeUnit,
+    String? normalizedName,
+    DateTime? parsedAt,
+    String? category,
+  }) {
+    return Product(
+      index: index ?? this.index,
+      name: name ?? this.name,
+      price: price ?? this.price,
+      promotionPrice: promotionPrice ?? this.promotionPrice,
+      retailer: retailer ?? this.retailer,
+      imageUrl: imageUrl ?? this.imageUrl,
+      promotionValid: promotionValid ?? this.promotionValid,
+      province: province ?? this.province,
+      brand: brand ?? this.brand,
+      sizeValue: sizeValue ?? this.sizeValue,
+      sizeUnit: sizeUnit ?? this.sizeUnit,
+      normalizedName: normalizedName ?? this.normalizedName,
+      parsedAt: parsedAt ?? this.parsedAt,
+      category: category ?? this.category,
+    );
   }
 
   /// Check if product has a promotion
@@ -125,6 +193,18 @@ class Product {
       return promotionPrice!;
     }
     return price ?? 'Price not available';
+  }
+
+  /// Get formatted size string (e.g., "500g", "1L")
+  String? get formattedSize {
+    if (sizeValue == null || sizeUnit == null) return null;
+
+    // Format nicely - no decimals for whole numbers
+    final valueStr = sizeValue! == sizeValue!.roundToDouble()
+        ? sizeValue!.round().toString()
+        : sizeValue!.toString();
+
+    return '$valueStr${sizeUnit!}';
   }
 
   /// Get numeric price for calculations (removes "R" and converts to double)
@@ -248,7 +328,7 @@ class Product {
 
   @override
   String toString() {
-    return 'Product(name: $name, retailer: $retailer, price: $price)';
+    return 'Product(name: $name, retailer: $retailer, price: $price, province: $province)';
   }
 
   @override

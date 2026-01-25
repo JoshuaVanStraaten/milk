@@ -11,6 +11,7 @@ import '../../widgets/recipes/recipe_result_card.dart';
 import '../../widgets/recipes/ingredient_matching_sheet.dart';
 import '../../widgets/recipes/ingredients_input_card.dart';
 import '../../widgets/recipes/recipe_suggestions_card.dart';
+import '../../widgets/common/ai_error_dialog.dart';
 
 /// Main screen for AI recipe generation
 class RecipeScreen extends ConsumerStatefulWidget {
@@ -72,6 +73,32 @@ class _GenerateRecipeTabState extends ConsumerState<_GenerateRecipeTab> {
 
   @override
   Widget build(BuildContext context) {
+    // Listen for recipe generation errors
+    ref.listen<RecipeGenerationState>(recipeGenerationProvider, (prev, next) {
+      if (next.hasError && prev?.error != next.error) {
+        showAIErrorDialog(
+          context,
+          title: next.errorTitle ?? 'Error',
+          message: next.error!,
+          onDismiss: () =>
+              ref.read(recipeGenerationProvider.notifier).clearError(),
+        );
+      }
+    });
+
+    // Listen for recipe suggestions errors (from "Use Ingredients" mode)
+    ref.listen<RecipeSuggestionsState>(recipeSuggestionsProvider, (prev, next) {
+      if (next.hasError && prev?.error != next.error) {
+        showAIErrorDialog(
+          context,
+          title: next.errorTitle ?? 'Error',
+          message: next.error!,
+          onDismiss: () =>
+              ref.read(recipeSuggestionsProvider.notifier).clearError(),
+        );
+      }
+    });
+
     final state = ref.watch(recipeGenerationProvider);
     final suggestionsState = ref.watch(recipeSuggestionsProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;

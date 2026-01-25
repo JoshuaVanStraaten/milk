@@ -7,6 +7,7 @@ import '../../../core/constants/app_constants.dart';
 import '../../../data/models/product.dart';
 import '../../../data/models/comparable_product.dart';
 import '../providers/price_comparison_provider.dart';
+import '../providers/province_provider.dart';
 
 /// Bottom sheet for displaying price comparison results
 class PriceComparisonSheet extends ConsumerStatefulWidget {
@@ -239,7 +240,7 @@ class _PriceComparisonSheetState extends ConsumerState<PriceComparisonSheet> {
         if (state.similarMatches.isNotEmpty) ...[
           _buildSectionHeader(
             'Similar Products',
-            Icons.swap_horiz,
+            Icons.content_copy,
             AppColors.secondary,
             state.similarMatches.length,
           ),
@@ -248,11 +249,13 @@ class _PriceComparisonSheetState extends ConsumerState<PriceComparisonSheet> {
           const SizedBox(height: 16),
         ],
 
-        // Fallback matches
-        if (state.fallbackMatches.isNotEmpty) ...[
+        // Fallback matches (only if no better matches)
+        if (state.fallbackMatches.isNotEmpty &&
+            !state.hasExactMatches &&
+            state.similarMatches.isEmpty) ...[
           _buildSectionHeader(
-            'Alternatives',
-            Icons.lightbulb_outline,
+            'Related Products',
+            Icons.category,
             AppColors.textSecondary,
             state.fallbackMatches.length,
           ),
@@ -266,22 +269,25 @@ class _PriceComparisonSheetState extends ConsumerState<PriceComparisonSheet> {
   }
 
   Widget _buildSourceProductCard() {
-    final product = widget.sourceProduct;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final product = widget.sourceProduct;
+    final retailerColor = _getRetailerColor(product.retailer);
 
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.primary.withOpacity(isDark ? 0.15 : 0.05),
+        color: isDark
+            ? AppColors.primary.withOpacity(0.1)
+            : AppColors.primary.withOpacity(0.05),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+        border: Border.all(color: AppColors.primary.withOpacity(0.3)),
       ),
       child: Row(
         children: [
-          // Image
+          // Product image
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
-            child: product.imageUrl != null
+            child: product.imageUrl != null && product.imageUrl!.isNotEmpty
                 ? CachedNetworkImage(
                     imageUrl: product.imageUrl!,
                     width: 50,
@@ -294,7 +300,7 @@ class _PriceComparisonSheetState extends ConsumerState<PriceComparisonSheet> {
           ),
           const SizedBox(width: 12),
 
-          // Details
+          // Product details
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -307,11 +313,30 @@ class _PriceComparisonSheetState extends ConsumerState<PriceComparisonSheet> {
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
+                        color: retailerColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        product.retailer,
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: retailerColor,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
                         color: AppColors.primary.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: const Text(
-                        'Current',
+                        'Your Selection',
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w600,
@@ -319,43 +344,33 @@ class _PriceComparisonSheetState extends ConsumerState<PriceComparisonSheet> {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Text(
-                      product.retailer,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: isDark
-                            ? AppColors.textSecondaryDark
-                            : AppColors.textSecondary,
-                      ),
-                    ),
                   ],
                 ),
                 const SizedBox(height: 4),
-                // Base price
                 Text(
-                  product.price ?? 'N/A',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.primary,
+                  product.name,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: isDark
+                        ? AppColors.textPrimaryDark
+                        : AppColors.textPrimary,
                   ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                // Show promo as additional info if available
-                if (product.hasPromotion) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    product.promotionPrice!,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.error,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
               ],
+            ),
+          ),
+          const SizedBox(width: 8),
+
+          // Price
+          Text(
+            product.price ?? 'N/A',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: AppColors.primary,
             ),
           ),
         ],
@@ -369,6 +384,8 @@ class _PriceComparisonSheetState extends ConsumerState<PriceComparisonSheet> {
     Color color,
     int count,
   ) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Row(
       children: [
         Icon(icon, size: 18, color: color),
@@ -378,20 +395,20 @@ class _PriceComparisonSheetState extends ConsumerState<PriceComparisonSheet> {
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: color,
+            color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
           ),
         ),
         const SizedBox(width: 8),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
           decoration: BoxDecoration(
             color: color.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(12),
           ),
           child: Text(
             count.toString(),
             style: TextStyle(
-              fontSize: 11,
+              fontSize: 12,
               fontWeight: FontWeight.w600,
               color: color,
             ),
@@ -404,147 +421,146 @@ class _PriceComparisonSheetState extends ConsumerState<PriceComparisonSheet> {
   Widget _buildComparisonCard(ComparableProduct comparison, bool isDark) {
     final retailerColor = _getRetailerColor(comparison.retailer);
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
         color: isDark ? AppColors.surfaceDarkMode : AppColors.surface,
         borderRadius: BorderRadius.circular(12),
-        border: comparison.isCheaper
-            ? Border.all(color: AppColors.success.withOpacity(0.3))
-            : null,
-      ),
-      child: InkWell(
-        onTap: () => _navigateToProduct(comparison),
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              // Product image
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: comparison.productImageUrl != null
-                    ? CachedNetworkImage(
-                        imageUrl: comparison.productImageUrl!,
-                        width: 60,
-                        height: 60,
-                        fit: BoxFit.cover,
-                        errorWidget: (_, __, ___) =>
-                            _buildPlaceholderImage(60, isDark),
-                      )
-                    : _buildPlaceholderImage(60, isDark),
-              ),
-              const SizedBox(width: 12),
+        child: InkWell(
+          onTap: () => _navigateToProduct(comparison),
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                // Product image
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child:
+                      comparison.productImageUrl != null &&
+                          comparison.productImageUrl!.isNotEmpty
+                      ? CachedNetworkImage(
+                          imageUrl: comparison.productImageUrl!,
+                          width: 60,
+                          height: 60,
+                          fit: BoxFit.cover,
+                          errorWidget: (_, __, ___) =>
+                              _buildPlaceholderImage(60, isDark),
+                        )
+                      : _buildPlaceholderImage(60, isDark),
+                ),
+                const SizedBox(width: 12),
 
-              // Product details
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Retailer badge
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: retailerColor.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        comparison.retailer,
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          color: retailerColor,
+                // Product details
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Retailer badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: retailerColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          comparison.retailer,
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: retailerColor,
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 4),
+                      const SizedBox(height: 4),
 
-                    // Product name
+                      // Product name
+                      Text(
+                        comparison.productName,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: isDark
+                              ? AppColors.textPrimaryDark
+                              : AppColors.textPrimary,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+
+                      // Size if available
+                      if (comparison.formattedSize != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          comparison.formattedSize!,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+
+                // Price and difference
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    // Base price (used for comparison)
                     Text(
-                      comparison.productName,
+                      comparison.productPrice ?? 'N/A',
                       style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
                         color: isDark
                             ? AppColors.textPrimaryDark
                             : AppColors.textPrimary,
                       ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
                     ),
 
-                    // Size if available
-                    if (comparison.formattedSize != null) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        comparison.formattedSize!,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: isDark
-                              ? AppColors.textSecondaryDark
-                              : AppColors.textSecondary,
+                    // Price difference badge (based on base price)
+                    if (comparison.priceDifference != null) ...[
+                      const SizedBox(height: 4),
+                      _buildPriceDifferenceBadge(comparison),
+                    ],
+
+                    // Show promo as bonus info if available
+                    if (comparison.hasPromotion) ...[
+                      const SizedBox(height: 4),
+                      Container(
+                        constraints: const BoxConstraints(maxWidth: 100),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.error.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          comparison.productPromotionPrice!,
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.error,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.right,
                         ),
                       ),
                     ],
                   ],
                 ),
-              ),
-              const SizedBox(width: 8),
-
-              // Price and difference
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  // Base price (used for comparison)
-                  Text(
-                    comparison.productPrice ?? 'N/A',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: isDark
-                          ? AppColors.textPrimaryDark
-                          : AppColors.textPrimary,
-                    ),
-                  ),
-
-                  // Price difference badge (based on base price)
-                  if (comparison.priceDifference != null) ...[
-                    const SizedBox(height: 4),
-                    _buildPriceDifferenceBadge(comparison),
-                  ],
-
-                  // Show promo as bonus info if available
-                  if (comparison.hasPromotion) ...[
-                    const SizedBox(height: 4),
-                    Container(
-                      constraints: const BoxConstraints(maxWidth: 100),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.error.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        comparison.productPromotionPrice!,
-                        style: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.error,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.right,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -628,7 +644,11 @@ class _PriceComparisonSheetState extends ConsumerState<PriceComparisonSheet> {
   }
 
   void _navigateToProduct(ComparableProduct comparison) {
+    // Get current province from provider
+    final province = ref.read(selectedProvinceProvider);
+
     // Create a Product from the comparison to navigate
+    // Province is now required for the Product model
     final product = Product(
       index: comparison.productIndex,
       name: comparison.productName,
@@ -636,6 +656,9 @@ class _PriceComparisonSheetState extends ConsumerState<PriceComparisonSheet> {
       promotionPrice: comparison.productPromotionPrice,
       retailer: comparison.retailer,
       imageUrl: comparison.productImageUrl,
+      province: province, // Use current province
+      sizeValue: comparison.sizeValue,
+      sizeUnit: comparison.sizeUnit,
     );
 
     // Close the bottom sheet first

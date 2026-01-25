@@ -1,8 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/comparable_product.dart';
 import '../../data/repositories/product_repository.dart';
+import 'province_provider.dart';
 
 /// Provider for the product repository
+/// Note: This is also defined in product_provider.dart - ensure only one is used
 final productRepositoryProvider = Provider<ProductRepository>((ref) {
   return ProductRepository();
 });
@@ -13,12 +15,15 @@ class PriceComparisonState {
   final bool isLoading;
   final String? error;
   final String? sourceProductIndex;
+  final String?
+  comparedProvince; // Track which province comparisons were made for
 
   const PriceComparisonState({
     this.comparisons = const [],
     this.isLoading = false,
     this.error,
     this.sourceProductIndex,
+    this.comparedProvince,
   });
 
   PriceComparisonState copyWith({
@@ -26,12 +31,14 @@ class PriceComparisonState {
     bool? isLoading,
     String? error,
     String? sourceProductIndex,
+    String? comparedProvince,
   }) {
     return PriceComparisonState(
       comparisons: comparisons ?? this.comparisons,
       isLoading: isLoading ?? this.isLoading,
       error: error,
       sourceProductIndex: sourceProductIndex ?? this.sourceProductIndex,
+      comparedProvince: comparedProvince ?? this.comparedProvince,
     );
   }
 
@@ -93,14 +100,23 @@ class PriceComparisonState {
 /// Notifier for price comparison state
 class PriceComparisonNotifier extends StateNotifier<PriceComparisonState> {
   final ProductRepository _repository;
+  final Ref _ref;
 
-  PriceComparisonNotifier(this._repository)
+  PriceComparisonNotifier(this._repository, this._ref)
     : super(const PriceComparisonState());
 
+  /// Get current province from provider
+  String get _currentProvince => _ref.read(selectedProvinceProvider);
+
   /// Load comparable products for a given product index
+  /// Comparisons are filtered to the currently selected province
   Future<void> loadComparisons(String productIndex) async {
-    // Don't reload if already loaded for this product
-    if (state.sourceProductIndex == productIndex && state.hasResults) {
+    final province = _currentProvince;
+
+    // Don't reload if already loaded for this product AND same province
+    if (state.sourceProductIndex == productIndex &&
+        state.comparedProvince == province &&
+        state.hasResults) {
       return;
     }
 
@@ -108,11 +124,13 @@ class PriceComparisonNotifier extends StateNotifier<PriceComparisonState> {
       isLoading: true,
       error: null,
       sourceProductIndex: productIndex,
+      comparedProvince: province,
     );
 
     try {
       final comparisons = await _repository.findComparableProducts(
         productIndex: productIndex,
+        province: province,
       );
 
       state = state.copyWith(comparisons: comparisons, isLoading: false);
@@ -125,11 +143,18 @@ class PriceComparisonNotifier extends StateNotifier<PriceComparisonState> {
   Future<void> refresh() async {
     if (state.sourceProductIndex == null) return;
 
-    state = state.copyWith(isLoading: true, error: null);
+    final province = _currentProvince;
+
+    state = state.copyWith(
+      isLoading: true,
+      error: null,
+      comparedProvince: province,
+    );
 
     try {
       final comparisons = await _repository.findComparableProducts(
         productIndex: state.sourceProductIndex!,
+        province: province,
       );
 
       state = state.copyWith(comparisons: comparisons, isLoading: false);
@@ -149,10 +174,11 @@ class PriceComparisonNotifier extends StateNotifier<PriceComparisonState> {
 final priceComparisonProvider =
     StateNotifierProvider<PriceComparisonNotifier, PriceComparisonState>((ref) {
       final repository = ref.watch(productRepositoryProvider);
-      return PriceComparisonNotifier(repository);
+      return PriceComparisonNotifier(repository, ref);
     });
 
 /// Provider for loading comparisons - auto-disposes when not needed
+/// Uses the currently selected province
 /// Use: ref.watch(priceComparisonLoaderProvider(productIndex))
 final priceComparisonLoaderProvider =
     FutureProvider.family<List<ComparableProduct>, String>((
@@ -160,5 +186,9 @@ final priceComparisonLoaderProvider =
       productIndex,
     ) async {
       final repository = ref.watch(productRepositoryProvider);
-      return repository.findComparableProducts(productIndex: productIndex);
+      final province = ref.watch(selectedProvinceProvider);
+      return repository.findComparableProducts(
+        productIndex: productIndex,
+        province: province,
+      );
     });

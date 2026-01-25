@@ -16,6 +16,7 @@ class _RecipeInputCardState extends State<RecipeInputCard> {
   final _recipeController = TextEditingController();
   int _servings = 4;
   final Set<String> _selectedDietary = {};
+  String? _selectedSuggestion; // Track which quick suggestion is selected
 
   final List<String> _dietaryOptions = [
     'Vegetarian',
@@ -117,8 +118,19 @@ class _RecipeInputCardState extends State<RecipeInputCard> {
               fillColor: isDark ? AppColors.backgroundDark : Colors.white,
             ),
             textCapitalization: TextCapitalization.words,
-            onChanged: (_) =>
-                setState(() {}), // Trigger rebuild to update button state
+            onChanged: (value) {
+              setState(() {
+                // Clear selection if user types something different
+                if (_selectedSuggestion != null &&
+                   value != _selectedSuggestion) {
+                  _selectedSuggestion = null;
+                }
+                // Re-select if user types back to match a suggestion
+                if (_quickSuggestions.contains(value)) {
+                  _selectedSuggestion = value;
+                }
+              });
+            },
             onSubmitted: (_) => _handleGenerate(),
           ),
 
@@ -129,13 +141,28 @@ class _RecipeInputCardState extends State<RecipeInputCard> {
             spacing: 8,
             runSpacing: 8,
             children: _quickSuggestions.map((suggestion) {
-              return ActionChip(
-                label: Text(suggestion, style: const TextStyle(fontSize: 12)),
-                onPressed: () {
+              final isSelected = _selectedSuggestion == suggestion;
+              return ChoiceChip(
+                label: Text(
+                  suggestion,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isSelected ? Colors.white : null,
+                  ),
+                ),
+                selected: isSelected,
+                onSelected: (selected) {
                   setState(() {
-                    _recipeController.text = suggestion;
+                    if (selected) {
+                      _selectedSuggestion = suggestion;
+                      _recipeController.text = suggestion;
+                    } else {
+                      _selectedSuggestion = null;
+                      _recipeController.clear();
+                    }
                   });
                 },
+                selectedColor: AppColors.primary,
                 backgroundColor: isDark
                     ? AppColors.backgroundDark
                     : Colors.white,

@@ -147,17 +147,48 @@ Suggest recipes that:
     });
 
     try {
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: body,
-      );
+      final response = await http
+          .post(url, headers: {'Content-Type': 'application/json'}, body: body)
+          .timeout(
+            const Duration(seconds: 60),
+            onTimeout: () {
+              throw GeminiException(
+                'Request timed out',
+                statusCode: 408,
+                isRetryable: true,
+              );
+            },
+          );
 
       if (response.statusCode != 200) {
         debugPrint(
           'Gemini API error: ${response.statusCode} - ${response.body}',
         );
-        throw GeminiException('API request failed: ${response.statusCode}');
+
+        // Parse the error response to get details
+        try {
+          final errorBody = jsonDecode(response.body) as Map<String, dynamic>;
+          final error = errorBody['error'] as Map<String, dynamic>?;
+          final status = error?['status'] as String?;
+
+          throw GeminiException(
+            error?['message'] as String? ?? 'API request failed',
+            statusCode: response.statusCode,
+            status: status,
+            isRetryable:
+                response.statusCode >= 500 ||
+                response.statusCode == 429 ||
+                status == 'UNAVAILABLE' ||
+                status == 'RESOURCE_EXHAUSTED',
+          );
+        } catch (e) {
+          if (e is GeminiException) rethrow;
+          throw GeminiException(
+            'API request failed: ${response.statusCode}',
+            statusCode: response.statusCode,
+            isRetryable: response.statusCode >= 500,
+          );
+        }
       }
 
       final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -165,25 +196,39 @@ Suggest recipes that:
       // Extract text from response
       final candidates = data['candidates'] as List?;
       if (candidates == null || candidates.isEmpty) {
-        throw GeminiException('No response generated');
+        // Check for blocked content
+        final blockReason = data['promptFeedback']?['blockReason'];
+        if (blockReason != null) {
+          throw GeminiException(
+            'Content was blocked: $blockReason',
+            status: 'BLOCKED',
+            isRetryable: false,
+          );
+        }
+        throw GeminiException('No response generated', isRetryable: true);
       }
 
       final content = candidates[0]['content'] as Map<String, dynamic>?;
       final parts = content?['parts'] as List?;
       if (parts == null || parts.isEmpty) {
-        throw GeminiException('Empty response from API');
+        throw GeminiException('Empty response from API', isRetryable: true);
       }
 
       final text = parts[0]['text'] as String?;
       if (text == null || text.isEmpty) {
-        throw GeminiException('No text in response');
+        throw GeminiException('No text in response', isRetryable: true);
       }
 
       return text;
+    } on GeminiException {
+      rethrow;
+    } on http.ClientException catch (e) {
+      debugPrint('Network error: $e');
+      throw GeminiException('Network error: ${e.message}', isRetryable: true);
     } catch (e) {
       if (e is GeminiException) rethrow;
       debugPrint('Gemini API error: $e');
-      throw GeminiException('Failed to connect to Gemini API: $e');
+      throw GeminiException('Failed to connect to AI service: $e');
     }
   }
 
@@ -248,9 +293,10 @@ Suggest recipes that:
         ingredients: ingredientsList,
       );
     } catch (e) {
+      if (e is GeminiException) rethrow;
       debugPrint('Failed to parse recipe response: $e');
       debugPrint('Response was: $response');
-      throw GeminiException('Failed to parse recipe: $e');
+      throw GeminiException('Failed to parse recipe', isRetryable: true);
     }
   }
 
@@ -291,8 +337,9 @@ Suggest recipes that:
         );
       }).toList();
     } catch (e) {
+      if (e is GeminiException) rethrow;
       debugPrint('Failed to parse suggestions: $e');
-      throw GeminiException('Failed to parse recipe suggestions: $e');
+      throw GeminiException('Failed to parse suggestions', isRetryable: true);
     }
   }
 
@@ -389,8 +436,89 @@ class RecipeSuggestion {
 /// Custom exception for Gemini API errors
 class GeminiException implements Exception {
   final String message;
-  GeminiException(this.message);
+  final int? statusCode;
+  final String? status;
+  final bool isRetryable;
+
+  GeminiException(
+    this.message, {
+    this.statusCode,
+    this.status,
+    this.isRetryable = false,
+  });
+
+  /// Get a user-friendly error message for display in UI
+  String get userFriendlyMessage {
+    // Service unavailable / overloaded (503)
+    if (statusCode == 503 || status == 'UNAVAILABLE') {
+      return 'Our AI service is currently experiencing high demand. Please try again in a few moments.';
+    }
+
+    // Rate limited (429)
+    if (statusCode == 429 || status == 'RESOURCE_EXHAUSTED') {
+      return 'You\'ve made too many requests. Please wait a moment before trying again.';
+    }
+
+    // Server error (5xx)
+    if (statusCode != null && statusCode! >= 500) {
+      return 'Our AI service is temporarily unavailable. Please try again later.';
+    }
+
+    // API key / Authentication error (check message content for API key issues)
+    if (statusCode == 401 ||
+        statusCode == 403 ||
+        message.toLowerCase().contains('api key')) {
+      return 'There was an authentication error with the AI service. Please contact support if this persists.';
+    }
+
+    // Invalid request (400) - but not API key related
+    if (statusCode == 400 || status == 'INVALID_ARGUMENT') {
+      return 'There was a problem with your request. Please try a different recipe description.';
+    }
+
+    // Content blocked
+    if (status == 'BLOCKED') {
+      return 'This request couldn\'t be processed. Please try a different recipe description.';
+    }
+
+    // Network/timeout
+    if (message.toLowerCase().contains('timeout') ||
+        message.toLowerCase().contains('network')) {
+      return 'Connection failed. Please check your internet and try again.';
+    }
+
+    // Parse error
+    if (message.toLowerCase().contains('parse')) {
+      return 'We had trouble understanding the AI response. Please try again.';
+    }
+
+    // Default fallback
+    return 'Something went wrong. Please try again.';
+  }
+
+  /// Short title for error dialogs
+  String get errorTitle {
+    if (statusCode == 503 || status == 'UNAVAILABLE') {
+      return 'AI Service Busy';
+    }
+    if (statusCode == 429 || status == 'RESOURCE_EXHAUSTED') {
+      return 'Too Many Requests';
+    }
+    if (statusCode != null && statusCode! >= 500) {
+      return 'Service Unavailable';
+    }
+    if (statusCode == 401 ||
+        statusCode == 403 ||
+        message.toLowerCase().contains('api key')) {
+      return 'Authentication Error';
+    }
+    if (status == 'BLOCKED') {
+      return 'Request Blocked';
+    }
+    return 'Request Failed';
+  }
 
   @override
-  String toString() => 'GeminiException: $message';
+  String toString() =>
+      'GeminiException: $message (status: $statusCode, $status)';
 }

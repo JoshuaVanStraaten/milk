@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/product.dart';
 import '../../data/repositories/product_repository.dart';
+import 'province_provider.dart';
 
 /// Provider for ProductRepository instance
 final productRepositoryProvider = Provider<ProductRepository>((ref) {
@@ -17,6 +18,7 @@ class ProductListState {
   final String searchQuery;
   final bool showPromotionsOnly;
   final String sortBy; // 'none', 'price_asc', 'price_desc', 'name_asc'
+  final String province; // Track which province products are loaded for
 
   ProductListState({
     this.products = const [],
@@ -27,6 +29,7 @@ class ProductListState {
     this.searchQuery = '',
     this.showPromotionsOnly = false,
     this.sortBy = 'none',
+    this.province = 'Gauteng',
   });
 
   ProductListState copyWith({
@@ -38,6 +41,7 @@ class ProductListState {
     String? searchQuery,
     bool? showPromotionsOnly,
     String? sortBy,
+    String? province,
   }) {
     return ProductListState(
       products: products ?? this.products,
@@ -48,17 +52,38 @@ class ProductListState {
       searchQuery: searchQuery ?? this.searchQuery,
       showPromotionsOnly: showPromotionsOnly ?? this.showPromotionsOnly,
       sortBy: sortBy ?? this.sortBy,
+      province: province ?? this.province,
     );
   }
+}
+
+/// Parameters for product list provider (retailer + province)
+class ProductListParams {
+  final String retailer;
+  final String province;
+
+  ProductListParams({required this.retailer, required this.province});
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is ProductListParams &&
+        other.retailer == retailer &&
+        other.province == province;
+  }
+
+  @override
+  int get hashCode => Object.hash(retailer, province);
 }
 
 /// Notifier for managing product list with pagination
 class ProductListNotifier extends StateNotifier<ProductListState> {
   final ProductRepository _productRepository;
   final String retailer;
+  final String province;
 
-  ProductListNotifier(this._productRepository, this.retailer)
-    : super(ProductListState()) {
+  ProductListNotifier(this._productRepository, this.retailer, this.province)
+    : super(ProductListState(province: province)) {
     // Load initial products when created
     loadProducts();
   }
@@ -79,16 +104,19 @@ class ProductListNotifier extends StateNotifier<ProductListState> {
       if (currentSearchQuery.isNotEmpty) {
         products = await _productRepository.searchProducts(
           query: currentSearchQuery,
+          province: province,
           retailer: retailer,
         );
       } else if (currentShowPromotionsOnly) {
         products = await _productRepository.getPromotionProducts(
           retailer: retailer,
+          province: province,
           page: 0,
         );
       } else {
         products = await _productRepository.getProductsByRetailer(
           retailer: retailer,
+          province: province,
           page: 0,
         );
       }
@@ -105,6 +133,7 @@ class ProductListNotifier extends StateNotifier<ProductListState> {
         searchQuery: currentSearchQuery,
         showPromotionsOnly: currentShowPromotionsOnly,
         sortBy: currentSortBy,
+        province: province,
       );
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
@@ -113,8 +142,9 @@ class ProductListNotifier extends StateNotifier<ProductListState> {
 
   /// Load next page of products (pagination)
   Future<void> loadMore() async {
-    if (state.isLoading || !state.hasMore || state.searchQuery.isNotEmpty)
+    if (state.isLoading || !state.hasMore || state.searchQuery.isNotEmpty) {
       return;
+    }
 
     state = state.copyWith(isLoading: true);
 
@@ -125,11 +155,13 @@ class ProductListNotifier extends StateNotifier<ProductListState> {
       if (state.showPromotionsOnly) {
         newProducts = await _productRepository.getPromotionProducts(
           retailer: retailer,
+          province: province,
           page: nextPage,
         );
       } else {
         newProducts = await _productRepository.getProductsByRetailer(
           retailer: retailer,
+          province: province,
           page: nextPage,
         );
       }
@@ -233,17 +265,30 @@ class ProductListNotifier extends StateNotifier<ProductListState> {
   }
 }
 
-/// Provider family for product list by retailer
+/// Provider family for product list by retailer AND province
+/// Usage: ref.watch(productListProvider(ProductListParams(retailer: 'Pick n Pay', province: 'Gauteng')))
+final productListProviderFamily =
+    StateNotifierProvider.family<
+      ProductListNotifier,
+      ProductListState,
+      ProductListParams
+    >((ref, params) {
+      final repository = ref.watch(productRepositoryProvider);
+      return ProductListNotifier(repository, params.retailer, params.province);
+    });
+
+/// Convenience provider that auto-uses the selected province
 /// Usage: ref.watch(productListProvider('Pick n Pay'))
 final productListProvider =
     StateNotifierProvider.family<ProductListNotifier, ProductListState, String>(
       (ref, retailer) {
         final repository = ref.watch(productRepositoryProvider);
-        return ProductListNotifier(repository, retailer);
+        final province = ref.watch(selectedProvinceProvider);
+        return ProductListNotifier(repository, retailer, province);
       },
     );
 
-/// Provider for searching products
+/// Provider for searching products (uses selected province)
 final productSearchProvider = FutureProvider.family<List<Product>, String>((
   ref,
   query,
@@ -251,14 +296,56 @@ final productSearchProvider = FutureProvider.family<List<Product>, String>((
   if (query.isEmpty) return [];
 
   final repository = ref.watch(productRepositoryProvider);
-  return repository.searchProducts(query: query);
+  final province = ref.watch(selectedProvinceProvider);
+  return repository.searchProducts(query: query, province: province);
 });
 
-/// Provider for promotion products by retailer
+/// Provider for searching products in specific retailer (uses selected province)
+final productSearchInRetailerProvider =
+    FutureProvider.family<List<Product>, ({String query, String retailer})>((
+      ref,
+      params,
+    ) async {
+      if (params.query.isEmpty) return [];
+
+      final repository = ref.watch(productRepositoryProvider);
+      final province = ref.watch(selectedProvinceProvider);
+      return repository.searchProducts(
+        query: params.query,
+        province: province,
+        retailer: params.retailer,
+      );
+    });
+
+/// Provider for promotion products by retailer (uses selected province)
 final promotionProductsProvider = FutureProvider.family<List<Product>, String>((
   ref,
   retailer,
 ) async {
   final repository = ref.watch(productRepositoryProvider);
-  return repository.getPromotionProducts(retailer: retailer);
+  final province = ref.watch(selectedProvinceProvider);
+  return repository.getPromotionProducts(
+    retailer: retailer,
+    province: province,
+  );
+});
+
+/// Provider for product count by retailer (uses selected province)
+final productCountProvider = FutureProvider.family<int, String?>((
+  ref,
+  retailer,
+) async {
+  final repository = ref.watch(productRepositoryProvider);
+  final province = ref.watch(selectedProvinceProvider);
+  return repository.getProductCount(retailer: retailer, province: province);
+});
+
+/// Provider for product categories (uses selected province)
+final productCategoriesProvider = FutureProvider.family<List<String>, String?>((
+  ref,
+  retailer,
+) async {
+  final repository = ref.watch(productRepositoryProvider);
+  final province = ref.watch(selectedProvinceProvider);
+  return repository.getCategories(province: province, retailer: retailer);
 });

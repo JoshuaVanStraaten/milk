@@ -11,6 +11,7 @@ class AppConstants {
   // Storage Keys (for SharedPreferences)
   static const String keyOnboardingComplete = 'onboarding_complete';
   static const String keyThemeMode = 'theme_mode';
+  static const String keySelectedProvince = 'selected_province';
 
   // Timeouts
   static const Duration apiTimeout = Duration(seconds: 30);
@@ -29,14 +30,89 @@ class AppConstants {
     checkers,
   ];
 
-  // Error Messages
+  // ==========================================================================
+  // PROVINCES
+  // ==========================================================================
+
+  /// Default province (used when none selected)
+  static const String defaultProvince = 'Gauteng';
+
+  /// All 9 South African provinces
+  static const List<String> allProvinces = [
+    'Gauteng',
+    'Western Cape',
+    'KwaZulu-Natal',
+    'Eastern Cape',
+    'Free State',
+    'North West',
+    'Mpumalanga',
+    'Limpopo',
+    'Northern Cape',
+  ];
+
+  /// Provinces with data currently available
+  /// Update this list as more provinces are scraped
+  static const List<String> availableProvinces = ['Gauteng'];
+
+  /// Provinces coming soon (no data yet)
+  static const List<String> comingSoonProvinces = [
+    'Western Cape',
+    'KwaZulu-Natal',
+    'Eastern Cape',
+    'Free State',
+    'North West',
+    'Mpumalanga',
+    'Limpopo',
+    'Northern Cape',
+  ];
+
+  /// Check if a province has data available
+  static bool isProvinceAvailable(String province) {
+    return availableProvinces.contains(province);
+  }
+
+  /// Get province display info (for UI)
+  static ProvinceInfo getProvinceInfo(String province) {
+    return ProvinceInfo(
+      name: province,
+      isAvailable: isProvinceAvailable(province),
+      icon: _getProvinceIcon(province),
+    );
+  }
+
+  /// Get an icon for each province (optional, for visual variety)
+  static String _getProvinceIcon(String province) {
+    // You can customize these or use a map marker for all
+    return switch (province) {
+      'Gauteng' => '🏙️',
+      'Western Cape' => '🏔️',
+      'KwaZulu-Natal' => '🌊',
+      'Eastern Cape' => '🌿',
+      'Free State' => '🌾',
+      'North West' => '⛏️',
+      'Mpumalanga' => '🌅',
+      'Limpopo' => '🦁',
+      'Northern Cape' => '🌵',
+      _ => '📍',
+    };
+  }
+
+  // ==========================================================================
+  // ERROR MESSAGES
+  // ==========================================================================
+
   static const String errorGeneric = 'Something went wrong. Please try again.';
   static const String errorNetwork =
       'No internet connection. Please check your network.';
   static const String errorAuth = 'Authentication failed. Please try again.';
   static const String errorNotFound = 'Item not found.';
+  static const String errorProvinceUnavailable =
+      'Data for this province is coming soon!';
 
-  // List Colors
+  // ==========================================================================
+  // LIST COLORS
+  // ==========================================================================
+
   static const Map<String, int> listColors = {
     'Red': 0xFFEF4444,
     'Orange': 0xFFF97316,
@@ -51,4 +127,17 @@ class AppConstants {
 
   // Private constructor to prevent instantiation
   AppConstants._();
+}
+
+/// Province information for UI display
+class ProvinceInfo {
+  final String name;
+  final bool isAvailable;
+  final String icon;
+
+  const ProvinceInfo({
+    required this.name,
+    required this.isAvailable,
+    required this.icon,
+  });
 }
