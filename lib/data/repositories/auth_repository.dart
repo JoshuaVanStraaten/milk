@@ -162,10 +162,24 @@ class AuthRepository {
 
       _logger.i('✅ OAuth callback - user authenticated: ${user.id}');
 
+      // Extract display name from Google OAuth metadata
+      final oauthDisplayName =
+          user.userMetadata?['full_name'] as String? ??
+          user.userMetadata?['name'] as String? ??
+          user.email?.split('@').first;
+
       // Try to fetch existing profile
       try {
         final profile = await getUserProfile(user.id);
         _logger.i('✅ Existing user profile found');
+
+        // If profile exists but display name is missing, update it from OAuth data
+        if (profile.displayName == null && oauthDisplayName != null) {
+          _logger.i('Updating missing display name from OAuth data');
+          final updated = profile.copyWith(displayName: oauthDisplayName);
+          return await updateUserProfile(updated);
+        }
+
         return profile;
       } catch (e) {
         // Profile doesn't exist, create one from OAuth data
@@ -175,10 +189,7 @@ class AuthRepository {
           id: user.id,
           createdAt: DateTime.now(),
           emailAddress: user.email ?? '',
-          displayName:
-              user.userMetadata?['full_name'] as String? ??
-              user.userMetadata?['name'] as String? ??
-              user.email?.split('@').first,
+          displayName: oauthDisplayName,
           mailingList: false,
         );
 

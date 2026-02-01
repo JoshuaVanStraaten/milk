@@ -90,9 +90,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     // Watch auth state to show loading
     final authState = ref.watch(authNotifierProvider);
     final isLoading = authState.isLoading;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: isDark ? AppColors.backgroundDark : Colors.white,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
@@ -123,22 +124,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 const SizedBox(height: 32),
 
                 // Title
-                const Text(
+                Text(
                   'Welcome Back',
                   style: TextStyle(
                     fontSize: 32,
                     fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
+                    color: isDark
+                        ? AppColors.textPrimaryDark
+                        : AppColors.textPrimary,
                   ),
                 ),
 
                 const SizedBox(height: 8),
 
-                const Text(
+                Text(
                   'Sign in to continue shopping',
                   style: TextStyle(
                     fontSize: 16,
-                    color: AppColors.textSecondary,
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondary,
                   ),
                 ),
 
@@ -148,6 +153,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 _GoogleSignInButton(
                   onPressed: isLoading ? null : _handleGoogleSignIn,
                   isLoading: isLoading,
+                  isDark: isDark,
                 ),
 
                 const SizedBox(height: 24),
@@ -155,19 +161,29 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 // Divider
                 Row(
                   children: [
-                    Expanded(child: Divider(color: AppColors.divider)),
+                    Expanded(
+                      child: Divider(
+                        color: isDark ? Colors.white24 : AppColors.divider,
+                      ),
+                    ),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: Text(
                         'or continue with email',
                         style: TextStyle(
-                          color: AppColors.textSecondary,
+                          color: isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textSecondary,
                           fontWeight: FontWeight.w500,
                           fontSize: 13,
                         ),
                       ),
                     ),
-                    Expanded(child: Divider(color: AppColors.divider)),
+                    Expanded(
+                      child: Divider(
+                        color: isDark ? Colors.white24 : AppColors.divider,
+                      ),
+                    ),
                   ],
                 ),
 
@@ -228,9 +244,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text(
+                    Text(
                       "Don't have an account? ",
-                      style: TextStyle(color: AppColors.textSecondary),
+                      style: TextStyle(
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondary,
+                      ),
                     ),
                     TextButton(
                       onPressed: () {
@@ -257,8 +277,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 class _GoogleSignInButton extends StatelessWidget {
   final VoidCallback? onPressed;
   final bool isLoading;
+  final bool isDark;
 
-  const _GoogleSignInButton({required this.onPressed, this.isLoading = false});
+  const _GoogleSignInButton({
+    required this.onPressed,
+    this.isLoading = false,
+    this.isDark = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -266,9 +291,9 @@ class _GoogleSignInButton extends StatelessWidget {
       onPressed: onPressed,
       style: OutlinedButton.styleFrom(
         padding: const EdgeInsets.symmetric(vertical: 14),
-        side: BorderSide(color: AppColors.divider),
+        side: BorderSide(color: isDark ? Colors.white24 : AppColors.divider),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        backgroundColor: Colors.white,
+        backgroundColor: isDark ? AppColors.surfaceDarkMode : Colors.white,
       ),
       child: isLoading
           ? const SizedBox(
@@ -285,7 +310,6 @@ class _GoogleSignInButton extends StatelessWidget {
                   height: 24,
                   width: 24,
                   errorBuilder: (context, error, stackTrace) {
-                    // Fallback if image fails to load
                     return Container(
                       height: 24,
                       width: 24,
@@ -307,12 +331,14 @@ class _GoogleSignInButton extends StatelessWidget {
                   },
                 ),
                 const SizedBox(width: 12),
-                const Text(
+                Text(
                   'Continue with Google',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
-                    color: AppColors.textPrimary,
+                    color: isDark
+                        ? AppColors.textPrimaryDark
+                        : AppColors.textPrimary,
                   ),
                 ),
               ],

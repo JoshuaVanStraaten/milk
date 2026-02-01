@@ -30,7 +30,22 @@ final currentUserProfileProvider = FutureProvider<UserProfile?>((ref) async {
       // Fetch user profile from database
       final authRepository = ref.watch(authRepositoryProvider);
       try {
-        return await authRepository.getUserProfile(user.id);
+        final profile = await authRepository.getUserProfile(user.id);
+
+        // If display name is missing, try to fill it from Google OAuth metadata
+        // Only use full_name/name from metadata (NOT email prefix - that's a poor fallback)
+        if (profile.displayName == null) {
+          final metaName =
+              user.userMetadata?['full_name'] as String? ??
+              user.userMetadata?['name'] as String?;
+
+          if (metaName != null && metaName.isNotEmpty) {
+            final updated = profile.copyWith(displayName: metaName);
+            return await authRepository.updateUserProfile(updated);
+          }
+        }
+
+        return profile;
       } catch (e) {
         // If profile doesn't exist or error, return null
         return null;
@@ -45,8 +60,10 @@ final currentUserProfileProvider = FutureProvider<UserProfile?>((ref) async {
 /// This is the main controller for auth operations
 class AuthNotifier extends StateNotifier<AsyncValue<UserProfile?>> {
   final AuthRepository _authRepository;
+  final Ref _ref;
 
-  AuthNotifier(this._authRepository) : super(const AsyncValue.data(null));
+  AuthNotifier(this._authRepository, this._ref)
+   : super(const AsyncValue.data(null));
 
   /// Sign up a new user
   Future<void> signUp({
@@ -67,6 +84,9 @@ class AuthNotifier extends StateNotifier<AsyncValue<UserProfile?>> {
 
       // Set success state with user profile
       state = AsyncValue.data(profile);
+
+      // Invalidate the profile provider so it refetches with the correct display name
+      _ref.invalidate(currentUserProfileProvider);
     } catch (e, stackTrace) {
       // Set error state
       state = AsyncValue.error(e, stackTrace);
@@ -147,5 +167,5 @@ class AuthNotifier extends StateNotifier<AsyncValue<UserProfile?>> {
 final authNotifierProvider =
     StateNotifierProvider<AuthNotifier, AsyncValue<UserProfile?>>((ref) {
       final authRepository = ref.watch(authRepositoryProvider);
-      return AuthNotifier(authRepository);
+      return AuthNotifier(authRepository, ref);
     });

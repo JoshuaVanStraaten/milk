@@ -68,13 +68,48 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
         },
         loading: () {},
         error: (error, _) {
-          // Show error message
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(error.toString()),
-              backgroundColor: AppColors.error,
-            ),
-          );
+          final errorMsg = error.toString().toLowerCase();
+
+          // Check if user is already registered
+          if (errorMsg.contains('already registered') ||
+              errorMsg.contains('already exists')) {
+            showDialog(
+              context: context,
+              builder: (context) => AlertDialog(
+                icon: const Icon(
+                  Icons.person_outline,
+                  size: 48,
+                  color: AppColors.primary,
+                ),
+                title: const Text('Account Exists'),
+                content: const Text(
+                  'An account with this email already exists. '
+                  'Please sign in instead.',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Cancel'),
+                  ),
+                  FilledButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      context.go('/login');
+                    },
+                    child: const Text('Go to Sign In'),
+                  ),
+                ],
+              ),
+            );
+          } else {
+            // Show generic error
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(error.toString()),
+                backgroundColor: AppColors.error,
+              ),
+            );
+          }
         },
       );
     }
@@ -94,9 +129,10 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   Widget build(BuildContext context) {
     final authState = ref.watch(authNotifierProvider);
     final isLoading = authState.isLoading;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: isDark ? AppColors.backgroundDark : Colors.white,
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
@@ -114,22 +150,26 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                 const SizedBox(height: 20),
 
                 // Title
-                const Text(
+                Text(
                   'Create Account',
                   style: TextStyle(
                     fontSize: 32,
                     fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
+                    color: isDark
+                        ? AppColors.textPrimaryDark
+                        : AppColors.textPrimary,
                   ),
                 ),
 
                 const SizedBox(height: 8),
 
-                const Text(
+                Text(
                   'Sign up to start saving on groceries',
                   style: TextStyle(
                     fontSize: 16,
-                    color: AppColors.textSecondary,
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondary,
                   ),
                 ),
 
@@ -139,6 +179,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                 _GoogleSignInButton(
                   onPressed: isLoading ? null : _handleGoogleSignIn,
                   isLoading: isLoading,
+                  isDark: isDark,
                 ),
 
                 const SizedBox(height: 24),
@@ -146,19 +187,29 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                 // Divider
                 Row(
                   children: [
-                    Expanded(child: Divider(color: AppColors.divider)),
+                    Expanded(
+                      child: Divider(
+                        color: isDark ? Colors.white24 : AppColors.divider,
+                      ),
+                    ),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: Text(
                         'or sign up with email',
                         style: TextStyle(
-                          color: AppColors.textSecondary,
+                          color: isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textSecondary,
                           fontWeight: FontWeight.w500,
                           fontSize: 13,
                         ),
                       ),
                     ),
-                    Expanded(child: Divider(color: AppColors.divider)),
+                    Expanded(
+                      child: Divider(
+                        color: isDark ? Colors.white24 : AppColors.divider,
+                      ),
+                    ),
                   ],
                 ),
 
@@ -229,7 +280,9 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 12,
-                    color: AppColors.textSecondary,
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondary,
                   ),
                 ),
 
@@ -239,9 +292,13 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text(
+                    Text(
                       'Already have an account? ',
-                      style: TextStyle(color: AppColors.textSecondary),
+                      style: TextStyle(
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondary,
+                      ),
                     ),
                     TextButton(
                       onPressed: () {
@@ -267,8 +324,13 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
 class _GoogleSignInButton extends StatelessWidget {
   final VoidCallback? onPressed;
   final bool isLoading;
+  final bool isDark;
 
-  const _GoogleSignInButton({required this.onPressed, this.isLoading = false});
+  const _GoogleSignInButton({
+    required this.onPressed,
+    this.isLoading = false,
+    this.isDark = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -276,9 +338,9 @@ class _GoogleSignInButton extends StatelessWidget {
       onPressed: onPressed,
       style: OutlinedButton.styleFrom(
         padding: const EdgeInsets.symmetric(vertical: 14),
-        side: BorderSide(color: AppColors.divider),
+        side: BorderSide(color: isDark ? Colors.white24 : AppColors.divider),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        backgroundColor: Colors.white,
+        backgroundColor: isDark ? AppColors.surfaceDarkMode : Colors.white,
       ),
       child: isLoading
           ? const SizedBox(
@@ -295,7 +357,6 @@ class _GoogleSignInButton extends StatelessWidget {
                   height: 24,
                   width: 24,
                   errorBuilder: (context, error, stackTrace) {
-                    // Fallback if image fails to load
                     return Container(
                       height: 24,
                       width: 24,
@@ -317,12 +378,14 @@ class _GoogleSignInButton extends StatelessWidget {
                   },
                 ),
                 const SizedBox(width: 12),
-                const Text(
+                Text(
                   'Continue with Google',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
-                    color: AppColors.textPrimary,
+                    color: isDark
+                        ? AppColors.textPrimaryDark
+                        : AppColors.textPrimary,
                   ),
                 ),
               ],
