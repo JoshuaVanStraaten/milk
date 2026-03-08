@@ -131,7 +131,7 @@ class AuthRepository {
 
       await _supabase.auth.signInWithOAuth(
         OAuthProvider.google,
-        redirectTo: 'com.example.milk://login-callback',
+        redirectTo: 'com.ubicorp.milkza://login-callback',
         authScreenLaunchMode: LaunchMode.externalApplication,
       );
 

@@ -1,3 +1,6 @@
+// lib/presentation/routes/app_router.dart
+//
+
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,7 +10,6 @@ import '../../data/models/product.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/signup_screen.dart';
 import '../screens/home/home_screen.dart';
-import '../screens/products/store_selector_screen.dart';
 import '../screens/products/product_list_screen.dart';
 import '../screens/products/product_detail_screen.dart';
 import '../screens/lists/my_lists_screen.dart';
@@ -16,9 +18,12 @@ import '../screens/lists/list_detail_screen.dart';
 import '../screens/profile/profile_screen.dart';
 import '../screens/main/main_shell_screen.dart';
 import '../screens/recipes/recipe_screen.dart';
-import '../screens/onboarding/onboarding_screen.dart';
+
+import '../screens/onboarding/store_selection_screen.dart';
+import '../screens/products/live_browse_screen.dart';
 import '../providers/auth_provider.dart';
-import '../providers/province_provider.dart';
+
+import '../providers/store_provider.dart';
 import 'page_transitions.dart';
 
 /// Route names for easy reference
@@ -50,8 +55,8 @@ class RouterNotifier extends ChangeNotifier {
           notifyListeners();
         });
 
-    // Also listen to province changes (for onboarding)
-    _ref.listen(provinceProvider, (previous, next) {
+    // Listen to store setup changes
+    _ref.listen(hasCompletedStoreSetupProvider, (previous, next) {
       notifyListeners();
     });
   }
@@ -85,9 +90,9 @@ final routerProvider = Provider<GoRouter>((ref) {
           state.matchedLocation == AppRoutes.signup;
       final isGoingToOnboarding = state.matchedLocation == AppRoutes.onboarding;
 
-      // Check onboarding status
-      final provinceState = ref.read(provinceProvider);
-      final needsOnboarding = !provinceState.hasCompletedOnboarding;
+      // Check store setup status
+      final hasCompletedStoreSetup = ref.read(hasCompletedStoreSetupProvider);
+      final needsOnboarding = !hasCompletedStoreSetup;
 
       // If not authenticated and trying to access protected route, go to login
       if (!isAuthenticated && !isGoingToAuth) {
@@ -96,14 +101,14 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       // If authenticated and trying to access auth screens
       if (isAuthenticated && isGoingToAuth) {
-        // Check if user needs onboarding
+        // Check if user needs store setup onboarding
         if (needsOnboarding) {
           return AppRoutes.onboarding;
         }
         return AppRoutes.home;
       }
 
-      // If authenticated but hasn't completed onboarding
+      // If authenticated but hasn't completed store setup
       if (isAuthenticated && needsOnboarding && !isGoingToOnboarding) {
         return AppRoutes.onboarding;
       }
@@ -119,11 +124,12 @@ final routerProvider = Provider<GoRouter>((ref) {
 
     routes: [
       // ===== ONBOARDING ROUTE =====
+      // Store selection onboarding screen
       GoRoute(
         path: AppRoutes.onboarding,
         pageBuilder: (context, state) => AppPageTransitions.fade(
           state: state,
-          child: const OnboardingScreen(),
+          child: const StoreSelectionScreen(),
         ),
       ),
 
@@ -163,7 +169,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           state: state,
           child: const MainShellScreen(
             currentIndex: 1,
-            child: StoreSelectorScreen(),
+            child: LiveBrowseScreen(),
           ),
         ),
       ),

@@ -1001,8 +1001,6 @@ class ListItemNotifier extends StateNotifier<AsyncValue<void>> {
     state = const AsyncValue.loading();
 
     // Get item data before deleting (for sync queue)
-    final item = _cache.getItemById(itemId);
-
     // Always delete from cache first (optimistic)
     await _cache.deleteItem(itemId);
     await _updateListTotalLocally(listId);

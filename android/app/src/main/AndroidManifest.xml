@@ -1,5 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Required for network requests -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
     <application
         android:label="Milk"
         android:name="${applicationName}"
@@ -33,7 +37,7 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <!-- Handle OAuth callback from Supabase -->
                 <data
-                    android:scheme="com.example.milk"
+                    android:scheme="com.ubicorp.milkza"
                     android:host="login-callback" />
             </intent-filter>
         </activity>

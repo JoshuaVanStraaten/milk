@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/constants/app_constants.dart';
 import '../../providers/recipe_provider.dart';
 import '../../providers/list_provider.dart';
 import '../../../data/models/recipe.dart';
@@ -39,8 +38,6 @@ class _RecipeScreenState extends ConsumerState<RecipeScreen>
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('AI Recipes'),
@@ -222,7 +219,7 @@ class _GenerateRecipeTabState extends ConsumerState<_GenerateRecipeTab> {
         );
 
       case RecipeGenerationStep.generating:
-        return _buildLoadingState(isDark);
+        return _buildLoadingState(state, isDark);
 
       case RecipeGenerationStep.review:
       case RecipeGenerationStep.matching:
@@ -280,9 +277,13 @@ class _GenerateRecipeTabState extends ConsumerState<_GenerateRecipeTab> {
     }
   }
 
-  Widget _buildLoadingState(bool isDark) {
+  Widget _buildLoadingState(RecipeGenerationState state, bool isDark) {
+    final isMatching = state.isMatching;
+    final progressText = state.matchingProgressText;
+    final percent = state.matchingPercent;
+
     return Container(
-      padding: const EdgeInsets.all(48),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
       decoration: BoxDecoration(
         color: isDark ? AppColors.surfaceDarkMode : AppColors.surface,
         borderRadius: BorderRadius.circular(16),
@@ -290,27 +291,135 @@ class _GenerateRecipeTabState extends ConsumerState<_GenerateRecipeTab> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const CircularProgressIndicator(),
-          const SizedBox(height: 24),
+          // Icon / animated indicator
+          if (isMatching) ...[
+            // Progress ring — large, clean
+            SizedBox(
+              width: 80,
+              height: 80,
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0, end: percent),
+                duration: const Duration(milliseconds: 400),
+                curve: Curves.easeOut,
+                builder: (context, value, _) {
+                  return Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      // Track
+                      SizedBox(
+                        width: 80,
+                        height: 80,
+                        child: CircularProgressIndicator(
+                          value: 1.0,
+                          strokeWidth: 5,
+                          color:
+                              (isDark
+                                      ? AppColors.textDisabledDark
+                                      : AppColors.textDisabled)
+                                  .withValues(alpha: 0.3),
+                        ),
+                      ),
+                      // Progress
+                      SizedBox(
+                        width: 80,
+                        height: 80,
+                        child: CircularProgressIndicator(
+                          value: value,
+                          strokeWidth: 5,
+                          strokeCap: StrokeCap.round,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      // Percentage text
+                      Text(
+                        '${(value * 100).round()}%',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: isDark
+                              ? AppColors.textPrimaryDark
+                              : AppColors.textPrimary,
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ] else ...[
+            // Indeterminate spinner for recipe generation
+            SizedBox(
+              width: 56,
+              height: 56,
+              child: CircularProgressIndicator(
+                strokeWidth: 4,
+                strokeCap: StrokeCap.round,
+                color: AppColors.primary,
+              ),
+            ),
+          ],
+
+          const SizedBox(height: 28),
+
+          // Title
           Text(
-            'Generating your recipe...',
+            isMatching ? 'Matching ingredients' : 'Generating your recipe',
             style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
               color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
             ),
           ),
+
           const SizedBox(height: 8),
-          Text(
-            'Creating recipe & matching ingredients to products',
-            style: TextStyle(
-              fontSize: 14,
-              color: isDark
-                  ? AppColors.textSecondaryDark
-                  : AppColors.textSecondary,
+
+          // Counter chip
+          if (isMatching) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                '${state.matchingCurrent} of ${state.matchingTotal} ingredients',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.primary,
+                ),
+              ),
             ),
-            textAlign: TextAlign.center,
-          ),
+            const SizedBox(height: 16),
+          ],
+
+          // Progress text — ingredient being searched
+          if (progressText != null) ...[
+            Text(
+              progressText,
+              style: TextStyle(
+                fontSize: 13,
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondary,
+                height: 1.4,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ] else ...[
+            Text(
+              'This may take a moment...',
+              style: TextStyle(
+                fontSize: 13,
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
         ],
       ),
     );

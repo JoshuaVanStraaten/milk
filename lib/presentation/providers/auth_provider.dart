@@ -63,7 +63,7 @@ class AuthNotifier extends StateNotifier<AsyncValue<UserProfile?>> {
   final Ref _ref;
 
   AuthNotifier(this._authRepository, this._ref)
-   : super(const AsyncValue.data(null));
+    : super(const AsyncValue.data(null));
 
   /// Sign up a new user
   Future<void> signUp({

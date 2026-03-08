@@ -6,7 +6,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../data/models/product.dart';
 import '../../providers/list_provider.dart';
-import '../../widgets/price_comparison_sheet.dart';
+// NOTE: This screen is legacy (DB-based). Use LiveProductDetailScreen for live API products.
 import '../../widgets/common/app_snackbar.dart';
 import '../../widgets/animations.dart';
 
@@ -186,7 +186,8 @@ class ProductDetailScreen extends ConsumerWidget {
               // Compare Prices button
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () => showPriceComparisonSheet(context, product),
+                  onPressed:
+                      null, // Legacy — use LiveProductDetailScreen for live comparisons
                   icon: const Icon(Icons.compare_arrows),
                   label: const Text('Compare'),
                   style: OutlinedButton.styleFrom(
@@ -377,7 +378,6 @@ class ProductDetailScreen extends ConsumerWidget {
         );
 
       case PromoType.none:
-      default:
         // No promo - show regular price
         return Text(
           product.price ?? 'Price unavailable',
@@ -812,7 +812,7 @@ class _AddToListSheetState extends ConsumerState<_AddToListSheet> {
       // Refresh the realtime list items provider so the list shows updated items
       // The realtimeListItemsProvider is a StateNotifier, so we need to call refresh()
       ref.read(realtimeListItemsProvider(listId!).notifier).refresh();
-      ref.invalidate(listByIdProvider(listId!));
+      ref.invalidate(listByIdProvider(listId));
 
       AppHaptics.success();
       AppSnackbar.success(

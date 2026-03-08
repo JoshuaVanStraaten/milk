@@ -1,8 +1,14 @@
+// lib/presentation/widgets/recipes/ingredient_matching_sheet.dart
+//
+// UPDATED: Uses Retailers constants instead of AppConstants for retailer chips.
+// The actual search is done via ingredientMatchingProvider which now uses
+// live API instead of DB RPC.
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/constants/app_constants.dart';
+import '../../../core/constants/retailers.dart';
 import '../../../data/models/recipe.dart';
 import '../../providers/recipe_provider.dart';
 
@@ -31,7 +37,6 @@ class _IngredientMatchingSheetState
   void initState() {
     super.initState();
     _searchController.text = widget.ingredient.ingredientName;
-    // Load initial matches
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _searchMatches();
     });
@@ -156,7 +161,7 @@ class _IngredientMatchingSheetState
 
               const SizedBox(height: 12),
 
-              // Retailer filter
+              // Retailer filter — dynamic from Retailers constants
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: SingleChildScrollView(
@@ -165,28 +170,16 @@ class _IngredientMatchingSheetState
                     children: [
                       _buildRetailerChip(null, 'All Stores', isDark),
                       const SizedBox(width: 8),
-                      _buildRetailerChip(
-                        AppConstants.pickNPay,
-                        'Pick n Pay',
-                        isDark,
-                      ),
-                      const SizedBox(width: 8),
-                      _buildRetailerChip(
-                        AppConstants.woolworths,
-                        'Woolworths',
-                        isDark,
-                      ),
-                      const SizedBox(width: 8),
-                      _buildRetailerChip(
-                        AppConstants.shoprite,
-                        'Shoprite',
-                        isDark,
-                      ),
-                      const SizedBox(width: 8),
-                      _buildRetailerChip(
-                        AppConstants.checkers,
-                        'Checkers',
-                        isDark,
+                      ...Retailers.all.values.map(
+                        (config) => Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: _buildRetailerChip(
+                            config.name,
+                            config.name,
+                            isDark,
+                            chipColor: config.color,
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -204,7 +197,12 @@ class _IngredientMatchingSheetState
     );
   }
 
-  Widget _buildRetailerChip(String? retailer, String label, bool isDark) {
+  Widget _buildRetailerChip(
+    String? retailer,
+    String label,
+    bool isDark, {
+    Color? chipColor,
+  }) {
     final isSelected = _selectedRetailer == retailer;
 
     return ChoiceChip(
@@ -216,7 +214,7 @@ class _IngredientMatchingSheetState
         });
         _searchMatches();
       },
-      selectedColor: AppColors.primary,
+      selectedColor: chipColor ?? AppColors.primary,
       labelStyle: TextStyle(
         fontSize: 12,
         color: isSelected ? Colors.white : null,
@@ -296,158 +294,138 @@ class _IngredientMatchingSheetState
   }
 
   Widget _buildMatchCard(IngredientProductMatch match, bool isDark) {
-    final retailerColor = _getRetailerColor(match.retailer);
+    final config = Retailers.fromName(match.retailer);
+    final retailerColor = config?.color ?? AppColors.primary;
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: InkWell(
-        onTap: () => widget.onSelectMatch(match),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: isDark ? AppColors.surfaceDarkMode : AppColors.surface,
         borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              // Product image
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: match.productImageUrl != null
-                    ? CachedNetworkImage(
-                        imageUrl: match.productImageUrl!,
-                        width: 60,
-                        height: 60,
-                        fit: BoxFit.cover,
-                        errorWidget: (_, __, ___) => _buildPlaceholder(isDark),
-                      )
-                    : _buildPlaceholder(isDark),
-              ),
-              const SizedBox(width: 12),
+        child: InkWell(
+          onTap: () {
+            widget.onSelectMatch(match);
+            // Don't pop here — the callback in recipe_screen handles closing
+          },
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                // Product image
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child:
+                      match.productImageUrl != null &&
+                          match.productImageUrl!.isNotEmpty
+                      ? CachedNetworkImage(
+                          imageUrl: match.productImageUrl!,
+                          width: 60,
+                          height: 60,
+                          fit: BoxFit.contain,
+                          errorWidget: (_, __, ___) =>
+                              _buildPlaceholder(isDark),
+                        )
+                      : _buildPlaceholder(isDark),
+                ),
+                const SizedBox(width: 12),
 
-              // Product details
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Retailer badge
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: retailerColor.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        match.retailer,
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          color: retailerColor,
+                // Product details
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Retailer badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: retailerColor.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          match.retailer,
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: retailerColor,
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 4),
+                      const SizedBox(height: 4),
 
-                    // Product name
-                    Text(
-                      match.productName,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                        color: isDark
-                            ? AppColors.textPrimaryDark
-                            : AppColors.textPrimary,
+                      // Product name
+                      Text(
+                        match.productName,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: isDark
+                              ? AppColors.textPrimaryDark
+                              : AppColors.textPrimary,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                    ],
+                  ),
+                ),
 
-                    // Size and similarity
-                    Row(
-                      children: [
-                        if (match.formattedSize != null) ...[
-                          Text(
-                            match.formattedSize!,
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: isDark
-                                  ? AppColors.textSecondaryDark
-                                  : AppColors.textSecondary,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                        ],
-                        Container(
+                const SizedBox(width: 8),
+
+                // Price + select icon
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    if (match.productPrice != null)
+                      Text(
+                        match.productPrice!,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: isDark
+                              ? AppColors.textPrimaryDark
+                              : AppColors.textPrimary,
+                        ),
+                      ),
+                    if (match.productPromotionPrice != null &&
+                        match.productPromotionPrice!.isNotEmpty &&
+                        !match.productPromotionPrice!.toLowerCase().contains(
+                          'no promo',
+                        ))
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Container(
+                          constraints: const BoxConstraints(maxWidth: 100),
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 4,
-                            vertical: 1,
+                            horizontal: 6,
+                            vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color: _getSimilarityColor(
-                              match.similarityScore,
-                            ).withOpacity(0.1),
+                            color: AppColors.error.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
-                            match.similarityPercentage,
-                            style: TextStyle(
+                            match.productPromotionPrice!,
+                            style: const TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w600,
-                              color: _getSimilarityColor(match.similarityScore),
+                              color: AppColors.error,
                             ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                      ],
-                    ),
+                      ),
                   ],
                 ),
-              ),
-              const SizedBox(width: 8),
 
-              // Price
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    match.productPrice ?? 'N/A',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: isDark
-                          ? AppColors.textPrimaryDark
-                          : AppColors.textPrimary,
-                    ),
-                  ),
-                  if (match.productPromotionPrice != null &&
-                      match.productPromotionPrice != 'No promo')
-                    Container(
-                      margin: const EdgeInsets.only(top: 4),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
-                      constraints: const BoxConstraints(maxWidth: 80),
-                      decoration: BoxDecoration(
-                        color: AppColors.error.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        match.productPromotionPrice!,
-                        style: const TextStyle(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.error,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                ],
-              ),
-
-              const SizedBox(width: 8),
-              const Icon(Icons.add_circle, color: AppColors.primary),
-            ],
+                const SizedBox(width: 8),
+                const Icon(Icons.add_circle, color: AppColors.primary),
+              ],
+            ),
           ),
         ),
       ),
@@ -465,26 +443,5 @@ class _IngredientMatchingSheetState
         color: isDark ? AppColors.textDisabledDark : AppColors.textDisabled,
       ),
     );
-  }
-
-  Color _getRetailerColor(String retailer) {
-    switch (retailer) {
-      case AppConstants.pickNPay:
-        return const Color(0xFFE31837);
-      case AppConstants.woolworths:
-        return const Color(0xFF006341);
-      case AppConstants.shoprite:
-        return const Color(0xFFFF6600);
-      case AppConstants.checkers:
-        return const Color(0xFF005EB8);
-      default:
-        return AppColors.primary;
-    }
-  }
-
-  Color _getSimilarityColor(double score) {
-    if (score >= 0.7) return AppColors.success;
-    if (score >= 0.5) return AppColors.secondary;
-    return AppColors.textSecondary;
   }
 }

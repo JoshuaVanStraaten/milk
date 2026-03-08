@@ -5,6 +5,7 @@ import 'core/config/supabase_config.dart';
 import 'core/theme/app_theme.dart';
 import 'data/local/hive_database.dart';
 import 'data/services/connectivity_service.dart';
+import 'data/services/image_lookup_service.dart';
 import 'data/services/sync_service.dart';
 import 'presentation/providers/theme_provider.dart';
 import 'presentation/routes/app_router.dart';
@@ -13,7 +14,7 @@ void main() async {
   // Ensure Flutter is initialized
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize SharedPreferences for theme and province persistence
+  // Initialize SharedPreferences for theme and store persistence
   final sharedPreferences = await SharedPreferences.getInstance();
 
   // Initialize Hive for offline storage
@@ -21,6 +22,9 @@ void main() async {
 
   // Initialize Supabase
   await SupabaseConfig.initialize();
+
+  // Initialize Checkers/Shoprite image lookup cache (bundled asset)
+  await ImageLookupService.instance.initialize();
 
   // Initialize connectivity service
   final connectivityService = ConnectivityService();
@@ -31,7 +35,7 @@ void main() async {
     ProviderScope(
       overrides: [
         // Provide the SharedPreferences instance
-        // This is used by both themeProvider and provinceProvider
+        // This is used by themeProvider and storeSelectionProvider
         sharedPreferencesProvider.overrideWithValue(sharedPreferences),
         // Provide the initialized connectivity service
         connectivityServiceProvider.overrideWithValue(connectivityService),
@@ -53,7 +57,7 @@ class MyApp extends ConsumerWidget {
     final themeMode = ref.watch(themeModeProvider);
 
     return MaterialApp.router(
-      title: 'Savvy Grocery',
+      title: 'Milk',
       debugShowCheckedModeBanner: false,
 
       // Theme configuration
@@ -85,10 +89,8 @@ class _GlobalOfflineBannerState extends ConsumerState<_GlobalOfflineBanner>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<Offset> _slideAnimation;
-  bool _isOffline = false;
   bool _showBanner = false;
   bool _initialized = false;
-  SyncStatus _syncStatus = SyncStatus.idle;
 
   @override
   void initState() {
@@ -125,18 +127,12 @@ class _GlobalOfflineBannerState extends ConsumerState<_GlobalOfflineBanner>
     // Skip if not initialized yet
     if (!_initialized) {
       _initialized = true;
-      _isOffline = isOffline;
-      _syncStatus = syncStatus;
       if (shouldShow) {
         _showBanner = true;
         _controller.forward();
       }
       return;
     }
-
-    // Update state
-    _isOffline = isOffline;
-    _syncStatus = syncStatus;
 
     if (shouldShow && !_showBanner) {
       setState(() => _showBanner = true);

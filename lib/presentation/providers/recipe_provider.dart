@@ -1,18 +1,25 @@
+// lib/presentation/providers/recipe_provider.dart
+//
+// UPDATED: Ingredient matching now uses LiveApiService (live retailer APIs)
+// instead of province-based DB RPC. All method signatures preserved for
+// recipe_screen.dart compatibility.
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../data/models/recipe.dart';
+import '../../data/models/live_product.dart';
 import '../../data/repositories/recipe_repository.dart';
-import '../../data/services/gemini_service.dart'; // RecipeSuggestion & GeminiException
-import 'province_provider.dart';
+import '../../data/services/gemini_service.dart';
+import '../../data/services/image_lookup_service.dart';
+import 'store_provider.dart';
 
 // =============================================================================
 // SERVICE PROVIDERS
 // =============================================================================
 
 /// Gemini service provider
-/// Reads GEMINI_API_KEY from .env file
 final geminiServiceProvider = Provider<GeminiService>((ref) {
   final apiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
   if (apiKey.isEmpty) {
@@ -33,15 +40,17 @@ final recipeRepositoryProvider = Provider<RecipeRepository>((ref) {
 // RECIPE GENERATION STATE
 // =============================================================================
 
-/// State for recipe generation
 class RecipeGenerationState {
   final bool isLoading;
   final Recipe? generatedRecipe;
   final String? error;
-  final String? errorTitle; // For popup dialog title
+  final String? errorTitle;
   final RecipeGenerationStep currentStep;
+  final String? matchedRetailer;
   final String?
-  matchedProvince; // Track which province ingredients were matched for
+  matchingProgressText; // e.g. "Searching Pick n Pay for Chicken Breast..."
+  final int matchingTotal; // total ingredients to match
+  final int matchingCurrent; // current ingredient being matched
 
   const RecipeGenerationState({
     this.isLoading = false,
@@ -49,7 +58,10 @@ class RecipeGenerationState {
     this.error,
     this.errorTitle,
     this.currentStep = RecipeGenerationStep.input,
-    this.matchedProvince,
+    this.matchedRetailer,
+    this.matchingProgressText,
+    this.matchingTotal = 0,
+    this.matchingCurrent = 0,
   });
 
   RecipeGenerationState copyWith({
@@ -58,8 +70,12 @@ class RecipeGenerationState {
     String? error,
     String? errorTitle,
     RecipeGenerationStep? currentStep,
-    String? matchedProvince,
+    String? matchedRetailer,
+    String? matchingProgressText,
+    int? matchingTotal,
+    int? matchingCurrent,
     bool clearError = false,
+    bool clearProgress = false,
   }) {
     return RecipeGenerationState(
       isLoading: isLoading ?? this.isLoading,
@@ -67,24 +83,34 @@ class RecipeGenerationState {
       error: clearError ? null : (error ?? this.error),
       errorTitle: clearError ? null : (errorTitle ?? this.errorTitle),
       currentStep: currentStep ?? this.currentStep,
-      matchedProvince: matchedProvince ?? this.matchedProvince,
+      matchedRetailer: matchedRetailer ?? this.matchedRetailer,
+      matchingProgressText: clearProgress
+          ? null
+          : (matchingProgressText ?? this.matchingProgressText),
+      matchingTotal: matchingTotal ?? this.matchingTotal,
+      matchingCurrent: matchingCurrent ?? this.matchingCurrent,
     );
   }
 
-  /// Whether there's an error to show in a popup
   bool get hasError => error != null;
+  bool get isMatching => matchingTotal > 0 && matchingCurrent > 0;
+  double get matchingPercent =>
+      matchingTotal > 0 ? matchingCurrent / matchingTotal : 0;
 }
 
 enum RecipeGenerationStep {
-  input, // User entering recipe request
-  generating, // AI generating recipe
-  review, // Showing generated recipe
-  matching, // Matching ingredients to products
-  export, // Exporting to shopping list
-  complete, // Done
+  input,
+  generating,
+  review,
+  matching,
+  export,
+  complete,
 }
 
-/// Recipe generation notifier
+// =============================================================================
+// RECIPE GENERATION NOTIFIER
+// =============================================================================
+
 class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
   final GeminiService _geminiService;
   final RecipeRepository _repository;
@@ -93,17 +119,11 @@ class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
   RecipeGenerationNotifier(this._geminiService, this._repository, this._ref)
     : super(const RecipeGenerationState());
 
-  /// Get current province from provider
-  String get _currentProvince => _ref.read(selectedProvinceProvider);
-
-  /// Clear the current error (call after showing popup)
   void clearError() {
     state = state.copyWith(clearError: true);
   }
 
   /// Generate a recipe from user request
-  /// [autoMatch] - If true, automatically match ingredients to products after generation
-  /// [preferredRetailer] - If set, prefer products from this retailer when auto-matching
   Future<void> generateRecipe({
     required String recipeRequest,
     int servings = 4,
@@ -126,7 +146,7 @@ class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
 
       state = state.copyWith(generatedRecipe: recipe);
 
-      // Auto-match ingredients to products in current province
+      // Auto-match ingredients using live API
       if (autoMatch) {
         await _autoMatchIngredients(preferredRetailer: preferredRetailer);
       }
@@ -134,10 +154,10 @@ class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
       state = state.copyWith(
         isLoading: false,
         currentStep: RecipeGenerationStep.review,
-        matchedProvince: _currentProvince,
+        matchedRetailer: preferredRetailer,
       );
     } on GeminiException catch (e) {
-      debugPrint('Gemini error generating recipe: $e');
+      debugPrint('Gemini error: $e');
       state = state.copyWith(
         isLoading: false,
         error: e.userFriendlyMessage,
@@ -148,72 +168,105 @@ class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
       debugPrint('Error generating recipe: $e');
       state = state.copyWith(
         isLoading: false,
-        error: 'Failed to generate recipe. Please try again.',
-        errorTitle: 'Request Failed',
+        error: e.toString(),
+        errorTitle: 'Something Went Wrong',
         currentStep: RecipeGenerationStep.input,
       );
     }
   }
 
-  /// Automatically match all ingredients to best matching products
+  /// Auto-match ingredients to products using live API search
+  /// with smart filtering via ProductNameParser to avoid bad matches.
   Future<void> _autoMatchIngredients({String? preferredRetailer}) async {
     if (state.generatedRecipe == null) return;
 
-    final province = _currentProvince;
+    final api = _ref.read(liveApiServiceProvider);
+    final storeSelection = _ref.read(storeSelectionProvider).value;
+
+    if (storeSelection == null) {
+      debugPrint('No store selection available — skipping ingredient matching');
+      return;
+    }
+
     final ingredients = List<RecipeIngredient>.from(
       state.generatedRecipe!.ingredients,
+    );
+
+    final retailerName = preferredRetailer ?? storeSelection.stores.keys.first;
+
+    // Set total for progress tracking
+    state = state.copyWith(
+      matchingTotal: ingredients.length,
+      matchingCurrent: 0,
+      matchingProgressText: 'Starting ingredient matching...',
     );
 
     for (int i = 0; i < ingredients.length; i++) {
       final ingredient = ingredients[i];
 
+      // Clean the search query — strip quantities, units, prep instructions
+      final searchQuery = _cleanIngredientForSearch(ingredient.ingredientName);
+
+      // Update progress
+      state = state.copyWith(
+        matchingCurrent: i + 1,
+        matchingProgressText: 'Searching $retailerName for "$searchQuery"',
+      );
+
       try {
-        // Search for matching products in the current province
-        final matches = await _repository.findMatchingProducts(
-          ingredientName: ingredient.ingredientName,
-          province: province,
-          retailer: preferredRetailer,
-          maxResults: 5,
-        );
+        List<LiveProduct> matches;
 
-        if (matches.isNotEmpty) {
-          // If a specific retailer is preferred, filter to only that retailer
-          // (safety check in case SQL function doesn't filter properly)
-          IngredientProductMatch? bestMatch;
+        if (preferredRetailer != null && preferredRetailer.isNotEmpty) {
+          final store = storeSelection.stores[preferredRetailer];
+          if (store == null) continue;
+
+          final response = await api.searchProducts(
+            query: searchQuery,
+            store: store,
+            retailer: preferredRetailer,
+            pageSize: 10, // Fetch more to find better matches
+          );
+          matches = response.products;
+        } else {
+          final firstRetailer = storeSelection.stores.keys.first;
+          final store = storeSelection.stores[firstRetailer]!;
+
+          final response = await api.searchProducts(
+            query: searchQuery,
+            store: store,
+            retailer: firstRetailer,
+            pageSize: 10,
+          );
+          matches = response.products;
+        }
+
+        matches = _resolveImages(matches, retailerName);
+
+        // Smart match — use ProductNameParser to find the best match
+        final best = _findBestMatch(searchQuery, matches);
+
+        if (best != null) {
+          ingredients[i] = ingredient.copyWith(
+            matchedProductIndex: '${best.retailer}:${best.name}',
+            matchedProductName: best.name,
+            matchedProductPrice: best.priceNumeric,
+            matchedRetailer: best.retailer,
+          );
+          state = state.copyWith(
+            matchingProgressText: '✓ Found "${best.name}" for "$searchQuery"',
+          );
+        } else {
           if (preferredRetailer != null && preferredRetailer.isNotEmpty) {
-            final filteredMatches = matches
-                .where(
-                  (m) =>
-                      m.retailer.toLowerCase() ==
-                      preferredRetailer.toLowerCase(),
-                )
-                .toList();
-            if (filteredMatches.isNotEmpty) {
-              bestMatch = filteredMatches.first;
-            }
-          } else {
-            bestMatch = matches.first;
-          }
-
-          if (bestMatch != null) {
-            ingredients[i] = ingredient.copyWith(
-              matchedProductIndex: bestMatch.productIndex,
-              matchedProductName: bestMatch.productName,
-              matchedProductPrice: bestMatch.numericPrice,
-              matchedRetailer: bestMatch.retailer,
-            );
-          } else if (preferredRetailer != null &&
-              preferredRetailer.isNotEmpty) {
-            // When filtering by retailer and no match found, ensure cleared
             ingredients[i] = ingredient.copyWith(clearMatch: true);
           }
+          state = state.copyWith(
+            matchingProgressText: '✗ No match for "$searchQuery"',
+          );
         }
       } catch (e) {
-        // If matching fails for one ingredient, continue with others
         debugPrint(
           'Failed to match ingredient "${ingredient.ingredientName}": $e',
         );
-        // When filtering by retailer, clear match on error to avoid wrong store
         if (preferredRetailer != null && preferredRetailer.isNotEmpty) {
           ingredients[i] = ingredient.copyWith(clearMatch: true);
         }
@@ -224,33 +277,39 @@ class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
       generatedRecipe: state.generatedRecipe!.copyWith(
         ingredients: ingredients,
       ),
-      matchedProvince: province,
+      matchedRetailer: preferredRetailer,
+      clearProgress: true,
     );
   }
 
   /// Re-run auto-matching with a specific retailer
-  /// Pass empty string or null for "All Stores"
   Future<void> reMatchWithRetailer(String retailer) async {
     if (state.generatedRecipe == null) return;
 
-    state = state.copyWith(isLoading: true);
+    state = state.copyWith(
+      isLoading: true,
+      currentStep: RecipeGenerationStep.generating,
+    );
 
-    // Clear existing matches first using clearMatch flag
-    final ingredients = state.generatedRecipe!.ingredients
+    // Clear existing matches when switching retailer
+    final clearedIngredients = state.generatedRecipe!.ingredients
         .map((i) => i.copyWith(clearMatch: true))
         .toList();
 
     state = state.copyWith(
       generatedRecipe: state.generatedRecipe!.copyWith(
-        ingredients: ingredients,
+        ingredients: clearedIngredients,
       ),
     );
 
-    // Convert empty string to null for "All Stores"
     final preferredRetailer = retailer.isEmpty ? null : retailer;
     await _autoMatchIngredients(preferredRetailer: preferredRetailer);
 
-    state = state.copyWith(isLoading: false);
+    state = state.copyWith(
+      isLoading: false,
+      currentStep: RecipeGenerationStep.review,
+      clearProgress: true,
+    );
   }
 
   /// Move to ingredient matching step
@@ -330,7 +389,6 @@ class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
     );
 
     try {
-      // Save recipe first if requested
       if (saveRecipe) {
         await this.saveRecipe();
       }
@@ -343,7 +401,6 @@ class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
             .toList();
 
         if (matchedRetailers.isNotEmpty) {
-          // Use most common retailer
           final retailerCounts = <String, int>{};
           for (final r in matchedRetailers) {
             retailerCounts[r] = (retailerCounts[r] ?? 0) + 1;
@@ -370,33 +427,156 @@ class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
       debugPrint('Error exporting to shopping list: $e');
       state = state.copyWith(
         isLoading: false,
-        error: 'Failed to create shopping list.',
+        error: 'Failed to export to shopping list.',
         errorTitle: 'Export Failed',
+        currentStep: RecipeGenerationStep.review,
       );
       return null;
     }
   }
 
-  /// Reset to initial state
   void reset() {
     state = const RecipeGenerationState();
   }
 
-  /// Go back to previous step
-  void goBack() {
-    switch (state.currentStep) {
-      case RecipeGenerationStep.review:
-        state = state.copyWith(currentStep: RecipeGenerationStep.input);
-        break;
-      case RecipeGenerationStep.matching:
-        state = state.copyWith(currentStep: RecipeGenerationStep.review);
-        break;
-      case RecipeGenerationStep.export:
-        state = state.copyWith(currentStep: RecipeGenerationStep.matching);
-        break;
-      default:
-        break;
+  List<LiveProduct> _resolveImages(
+    List<LiveProduct> products,
+    String retailer,
+  ) {
+    final lookup = ImageLookupService.instance;
+    if (!lookup.isReady) return products;
+    final lower = retailer.toLowerCase();
+    if (!lower.contains('checkers') && !lower.contains('shoprite')) {
+      return products;
     }
+    return products.map((p) {
+      final cached = lookup.lookupImage(
+        retailer: retailer,
+        productName: p.name,
+      );
+      if (cached != null) return p.copyWith(imageUrl: cached);
+      return p;
+    }).toList();
+  }
+
+  /// Clean an ingredient name for API search.
+  /// Strips quantities, units, and prep instructions so the search
+  /// focuses on the actual food item.
+  ///
+  /// "500g, lean Beef Mince 500g" → "Beef Mince"
+  /// "2 cans (400g each), Chopped Tinned Tomatoes" → "Tinned Tomatoes"
+  /// "3 units, minced Garlic Cloves" → "Garlic Cloves"
+  static String _cleanIngredientForSearch(String ingredientName) {
+    var cleaned = ingredientName;
+
+    // Remove leading quantity + unit: "500g, " or "2 cans (400g each), "
+    cleaned = cleaned.replaceAll(
+      RegExp(
+        r'^\d+\.?\d*\s*(g|kg|ml|l|cups?|tbsp|tsp|units?|cans?|pieces?|cloves?|stalks?|bunch|handful)\b[,\s]*',
+        caseSensitive: false,
+      ),
+      '',
+    );
+
+    // Remove parenthetical info: "(400g each)"
+    cleaned = cleaned.replaceAll(RegExp(r'\([^)]*\)'), '');
+
+    // Remove trailing size: "500g", "2 x 400g"
+    cleaned = cleaned.replaceAll(
+      RegExp(
+        r'\d+\.?\d*\s*x?\s*\d*\.?\d*\s*(g|kg|ml|l)\b',
+        caseSensitive: false,
+      ),
+      '',
+    );
+
+    // Remove prep instructions that add noise to search
+    cleaned = cleaned.replaceAll(
+      RegExp(
+        r'\b(finely|roughly|freshly|thinly)?\s*(chopped|diced|minced|sliced|grated|crushed|peeled|deseeded|trimmed|halved)\b',
+        caseSensitive: false,
+      ),
+      '',
+    );
+
+    // Remove common qualifiers that don't help search
+    cleaned = cleaned.replaceAll(
+      RegExp(
+        r'\b(fresh|dried|frozen|large|small|medium|to taste)\b',
+        caseSensitive: false,
+      ),
+      '',
+    );
+
+    // Clean up whitespace, commas, leading/trailing junk
+    cleaned = cleaned.replaceAll(RegExp(r'[,\s]+'), ' ').trim();
+
+    // If cleaning removed everything, fall back to original minus leading numbers
+    if (cleaned.isEmpty || cleaned.length < 3) {
+      return ingredientName.replaceAll(RegExp(r'^\d+\S*\s*,?\s*'), '').trim();
+    }
+
+    return cleaned;
+  }
+
+  /// Find the best product match from API results using word similarity.
+  /// Returns null if no reasonable match found — prevents "mosquito killer"
+  /// matching "carrots".
+  LiveProduct? _findBestMatch(
+    String searchQuery,
+    List<LiveProduct> candidates,
+  ) {
+    if (candidates.isEmpty) return null;
+
+    final sourceWords = searchQuery
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^\w\s]'), '')
+        .split(RegExp(r'\s+'))
+        .where((w) => w.length > 1)
+        .toSet();
+
+    if (sourceWords.isEmpty) return candidates.first;
+
+    final scored = <(LiveProduct, double)>[];
+
+    for (final product in candidates) {
+      final candidateWords = product.name
+          .toLowerCase()
+          .replaceAll(RegExp(r'[^\w\s]'), '')
+          .split(RegExp(r'\s+'))
+          .where((w) => w.length > 1)
+          .toSet();
+
+      if (candidateWords.isEmpty) continue;
+
+      // Jaccard similarity
+      final overlap = sourceWords.intersection(candidateWords).length;
+      final jaccard = overlap / sourceWords.union(candidateWords).length;
+
+      // Containment score: do all search words appear in the product name?
+      // "beef mince" → "Lean Beef Mince 500g" = 1.0
+      final containment = sourceWords.isEmpty
+          ? 0.0
+          : sourceWords
+                    .where((w) => candidateWords.any((cw) => cw.contains(w)))
+                    .length /
+                sourceWords.length;
+
+      // Combined score: weight containment higher (it's more important
+      // that "beef" and "mince" both appear than Jaccard overlap)
+      final score = (jaccard * 0.4) + (containment * 0.6);
+
+      // Minimum threshold — rejects totally unrelated products
+      if (score >= 0.2) {
+        scored.add((product, score));
+      }
+    }
+
+    if (scored.isEmpty) return null;
+
+    // Sort by score descending, return best
+    scored.sort((a, b) => b.$2.compareTo(a.$2));
+    return scored.first.$1;
   }
 }
 
@@ -405,16 +585,15 @@ final recipeGenerationProvider =
     StateNotifierProvider<RecipeGenerationNotifier, RecipeGenerationState>((
       ref,
     ) {
-      final geminiService = ref.watch(geminiServiceProvider);
+      final gemini = ref.watch(geminiServiceProvider);
       final repository = ref.watch(recipeRepositoryProvider);
-      return RecipeGenerationNotifier(geminiService, repository, ref);
+      return RecipeGenerationNotifier(gemini, repository, ref);
     });
 
 // =============================================================================
-// INGREDIENT MATCHING STATE
+// INGREDIENT MATCHING (manual search from matching sheet)
 // =============================================================================
 
-/// State for ingredient product matching
 class IngredientMatchingState {
   final bool isLoading;
   final List<IngredientProductMatch> matches;
@@ -439,19 +618,15 @@ class IngredientMatchingState {
   }
 }
 
-/// Ingredient matching notifier
+/// Ingredient matching notifier — uses live API search
 class IngredientMatchingNotifier
     extends StateNotifier<IngredientMatchingState> {
-  final RecipeRepository _repository;
   final Ref _ref;
 
-  IngredientMatchingNotifier(this._repository, this._ref)
+  IngredientMatchingNotifier(this._ref)
     : super(const IngredientMatchingState());
 
-  /// Get current province from provider
-  String get _currentProvince => _ref.read(selectedProvinceProvider);
-
-  /// Search for matching products in current province
+  /// Search for matching products via live API
   Future<void> searchMatches({
     required String ingredientName,
     String? retailer,
@@ -459,11 +634,62 @@ class IngredientMatchingNotifier
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      final matches = await _repository.findMatchingProducts(
-        ingredientName: ingredientName,
-        province: _currentProvince,
-        retailer: retailer,
-      );
+      final api = _ref.read(liveApiServiceProvider);
+      final storeSelection = _ref.read(storeSelectionProvider).value;
+
+      if (storeSelection == null) {
+        state = state.copyWith(
+          isLoading: false,
+          error: 'No stores selected. Complete store setup first.',
+          matches: [],
+        );
+        return;
+      }
+
+      List<LiveProduct> products;
+
+      if (retailer != null && retailer.isNotEmpty) {
+        final store = storeSelection.stores[retailer];
+        if (store == null) {
+          state = state.copyWith(isLoading: false, matches: []);
+          return;
+        }
+
+        final response = await api.searchProducts(
+          query: ingredientName,
+          store: store,
+          retailer: retailer,
+          pageSize: 10,
+        );
+        products = response.products;
+        products = _resolveImages(products, retailer);
+      } else {
+        // Search all retailers in parallel
+        final results = await api.compareProduct(
+          productName: ingredientName,
+          stores: storeSelection.stores,
+        );
+
+        products = [];
+        for (final entry in results.entries) {
+          final resolved = _resolveImages(entry.value, entry.key);
+          products.addAll(resolved);
+        }
+      }
+
+      // Convert LiveProduct → IngredientProductMatch
+      final matches = products
+          .map(
+            (p) => IngredientProductMatch(
+              productIndex: '${p.retailer}:${p.name}',
+              productName: p.name,
+              productPrice: p.price,
+              productImageUrl: p.imageUrl,
+              retailer: p.retailer,
+              similarityScore: 1.0,
+            ),
+          )
+          .toList();
 
       state = state.copyWith(isLoading: false, matches: matches);
     } catch (e) {
@@ -476,9 +702,28 @@ class IngredientMatchingNotifier
     }
   }
 
-  /// Clear matches
   void clearMatches() {
     state = const IngredientMatchingState();
+  }
+
+  List<LiveProduct> _resolveImages(
+    List<LiveProduct> products,
+    String retailer,
+  ) {
+    final lookup = ImageLookupService.instance;
+    if (!lookup.isReady) return products;
+    final lower = retailer.toLowerCase();
+    if (!lower.contains('checkers') && !lower.contains('shoprite')) {
+      return products;
+    }
+    return products.map((p) {
+      final cached = lookup.lookupImage(
+        retailer: retailer,
+        productName: p.name,
+      );
+      if (cached != null) return p.copyWith(imageUrl: cached);
+      return p;
+    }).toList();
   }
 }
 
@@ -487,21 +732,18 @@ final ingredientMatchingProvider =
     StateNotifierProvider<IngredientMatchingNotifier, IngredientMatchingState>((
       ref,
     ) {
-      final repository = ref.watch(recipeRepositoryProvider);
-      return IngredientMatchingNotifier(repository, ref);
+      return IngredientMatchingNotifier(ref);
     });
 
 // =============================================================================
 // USER RECIPES
 // =============================================================================
 
-/// Provider for user's saved recipes
 final userRecipesProvider = FutureProvider<List<Recipe>>((ref) async {
   final repository = ref.watch(recipeRepositoryProvider);
   return repository.getUserRecipes();
 });
 
-/// Provider for a single recipe by ID
 final recipeByIdProvider = FutureProvider.family<Recipe, String>((
   ref,
   recipeId,
@@ -514,14 +756,12 @@ final recipeByIdProvider = FutureProvider.family<Recipe, String>((
 // RECIPE SUGGESTIONS (FROM INGREDIENTS)
 // =============================================================================
 
-/// State for ingredient-based recipe suggestions
-/// Note: RecipeSuggestion is imported from gemini_service.dart
 class RecipeSuggestionsState {
   final bool isLoading;
   final List<RecipeSuggestion> suggestions;
   final String? error;
   final String? errorTitle;
-  final List<String> ingredients; // Preserve ingredients for back navigation
+  final List<String> ingredients; // Preserve for back navigation
   final String? mealType; // Preserve meal type selection
 
   const RecipeSuggestionsState({
@@ -552,18 +792,15 @@ class RecipeSuggestionsState {
     );
   }
 
-  /// Whether there's an error to show in a popup
   bool get hasError => error != null;
 }
 
-/// Recipe suggestions notifier
 class RecipeSuggestionsNotifier extends StateNotifier<RecipeSuggestionsState> {
   final GeminiService _geminiService;
 
   RecipeSuggestionsNotifier(this._geminiService)
     : super(const RecipeSuggestionsState());
 
-  /// Clear the current error (call after showing popup)
   void clearError() {
     state = state.copyWith(clearError: true);
   }
@@ -627,7 +864,6 @@ class RecipeSuggestionsNotifier extends StateNotifier<RecipeSuggestionsState> {
   }
 }
 
-/// Recipe suggestions provider
 final recipeSuggestionsProvider =
     StateNotifierProvider<RecipeSuggestionsNotifier, RecipeSuggestionsState>((
       ref,

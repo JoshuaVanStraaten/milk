@@ -131,3 +131,8 @@ env.dart
 *.aab
 *.ipa
 *.app
+
+# Signing
+android/key.properties
+android/upload-keystore.jks
+*.jks

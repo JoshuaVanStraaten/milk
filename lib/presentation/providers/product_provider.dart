@@ -1,7 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/product.dart';
 import '../../data/repositories/product_repository.dart';
-import 'province_provider.dart';
+
+// Province is no longer user-selectable — the live API uses GPS-based stores.
+// This constant is kept for backward compatibility with DB queries (fallback).
+const _defaultProvince = 'Gauteng';
 
 /// Provider for ProductRepository instance
 final productRepositoryProvider = Provider<ProductRepository>((ref) {
@@ -283,7 +286,7 @@ final productListProvider =
     StateNotifierProvider.family<ProductListNotifier, ProductListState, String>(
       (ref, retailer) {
         final repository = ref.watch(productRepositoryProvider);
-        final province = ref.watch(selectedProvinceProvider);
+        final province = _defaultProvince;
         return ProductListNotifier(repository, retailer, province);
       },
     );
@@ -296,7 +299,7 @@ final productSearchProvider = FutureProvider.family<List<Product>, String>((
   if (query.isEmpty) return [];
 
   final repository = ref.watch(productRepositoryProvider);
-  final province = ref.watch(selectedProvinceProvider);
+  final province = _defaultProvince;
   return repository.searchProducts(query: query, province: province);
 });
 
@@ -309,7 +312,7 @@ final productSearchInRetailerProvider =
       if (params.query.isEmpty) return [];
 
       final repository = ref.watch(productRepositoryProvider);
-      final province = ref.watch(selectedProvinceProvider);
+      final province = _defaultProvince;
       return repository.searchProducts(
         query: params.query,
         province: province,
@@ -323,7 +326,7 @@ final promotionProductsProvider = FutureProvider.family<List<Product>, String>((
   retailer,
 ) async {
   final repository = ref.watch(productRepositoryProvider);
-  final province = ref.watch(selectedProvinceProvider);
+  final province = _defaultProvince;
   return repository.getPromotionProducts(
     retailer: retailer,
     province: province,
@@ -336,7 +339,7 @@ final productCountProvider = FutureProvider.family<int, String?>((
   retailer,
 ) async {
   final repository = ref.watch(productRepositoryProvider);
-  final province = ref.watch(selectedProvinceProvider);
+  final province = _defaultProvince;
   return repository.getProductCount(retailer: retailer, province: province);
 });
 
@@ -346,6 +349,6 @@ final productCategoriesProvider = FutureProvider.family<List<String>, String?>((
   retailer,
 ) async {
   final repository = ref.watch(productRepositoryProvider);
-  final province = ref.watch(selectedProvinceProvider);
+  final province = _defaultProvince;
   return repository.getCategories(province: province, retailer: retailer);
 });

@@ -1371,9 +1371,6 @@ class _AnimatedItemListState extends State<_AnimatedItemList>
     // Items to remove (in old but not in new)
     final toRemove = oldIds.difference(newIds);
 
-    // Items to add (in new but not in old)
-    final toAdd = newIds.difference(oldIds);
-
     // Remove items with animation
     for (final id in toRemove) {
       final index = _items.indexWhere((item) => item.itemId == id);
