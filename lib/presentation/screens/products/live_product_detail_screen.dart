@@ -694,13 +694,37 @@ class _LiveProductDetailScreenState
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: isDark ? AppColors.surfaceDarkMode : AppColors.surface,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () {
+          double? specialPrice;
+          if (match.hasPromo && match.promotionPrice != null) {
+            specialPrice = double.tryParse(
+              match.promotionPrice!
+                  .replaceAll('R', '')
+                  .replaceAll(',', '')
+                  .trim(),
+            );
+          }
+          showAddToListSheet(
+            context,
+            ref,
+            productName: match.name,
+            price: match.priceNumeric,
+            retailer: match.retailer,
+            specialPrice: specialPrice,
+            imageUrl: match.imageUrl,
+            priceDisplay: match.price,
+            multiBuyInfo: null,
+          );
+        },
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.surfaceDarkMode : AppColors.surface,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
           children: [
             // Product image
             Container(
@@ -814,6 +838,7 @@ class _LiveProductDetailScreenState
             ),
           ],
         ),
+      ),
       ),
     );
   }
