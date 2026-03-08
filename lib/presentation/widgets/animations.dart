@@ -478,7 +478,7 @@ class _StrikethroughPainter extends CustomPainter {
     if (progress <= 0) return;
 
     final paint = Paint()
-      ..color = (textStyle.color ?? Colors.black).withOpacity(0.5)
+      ..color = (textStyle.color ?? Colors.black).withValues(alpha: 0.5)
       ..strokeWidth = 1.5
       ..style = PaintingStyle.stroke;
 
@@ -594,7 +594,7 @@ class _CheckPainter extends CustomPainter {
 
     // Draw circle
     final circlePaint = Paint()
-      ..color = color.withOpacity(0.2)
+      ..color = color.withValues(alpha: 0.2)
       ..style = PaintingStyle.fill;
 
     canvas.drawCircle(

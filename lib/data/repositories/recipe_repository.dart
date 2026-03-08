@@ -17,21 +17,21 @@ class RecipeRepository {
         throw Exception('User not authenticated');
       }
 
-      // Insert the recipe
+      // Upsert the recipe (handles re-save of existing recipe gracefully)
       final recipeData = recipe.toJson();
       recipeData['user_id'] = userId;
 
       final recipeResponse = await _supabase
           .from('Recipes_Overview')
-          .insert(recipeData)
+          .upsert(recipeData)
           .select()
           .single();
 
       final savedRecipe = Recipe.fromJson(recipeResponse);
       final recipeId = savedRecipe.recipeId!;
 
-      // Insert ingredients
-      if (recipe.ingredients.isNotEmpty) {
+      // Insert ingredients only for new recipes (recipeId was null before save)
+      if (recipe.recipeId == null && recipe.ingredients.isNotEmpty) {
         final ingredientsData = recipe.ingredients.asMap().entries.map((entry) {
           final ingredient = entry.value;
           final data = ingredient.toJson();

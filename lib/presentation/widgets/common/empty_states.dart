@@ -90,8 +90,8 @@ class EmptyState extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            config.color.withOpacity(isDark ? 0.2 : 0.1),
-            config.secondaryColor.withOpacity(isDark ? 0.15 : 0.05),
+            config.color.withValues(alpha: isDark ? 0.2 : 0.1),
+            config.secondaryColor.withValues(alpha: isDark ? 0.15 : 0.05),
           ],
         ),
         shape: BoxShape.circle,
@@ -113,7 +113,7 @@ class EmptyState extends StatelessWidget {
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: config.secondaryColor.withOpacity(0.3),
+                      color: config.secondaryColor.withValues(alpha: 0.3),
                       blurRadius: 8,
                       offset: const Offset(0, 2),
                     ),
@@ -150,8 +150,8 @@ class EmptyState extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: isDark
-              ? Colors.white.withOpacity(0.1)
-              : Colors.black.withOpacity(0.05),
+              ? Colors.white.withValues(alpha: 0.1)
+              : Colors.black.withValues(alpha: 0.05),
         ),
       ),
       child: Column(

@@ -274,9 +274,9 @@ class _ListDetailScreenState extends ConsumerState<ListDetailScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: retailerColor.withOpacity(isDark ? 0.2 : 0.1),
+              color: retailerColor.withValues(alpha: isDark ? 0.2 : 0.1),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: retailerColor.withOpacity(0.3)),
+              border: Border.all(color: retailerColor.withValues(alpha: 0.3)),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -551,13 +551,13 @@ class _ListHeader extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.all(20),
-      color: listColor.withOpacity(isDark ? 0.2 : 0.1),
+      color: listColor.withValues(alpha: isDark ? 0.2 : 0.1),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: listColor.withOpacity(isDark ? 0.3 : 0.2),
+              color: listColor.withValues(alpha: isDark ? 0.3 : 0.2),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(Icons.shopping_cart, color: listColor, size: 28),
@@ -702,7 +702,7 @@ class _ListItemTile extends ConsumerWidget {
                                 vertical: 2,
                               ),
                               decoration: BoxDecoration(
-                                color: AppColors.error.withOpacity(0.1),
+                                color: AppColors.error.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: const Text(
@@ -1085,7 +1085,7 @@ class _EditItemSheetState extends ConsumerState<_EditItemSheet> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(isDark ? 0.2 : 0.1),
+                  color: AppColors.primary.withValues(alpha: isDark ? 0.2 : 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
@@ -1409,7 +1409,7 @@ class _AnimatedItemListState extends State<_AnimatedItemList>
     // Use a regular ListView with AnimatedSwitcher for each item
     // This gives us smooth transitions when items reorder
     return ListView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 96),
       itemCount: widget.items.length,
       itemBuilder: (context, index) {
         final item = widget.items[index];

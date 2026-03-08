@@ -1,5 +1,6 @@
 // lib/data/services/live_api_service.dart
 
+import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:logger/logger.dart';
@@ -25,6 +26,35 @@ class LiveApiService {
 
   LiveApiService({http.Client? client}) : _client = client ?? http.Client();
 
+  /// Retry an async operation with exponential backoff.
+  ///
+  /// Attempts [maxRetries] times with delays of 1s, 2s, 4s between attempts.
+  /// Only retries on timeout or HTTP errors, not on argument/parse errors.
+  Future<T> _retryWithBackoff<T>(
+    Future<T> Function() operation, {
+    int maxRetries = 3,
+    String label = 'API call',
+  }) async {
+    for (var attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        return await operation();
+      } catch (e) {
+        final isRetryable = e is TimeoutException ||
+            e is http.ClientException ||
+            e is LiveApiException;
+
+        if (!isRetryable || attempt == maxRetries) {
+          rethrow;
+        }
+
+        final delay = Duration(seconds: 1 << (attempt - 1)); // 1s, 2s, 4s
+        _logger.w('$label attempt $attempt failed, retrying in ${delay.inSeconds}s: $e');
+        await Future.delayed(delay);
+      }
+    }
+    throw StateError('Unreachable'); // dart needs this for type safety
+  }
+
   // ──────────────────────────────────────────────────────────────────────────
   // STORES NEARBY
   // ──────────────────────────────────────────────────────────────────────────
@@ -44,22 +74,26 @@ class LiveApiService {
 
     _logger.d('Fetching nearby stores for ($latitude, $longitude)');
 
-    final response = await _client
-        .post(
-          Uri.parse(url),
-          headers: LiveApiConfig.headers,
-          body: jsonEncode({'latitude': latitude, 'longitude': longitude}),
-        )
-        .timeout(LiveApiConfig.requestTimeout);
-
-    if (response.statusCode != 200) {
-      _logger.e('stores-nearby failed: ${response.statusCode}');
-      throw LiveApiException(
-        'Failed to fetch nearby stores',
-        statusCode: response.statusCode,
-        body: response.body,
-      );
-    }
+    final response = await _retryWithBackoff(
+      () => _client
+          .post(
+            Uri.parse(url),
+            headers: LiveApiConfig.headers,
+            body: jsonEncode({'latitude': latitude, 'longitude': longitude}),
+          )
+          .timeout(LiveApiConfig.requestTimeout)
+          .then((r) {
+            if (r.statusCode != 200) {
+              throw LiveApiException(
+                'Failed to fetch nearby stores',
+                statusCode: r.statusCode,
+                body: r.body,
+              );
+            }
+            return r;
+          }),
+      label: 'stores-nearby',
+    );
 
     final data = jsonDecode(response.body) as Map<String, dynamic>;
     final storesMap = data['stores'] as Map<String, dynamic>? ?? {};
@@ -119,22 +153,26 @@ class LiveApiService {
 
     _logger.d('Browsing $retailer (${store.storeName}), page $page');
 
-    final response = await _client
-        .post(
-          Uri.parse(url),
-          headers: LiveApiConfig.headers,
-          body: jsonEncode(body),
-        )
-        .timeout(LiveApiConfig.requestTimeout);
-
-    if (response.statusCode != 200) {
-      _logger.e('Browse $retailer failed: ${response.statusCode}');
-      throw LiveApiException(
-        'Failed to browse $retailer products',
-        statusCode: response.statusCode,
-        body: response.body,
-      );
-    }
+    final response = await _retryWithBackoff(
+      () => _client
+          .post(
+            Uri.parse(url),
+            headers: LiveApiConfig.headers,
+            body: jsonEncode(body),
+          )
+          .timeout(LiveApiConfig.requestTimeout)
+          .then((r) {
+            if (r.statusCode != 200) {
+              throw LiveApiException(
+                'Failed to browse $retailer products',
+                statusCode: r.statusCode,
+                body: r.body,
+              );
+            }
+            return r;
+          }),
+      label: 'browse-$retailer',
+    );
 
     return LiveProductsResponse.fromJson(
       jsonDecode(response.body) as Map<String, dynamic>,
@@ -182,22 +220,26 @@ class LiveApiService {
 
     _logger.d('Searching $retailer for "$query", page $page');
 
-    final response = await _client
-        .post(
-          Uri.parse(url),
-          headers: LiveApiConfig.headers,
-          body: jsonEncode(body),
-        )
-        .timeout(LiveApiConfig.requestTimeout);
-
-    if (response.statusCode != 200) {
-      _logger.e('Search $retailer failed: ${response.statusCode}');
-      throw LiveApiException(
-        'Failed to search $retailer',
-        statusCode: response.statusCode,
-        body: response.body,
-      );
-    }
+    final response = await _retryWithBackoff(
+      () => _client
+          .post(
+            Uri.parse(url),
+            headers: LiveApiConfig.headers,
+            body: jsonEncode(body),
+          )
+          .timeout(LiveApiConfig.requestTimeout)
+          .then((r) {
+            if (r.statusCode != 200) {
+              throw LiveApiException(
+                'Failed to search $retailer',
+                statusCode: r.statusCode,
+                body: r.body,
+              );
+            }
+            return r;
+          }),
+      label: 'search-$retailer',
+    );
 
     return LiveProductsResponse.fromJson(
       jsonDecode(response.body) as Map<String, dynamic>,

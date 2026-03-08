@@ -181,7 +181,7 @@ class _CreateListScreenState extends ConsumerState<CreateListScreen> {
                         boxShadow: isSelected
                             ? [
                                 BoxShadow(
-                                  color: Color(colorValue).withOpacity(0.4),
+                                  color: Color(colorValue).withValues(alpha: 0.4),
                                   blurRadius: 8,
                                   spreadRadius: 2,
                                 ),

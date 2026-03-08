@@ -86,4 +86,10 @@ lib/
 - Don't hardcode province names — GPS-based now
 - Don't use SharedPreferences for secrets — use flutter_secure_storage
 - Don't import deleted files: `province_provider.dart`, `onboarding_screen.dart`, `store_selector_screen.dart`, `price_comparison_sheet.dart`, `price_comparison_provider.dart`
-- Don't add new features during bug fix phase — fix what exists
+- Don't use `.withOpacity()` — use `.withValues(alpha: x)` instead (Flutter deprecation)
+
+## Future Backlog
+
+- **FatSecret API** — Nutritional info (fat, protein, carbs), diet plans, calorie tracking
+- **Barcode scanner** — Scan products in-store, compare prices across retailers (needs barcode/EAN data in DB first)
+- **Store price history** — Track price trends over time

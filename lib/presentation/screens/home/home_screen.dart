@@ -467,19 +467,19 @@ class _SavingsBanner extends StatelessWidget {
         gradient: LinearGradient(
           colors: isDark
               ? [
-                  AppColors.primary.withOpacity(0.25),
-                  AppColors.primaryDark.withOpacity(0.15),
+                  AppColors.primary.withValues(alpha: 0.25),
+                  AppColors.primaryDark.withValues(alpha: 0.15),
                 ]
               : [
-                  AppColors.primary.withOpacity(0.08),
-                  AppColors.primaryLight.withOpacity(0.05),
+                  AppColors.primary.withValues(alpha: 0.08),
+                  AppColors.primaryLight.withValues(alpha: 0.05),
                 ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: AppColors.primary.withOpacity(isDark ? 0.3 : 0.15),
+          color: AppColors.primary.withValues(alpha: isDark ? 0.3 : 0.15),
         ),
       ),
       child: Row(
@@ -489,7 +489,7 @@ class _SavingsBanner extends StatelessWidget {
             width: 48,
             height: 48,
             decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(isDark ? 0.3 : 0.15),
+              color: AppColors.primary.withValues(alpha: isDark ? 0.3 : 0.15),
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Icon(
@@ -629,7 +629,7 @@ class _HotDealCard extends ConsumerWidget {
               ? null
               : [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
+                    color: Colors.black.withValues(alpha: 0.04),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -694,7 +694,7 @@ class _HotDealCard extends ConsumerWidget {
                       vertical: 3,
                     ),
                     decoration: BoxDecoration(
-                      color: retailerColor.withOpacity(0.9),
+                      color: retailerColor.withValues(alpha: 0.9),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
@@ -937,7 +937,7 @@ class _EmptyDealsState extends StatelessWidget {
             width: 80,
             height: 80,
             decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(isDark ? 0.2 : 0.1),
+              color: AppColors.primary.withValues(alpha: isDark ? 0.2 : 0.1),
               borderRadius: BorderRadius.circular(20),
             ),
             child: const Icon(
@@ -1222,8 +1222,8 @@ class _DealsLoadingAnimationState extends State<_DealsLoadingAnimation>
                       gradient: LinearGradient(
                         colors: [
                           Colors.transparent,
-                          AppColors.primary.withOpacity(0.3),
-                          AppColors.primary.withOpacity(0.3),
+                          AppColors.primary.withValues(alpha: 0.3),
+                          AppColors.primary.withValues(alpha: 0.3),
                           Colors.transparent,
                         ],
                       ),
@@ -1285,10 +1285,10 @@ class _DealsLoadingAnimationState extends State<_DealsLoadingAnimation>
                     width: 8,
                     height: 8,
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(opacity),
+                      color: AppColors.primary.withValues(alpha: opacity),
                       shape: BoxShape.circle,
                     ),
-                    transform: Matrix4.identity()..scale(scale, scale),
+                    transform: Matrix4.diagonal3Values(scale, scale, 1.0),
                     transformAlignment: Alignment.center,
                   );
                 }),

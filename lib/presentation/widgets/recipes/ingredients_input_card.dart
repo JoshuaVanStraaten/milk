@@ -98,7 +98,7 @@ class _IngredientsInputCardState extends State<IngredientsInputCard> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.1),
+                  color: AppColors.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(
@@ -234,7 +234,7 @@ class _IngredientsInputCardState extends State<IngredientsInputCard> {
                   ),
                   deleteIcon: const Icon(Icons.close, size: 16),
                   onDeleted: () => _removeIngredient(entry.key),
-                  backgroundColor: AppColors.primary.withOpacity(0.1),
+                  backgroundColor: AppColors.primary.withValues(alpha: 0.1),
                   deleteIconColor: AppColors.primary,
                 );
               }).toList(),

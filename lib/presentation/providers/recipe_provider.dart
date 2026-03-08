@@ -358,6 +358,11 @@ class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
   Future<Recipe?> saveRecipe() async {
     if (state.generatedRecipe == null) return null;
 
+    // Already persisted — skip to avoid duplicate insert conflict
+    if (state.generatedRecipe?.recipeId != null) {
+      return state.generatedRecipe;
+    }
+
     state = state.copyWith(isLoading: true);
 
     try {
@@ -389,7 +394,7 @@ class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
     );
 
     try {
-      if (saveRecipe) {
+      if (saveRecipe && state.generatedRecipe?.recipeId == null) {
         await this.saveRecipe();
       }
 

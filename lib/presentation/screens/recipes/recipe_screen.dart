@@ -642,13 +642,13 @@ class _GenerateRecipeTabState extends ConsumerState<_GenerateRecipeTab> {
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: unmatchedCount > 0
-                        ? AppColors.warning.withOpacity(0.1)
-                        : AppColors.success.withOpacity(0.1),
+                        ? AppColors.warning.withValues(alpha: 0.1)
+                        : AppColors.success.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
                       color: unmatchedCount > 0
-                          ? AppColors.warning.withOpacity(0.3)
-                          : AppColors.success.withOpacity(0.3),
+                          ? AppColors.warning.withValues(alpha: 0.3)
+                          : AppColors.success.withValues(alpha: 0.3),
                     ),
                   ),
                   child: Row(
@@ -1052,7 +1052,7 @@ class _SavedRecipeCard extends StatelessWidget {
                   width: 60,
                   height: 60,
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.1),
+                    color: AppColors.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Icon(
@@ -1131,7 +1131,7 @@ class _SavedRecipeCard extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: _getDifficultyColor(
                               recipe.difficulty!,
-                            ).withOpacity(0.1),
+                            ).withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
@@ -1335,7 +1335,7 @@ class _SavedRecipeCard extends StatelessWidget {
                               height: 28,
                               alignment: Alignment.center,
                               decoration: BoxDecoration(
-                                color: AppColors.primary.withOpacity(0.1),
+                                color: AppColors.primary.withValues(alpha: 0.1),
                                 shape: BoxShape.circle,
                               ),
                               child: Text(
@@ -1379,7 +1379,7 @@ class _SavedRecipeCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: AppColors.primary.withOpacity(0.1),
+        color: AppColors.primary.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(

@@ -338,8 +338,8 @@ class ListDetailHeaderSkeleton extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(20),
         color: isDark
-            ? const Color(0xFF374151).withOpacity(0.3)
-            : const Color(0xFFE5E7EB).withOpacity(0.5),
+            ? const Color(0xFF374151).withValues(alpha: 0.3)
+            : const Color(0xFFE5E7EB).withValues(alpha: 0.5),
         child: Row(
           children: [
             // Icon container
@@ -431,7 +431,7 @@ class ProductDetailSkeleton extends StatelessWidget {
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: isDark
-                          ? const Color(0xFF374151).withOpacity(0.5)
+                          ? const Color(0xFF374151).withValues(alpha: 0.5)
                           : AppColors.surface,
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -505,7 +505,7 @@ class _StoreCardSkeleton extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -580,7 +580,7 @@ class _HomeCardSkeleton extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -635,8 +635,8 @@ class HomeScreenSkeleton extends StatelessWidget {
               padding: const EdgeInsets.all(32),
               decoration: BoxDecoration(
                 color: isDark
-                    ? const Color(0xFF374151).withOpacity(0.3)
-                    : AppColors.primary.withOpacity(0.1),
+                    ? const Color(0xFF374151).withValues(alpha: 0.3)
+                    : AppColors.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Column(
@@ -688,7 +688,7 @@ class _QuickActionCardSkeleton extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),

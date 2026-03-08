@@ -114,11 +114,11 @@ class _AnimatedOfflineBannerState extends ConsumerState<AnimatedOfflineBanner>
             padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
             decoration: BoxDecoration(
               color: isDark
-                  ? AppColors.warning.withOpacity(0.9)
+                  ? AppColors.warning.withValues(alpha: 0.9)
                   : AppColors.warning,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
+                  color: Colors.black.withValues(alpha: 0.1),
                   blurRadius: 4,
                   offset: const Offset(0, 2),
                 ),
@@ -148,7 +148,7 @@ class _AnimatedOfflineBannerState extends ConsumerState<AnimatedOfflineBanner>
                       vertical: 2,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
+                      color: Colors.white.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Text(
