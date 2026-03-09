@@ -127,14 +127,15 @@ class ProductCardSkeleton extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Image placeholder
-          AspectRatio(
-            aspectRatio: 1,
-            child: Container(
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF374151) : AppColors.surface,
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(12),
+          // Padded image placeholder — matches new LiveProductCard layout
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+            child: AspectRatio(
+              aspectRatio: 1,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF374151) : AppColors.surface,
+                  borderRadius: BorderRadius.circular(8),
                 ),
               ),
             ),
@@ -143,7 +144,7 @@ class ProductCardSkeleton extends StatelessWidget {
           // Text placeholders
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.all(6.0),
+              padding: const EdgeInsets.fromLTRB(10, 4, 10, 8),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
@@ -154,8 +155,16 @@ class ProductCardSkeleton extends StatelessWidget {
                   // Product name line 2
                   const SkeletonBox(height: 12, width: 80),
                   const SizedBox(height: 8),
-                  // Price
-                  const SkeletonBox(height: 14, width: 60),
+                  // Price + two button placeholders
+                  Row(
+                    children: [
+                      const SkeletonBox(height: 14, width: 60),
+                      const Spacer(),
+                      const SkeletonBox(height: 26, width: 26),
+                      const SizedBox(width: 4),
+                      const SkeletonBox(height: 26, width: 26),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -180,9 +189,9 @@ class ProductGridSkeleton extends StatelessWidget {
         physics: const NeverScrollableScrollPhysics(),
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 2,
-          childAspectRatio: 0.68,
-          crossAxisSpacing: 8,
-          mainAxisSpacing: 8,
+          childAspectRatio: 0.72,
+          crossAxisSpacing: 10,
+          mainAxisSpacing: 10,
         ),
         itemCount: itemCount,
         itemBuilder: (context, index) => const ProductCardSkeleton(),

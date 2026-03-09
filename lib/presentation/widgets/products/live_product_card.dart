@@ -8,8 +8,9 @@ import 'quick_add_button.dart';
 
 /// Product card for live API products.
 ///
-/// Displays product image, name, price, promotion badge, and a quick-add "+" button.
-/// Designed for use in a 2-column grid with `childAspectRatio: 0.62`.
+/// Displays product image (padded, floating on white container), name, price,
+/// promotion badge, quick-add "+" button, and optional compare button.
+/// Designed for use in a 2-column grid with `childAspectRatio: 0.72`.
 class LiveProductCard extends StatelessWidget {
   final LiveProduct product;
   final VoidCallback? onTap;
@@ -18,12 +19,20 @@ class LiveProductCard extends StatelessWidget {
   /// If true, shows the quick-add "+" button. Defaults to true.
   final bool showAddButton;
 
+  /// If true, shows the compare button. Defaults to true.
+  final bool showCompareButton;
+
+  /// Callback when compare button is tapped. If null, compare button is hidden.
+  final VoidCallback? onCompare;
+
   const LiveProductCard({
     super.key,
     required this.product,
     this.onTap,
     this.onLongPress,
     this.showAddButton = true,
+    this.showCompareButton = true,
+    this.onCompare,
   });
 
   @override
@@ -32,100 +41,90 @@ class LiveProductCard extends StatelessWidget {
 
     return Card(
       clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: product.hasPromo
+            ? BorderSide(
+                color: AppColors.error.withValues(alpha: 0.3),
+                width: 1,
+              )
+            : BorderSide.none,
+      ),
       child: InkWell(
         onTap: onTap,
         onLongPress: onLongPress,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Product Image
-            AspectRatio(aspectRatio: 1, child: _buildImage(isDark)),
+            // Padded product image area (badge + buttons inside)
+            _buildImageArea(isDark),
 
-            // Product Info
+            // Product info
             Expanded(
+              child: _buildInfoSection(isDark),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildImageArea(bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+      child: AspectRatio(
+        aspectRatio: 1,
+        child: Stack(
+          children: [
+            Container(
+              width: double.infinity,
+              height: double.infinity,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              clipBehavior: Clip.antiAlias,
               child: Padding(
-                padding: const EdgeInsets.all(6.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Product Name
-                    Flexible(
-                      child: Text(
-                        product.name,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          color: isDark
-                              ? AppColors.textPrimaryDark
-                              : AppColors.textPrimary,
-                          height: 1.2,
-                        ),
-                      ),
+                padding: const EdgeInsets.all(8),
+                child: _buildImageContent(),
+              ),
+            ),
+            // SALE badge (top-left)
+            if (product.hasPromo)
+              Positioned(
+                top: 4,
+                left: 4,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.error,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Text(
+                    'SALE',
+                    style: TextStyle(
+                      fontSize: 8,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                      letterSpacing: 0.5,
                     ),
-
-                    const SizedBox(height: 4),
-
-                    // Price row with add button
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        // Prices
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              // Regular Price
-                              Text(
-                                product.price,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: product.hasPromo
-                                      ? (isDark
-                                            ? AppColors.textSecondaryDark
-                                            : AppColors.textSecondary)
-                                      : AppColors.primary,
-                                  decoration: product.hasPromo
-                                      ? TextDecoration.lineThrough
-                                      : null,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-
-                              // Promotion Price
-                              if (product.hasPromo) ...[
-                                const SizedBox(height: 2),
-                                Text(
-                                  product.promotionPrice,
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.error,
-                                  ),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-
-                        // Quick add button
-                        if (showAddButton)
-                          Padding(
-                            padding: const EdgeInsets.only(left: 4),
-                            child: QuickAddButton(product: product, size: 28),
-                          ),
-                      ],
-                    ),
-                  ],
+                  ),
                 ),
+              ),
+            // Action buttons (top-right)
+            Positioned(
+              top: 4,
+              right: 4,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (showCompareButton && onCompare != null) ...[
+                    _CompareButton(size: 26, isDark: isDark, onTap: onCompare!),
+                    const SizedBox(width: 4),
+                  ],
+                  if (showAddButton)
+                    QuickAddButton(product: product, size: 26),
+                ],
               ),
             ),
           ],
@@ -134,29 +133,130 @@ class LiveProductCard extends StatelessWidget {
     );
   }
 
-  Widget _buildImage(bool isDark) {
-    final iconColor = isDark
-        ? AppColors.textDisabledDark
-        : AppColors.textDisabled;
-
+  Widget _buildImageContent() {
     if (product.imageUrl == null || product.imageUrl!.isEmpty) {
-      return Container(
-        color: Colors.white,
-        child: Center(
-          child: Icon(Icons.image_not_supported, size: 48, color: iconColor),
+      return const Center(
+        child: Icon(
+          Icons.image_not_supported,
+          size: 40,
+          color: AppColors.textDisabled,
         ),
       );
     }
 
-    return Container(
-      color: Colors.white, // White background for all product images
-      child: CachedNetworkImage(
-        imageUrl: product.imageUrl!,
-        fit: BoxFit.contain,
-        placeholder: (context, url) =>
-            const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-        errorWidget: (context, url, error) =>
-            Center(child: Icon(Icons.broken_image, size: 48, color: iconColor)),
+    return CachedNetworkImage(
+      imageUrl: product.imageUrl!,
+      fit: BoxFit.contain,
+      placeholder: (context, url) =>
+          const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      errorWidget: (context, url, error) => const Center(
+        child: Icon(Icons.broken_image, size: 40, color: AppColors.textDisabled),
+      ),
+    );
+  }
+
+  Widget _buildInfoSection(bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(10, 4, 10, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Product name
+          Flexible(
+            child: Text(
+              product.name,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+                height: 1.2,
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 4),
+
+          // Price row with buttons
+          _buildPriceRow(isDark),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPriceRow(bool isDark) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Regular price (strikethrough if promo)
+        Text(
+          product.price,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: product.hasPromo
+                ? (isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondary)
+                : AppColors.primary,
+            decoration: product.hasPromo ? TextDecoration.lineThrough : null,
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+
+        // Promo price
+        if (product.hasPromo) ...[
+          const SizedBox(height: 1),
+          Text(
+            product.promotionPrice,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: AppColors.error,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ],
+    );
+  }
+
+}
+
+/// Small compare button with gray background.
+class _CompareButton extends StatelessWidget {
+  final double size;
+  final bool isDark;
+  final VoidCallback onTap;
+
+  const _CompareButton({
+    required this.size,
+    required this.isDark,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.surfaceDarkModeLight : AppColors.surface,
+          borderRadius: BorderRadius.circular(size / 3),
+        ),
+        child: Icon(
+          Icons.compare_arrows,
+          size: size * 0.6,
+          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+        ),
       ),
     );
   }

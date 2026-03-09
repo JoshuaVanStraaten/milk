@@ -17,6 +17,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/store_provider.dart';
 import '../../widgets/products/add_to_list_sheet.dart';
 import '../products/live_product_detail_screen.dart';
+import '../compare/compare_sheet.dart';
 
 // =============================================================================
 // HOME DEALS PROVIDER — fetches promotions from all nearby stores
@@ -584,7 +585,7 @@ class _HotDealsSection extends StatelessWidget {
           ),
         ),
         SizedBox(
-          height: 248,
+          height: 210,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),
@@ -637,83 +638,115 @@ class _HotDealCard extends ConsumerWidget {
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
             // Image with badges
-            Stack(
-              children: [
-                ClipRRect(
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(16),
-                  ),
-                  child: Container(
-                    height: 110,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 8, 10, 4),
+              child: Stack(
+                children: [
+                  Container(
+                    height: 100,
                     width: double.infinity,
-                    color: Colors.white,
-                    child: deal.imageUrl != null && deal.imageUrl!.isNotEmpty
-                        ? CachedNetworkImage(
-                            imageUrl: deal.imageUrl!,
-                            fit: BoxFit.contain,
-                            errorWidget: (_, __, ___) => _buildPlaceholder(),
-                          )
-                        : _buildPlaceholder(),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: Padding(
+                      padding: const EdgeInsets.all(6),
+                      child: deal.imageUrl != null && deal.imageUrl!.isNotEmpty
+                          ? CachedNetworkImage(
+                              imageUrl: deal.imageUrl!,
+                              fit: BoxFit.contain,
+                              errorWidget: (_, __, ___) => _buildPlaceholder(),
+                            )
+                          : _buildPlaceholder(),
+                    ),
                   ),
-                ),
 
-                // Savings badge (top-right)
-                if (deal.savingsPercent != null && deal.savingsPercent! > 0)
+                  // Savings badge (top-left)
+                  if (deal.savingsPercent != null && deal.savingsPercent! > 0)
+                    Positioned(
+                      top: 4,
+                      left: 4,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.error,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          '-${deal.savingsPercent}%',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ),
+
+                  // Retailer pill (top-right)
                   Positioned(
-                    top: 8,
-                    right: 8,
+                    top: 4,
+                    right: 4,
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
+                        horizontal: 6,
+                        vertical: 3,
                       ),
                       decoration: BoxDecoration(
-                        color: AppColors.error,
-                        borderRadius: BorderRadius.circular(8),
+                        color: retailerColor.withValues(alpha: 0.9),
+                        borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
-                        '-${deal.savingsPercent}%',
+                        _shortRetailerName(deal.retailer),
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.5,
                         ),
                       ),
                     ),
                   ),
 
-                // Retailer pill (top-left)
-                Positioned(
-                  top: 8,
-                  left: 8,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: retailerColor.withValues(alpha: 0.9),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      _shortRetailerName(deal.retailer),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 9,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.5,
-                      ),
+                  // Action buttons (bottom-right)
+                  Positioned(
+                    bottom: 4,
+                    right: 4,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _HomeCompareButton(
+                          onTap: () => showCompareSheet(
+                            context,
+                            ref,
+                            deal.toLiveProduct(),
+                          ),
+                          isDark: isDark,
+                          size: 28,
+                        ),
+                        const SizedBox(width: 4),
+                        _QuickAddButton(
+                          onTap: () => _addToList(context, ref),
+                          isDark: isDark,
+                          size: 28,
+                        ),
+                      ],
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
 
             // Product info section
             Padding(
-              padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+              padding: const EdgeInsets.fromLTRB(10, 6, 10, 10),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -734,52 +767,32 @@ class _HotDealCard extends ConsumerWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  // Prices + add button row
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      // Prices column
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              deal.promotionPrice,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w800,
-                                color: AppColors.primary,
-                              ),
-                            ),
-                            const SizedBox(height: 1),
-                            Text(
-                              deal.price,
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w500,
-                                color: isDark
-                                    ? AppColors.textSecondaryDark
-                                    : AppColors.textSecondary,
-                                decoration: TextDecoration.lineThrough,
-                                decorationColor: isDark
-                                    ? AppColors.textSecondaryDark
-                                    : AppColors.textSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      // Quick add button
-                      _QuickAddButton(
-                        onTap: () => _addToList(context, ref),
-                        isDark: isDark,
-                        size: 32,
-                      ),
-                    ],
+                  const SizedBox(height: 6),
+                  // Prices — full width, no buttons competing
+                  Text(
+                    deal.promotionPrice,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                  const SizedBox(height: 1),
+                  Text(
+                    deal.price,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                      color: isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondary,
+                      decoration: TextDecoration.lineThrough,
+                      decorationColor: isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondary,
+                    ),
                   ),
                 ],
               ),
@@ -898,7 +911,7 @@ class _RetailerDealsSection extends StatelessWidget {
 
         // Horizontal deal cards — same style as Hot Deals
         SizedBox(
-          height: 248,
+          height: 210,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),
@@ -1076,6 +1089,43 @@ class _QuickAddButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(size / 3),
         ),
         child: Icon(Icons.add_rounded, size: size * 0.6, color: Colors.white),
+      ),
+    );
+  }
+}
+
+// =============================================================================
+// COMPARE BUTTON — small compare icon button for deal cards
+// =============================================================================
+
+class _HomeCompareButton extends StatelessWidget {
+  final VoidCallback onTap;
+  final bool isDark;
+  final double size;
+
+  const _HomeCompareButton({
+    required this.onTap,
+    required this.isDark,
+    this.size = 28,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.surfaceDarkModeLight : AppColors.surface,
+          borderRadius: BorderRadius.circular(size / 3),
+        ),
+        child: Icon(
+          Icons.compare_arrows,
+          size: size * 0.6,
+          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+        ),
       ),
     );
   }

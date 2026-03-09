@@ -19,6 +19,7 @@ import '../../widgets/animations.dart';
 import '../../widgets/products/add_to_list_sheet.dart';
 import '../../widgets/products/store_picker_sheet.dart';
 import 'live_product_detail_screen.dart';
+import '../compare/compare_sheet.dart';
 
 class LiveBrowseScreen extends ConsumerStatefulWidget {
   const LiveBrowseScreen({super.key});
@@ -290,9 +291,9 @@ class _LiveBrowseScreenState extends ConsumerState<LiveBrowseScreen> {
       padding: const EdgeInsets.all(16),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        childAspectRatio: 0.62,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
+        childAspectRatio: 0.72,
+        crossAxisSpacing: 10,
+        mainAxisSpacing: 10,
       ),
       itemCount: products.length + (hasMore ? 1 : 0),
       itemBuilder: (context, index) {
@@ -313,6 +314,7 @@ class _LiveBrowseScreenState extends ConsumerState<LiveBrowseScreen> {
                 ),
               );
             },
+            onCompare: () => showCompareSheet(context, ref, product),
             onLongPress: () {
               // Match existing add-to-list logic from product_list_screen
               double regularPrice = product.priceNumeric;

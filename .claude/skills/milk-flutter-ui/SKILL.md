@@ -29,13 +29,38 @@ Defined in `core/constants/retailers.dart`. Never hardcode "Pick n Pay" or `Colo
 
 ## Product Cards
 
-- Browse grid: `LiveProductCard` with `QuickAddButton` — 2-column, `childAspectRatio: 0.62`
-- Home deals: `_HotDealCard` — 160px wide, retailer pill, savings badge, quick-add button
-- Always white background for product images regardless of dark mode:
+### Browse Grid (`LiveProductCard`)
+- 2-column grid, `childAspectRatio: 0.72`, spacing 10px
+- Image floats inside a **padded rounded white container** (never edge-to-edge):
+  ```dart
+  Padding(padding: EdgeInsets.fromLTRB(12, 10, 12, 4),
+    child: AspectRatio(aspectRatio: 1,
+      child: Container(
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)),
+        clipBehavior: Clip.antiAlias,
+        child: Padding(padding: EdgeInsets.all(8), child: CachedNetworkImage(...)),
+      ),
+    ),
+  )
+  ```
+- Info padding: `EdgeInsets.fromLTRB(10, 4, 10, 8)`
+- Two action buttons on the right of the price row (compare + quick-add, 26px each, 4px gap):
+  - Compare: gray bg (`AppColors.surface` / `AppColors.surfaceDarkModeLight`), `Icons.compare_arrows`
+  - Quick-add: emerald green (`AppColors.primary`), `Icons.add_rounded`
+  - Both use `GestureDetector(behavior: HitTestBehavior.opaque)` for adequate tap targets
+- Promo items: "SALE" badge (`Positioned(top:6, left:6)`, red bg) + 1px red border at alpha 0.3
+- `showCompareButton: false` / `onCompare: null` hides the compare button (e.g. in search results)
 
-```dart
-Container(color: Colors.white, child: CachedNetworkImage(...))
-```
+### Home Deals (`_HotDealCard`, `home_screen.dart`)
+- 160px wide, horizontal scroll carousel
+- Image section: padded (`fromLTRB(10, 8, 10, 4)`), 100px height, 8px radius white container, 6px inner padding
+- Badges inside the padded Stack: savings % (top-right, 4px), retailer pill (top-left, 4px)
+- Price row: prices + compare button (28px) + quick-add (28px), 4px gap
+- Compare button wired via `showCompareSheet(context, ref, deal.toLiveProduct())`
+- Both cards share the same visual language: padded floating image, gray compare + green add
+
+### Always white background for product images regardless of dark mode
+The white image container is always `Colors.white` — product photos look correct on white.
 
 ## Checkers/Shoprite Images
 
