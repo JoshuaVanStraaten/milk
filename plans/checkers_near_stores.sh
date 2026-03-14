@@ -1,0 +1,18 @@
+curl 'https://www.checkers.co.za/api/stores/get-stores' \
+  -H 'accept: */*' \
+  -H 'accept-language: en-US,en;q=0.9' \
+  -H 'baggage: sentry-environment=production,sentry-release=EIVOUb565Mg8LTK0XQJfA,sentry-public_key=e91247fc7bd7560a90e5ce0c4e6c04e9,sentry-trace_id=ccebd60ccfee4a5a872087f89cc5ba5a,sentry-sample_rate=0,sentry-transaction=%2Fstore-directory-and-leaflets,sentry-sampled=false' \
+  -H 'content-type: application/json' \
+  -b 'storeContexts=%5B%7B%22storeId%22%3A%225ecf9cc7f5d049b9a1166932%22%2C%22serviceOptionIds%22%3A%5B%22sixty-min-delivery%22%5D%2C%22brandPriority%22%3A5%2C%22hasCapacity%22%3A%5B%22sixty-min-delivery%22%5D%2C%22distanceFromCustomer%22%3A0.01125369042655576%2C%22returnServiceOptionIds%22%3Anull%2C%22hasReturnCapacity%22%3Anull%7D%2C%7B%22storeId%22%3A%225ece6935faafe599532665b2%22%2C%22serviceOptionIds%22%3A%5B%22sixty-min-delivery%22%2C%22one-day-delivery%22%5D%2C%22brandPriority%22%3A2%2C%22hasCapacity%22%3A%5B%22one-day-delivery%22%2C%22sixty-min-delivery%22%5D%2C%22distanceFromCustomer%22%3A0.005583459286111866%2C%22returnServiceOptionIds%22%3Anull%2C%22hasReturnCapacity%22%3A%5B%22one-day-collection%22%5D%7D%2C%7B%22storeId%22%3A%22670e8b8097db005ed4f90051%22%2C%22serviceOptionIds%22%3A%5B%22one-day-delivery%22%5D%2C%22brandPriority%22%3A4%2C%22hasCapacity%22%3A%5B%22one-day-delivery%22%5D%2C%22distanceFromCustomer%22%3A0.005583459286111866%2C%22returnServiceOptionIds%22%3Anull%2C%22hasReturnCapacity%22%3A%5B%22one-day-collection%22%5D%7D%2C%7B%22storeId%22%3A%2268375ccc3324ea29a82fedf0%22%2C%22serviceOptionIds%22%3A%5B%22one-day-delivery%22%5D%2C%22brandPriority%22%3A12%2C%22hasCapacity%22%3A%5B%22one-day-delivery%22%5D%2C%22distanceFromCustomer%22%3A0.1269813058802181%2C%22returnServiceOptionIds%22%3Anull%2C%22hasReturnCapacity%22%3A%5B%22one-day-collection%22%5D%7D%5D; storeids=5ecf9cc7f5d049b9a1166932-5ece6935faafe599532665b2-670e8b8097db005ed4f90051-68375ccc3324ea29a82fedf0; istio-storeIds=5ecf9cc7f5d049b9a1166932-5ece6935faafe599532665b2-670e8b8097db005ed4f90051-68375ccc3324ea29a82fedf0' \
+  -H 'origin: https://www.checkers.co.za' \
+  -H 'priority: u=1, i' \
+  -H 'referer: https://www.checkers.co.za/store-directory-and-leaflets' \
+  -H 'sec-ch-ua: "Not:A-Brand";v="99", "Google Chrome";v="145", "Chromium";v="145"' \
+  -H 'sec-ch-ua-mobile: ?0' \
+  -H 'sec-ch-ua-platform: "Windows"' \
+  -H 'sec-fetch-dest: empty' \
+  -H 'sec-fetch-mode: cors' \
+  -H 'sec-fetch-site: same-origin' \
+  -H 'sentry-trace: ccebd60ccfee4a5a872087f89cc5ba5a-ac57e5900811d302-0' \
+  -H 'user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36' \
+  --data-raw '{"geoPoint":"-25.854112042833606,28.248802693574955"}'

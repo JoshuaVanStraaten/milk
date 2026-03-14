@@ -202,8 +202,10 @@ class LiveProductsNotifier
   final FallbackProductService _fallback;
   String? _currentRetailer;
   NearbyStore? _currentStore;
+  String? _currentCategory;
   int _currentPage = 0;
   final List<LiveProduct> _allProducts = [];
+  int _requestId = 0; // Incremented on each new load; stale responses are discarded
 
   LiveProductsNotifier(LiveApiService _, this._fallback)
     : super(const AsyncValue.data(LiveProductsResponse.empty));
@@ -217,12 +219,16 @@ class LiveProductsNotifier
     String? category,
     bool refresh = false,
   }) async {
-    if (refresh || retailer != _currentRetailer) {
+    if (refresh || retailer != _currentRetailer || category != _currentCategory) {
       _currentPage = 0;
       _allProducts.clear();
       _currentRetailer = retailer;
       _currentStore = store;
+      _currentCategory = category;
     }
+
+    // Capture request ID — any response with a different ID is stale and discarded
+    final requestId = ++_requestId;
 
     // Show loading if no products yet, otherwise keep showing current data
     state = _allProducts.isEmpty
@@ -244,6 +250,9 @@ class LiveProductsNotifier
         page: _currentPage,
       );
 
+      // Discard if a newer request has started (category/retailer changed mid-flight)
+      if (requestId != _requestId) return;
+
       // Resolve Checkers/Shoprite images from bundled cache
       final resolvedProducts = resolveProductImages(
         response.products,
@@ -263,6 +272,7 @@ class LiveProductsNotifier
         ),
       );
     } catch (e, st) {
+      if (requestId != _requestId) return;
       if (_allProducts.isEmpty) {
         state = AsyncValue.error(e, st);
       }
@@ -271,13 +281,13 @@ class LiveProductsNotifier
   }
 
   /// Load the next page of products (for infinite scroll).
-  Future<void> loadNextPage({String? category}) async {
+  Future<void> loadNextPage() async {
     if (_currentRetailer == null || _currentStore == null) return;
     _currentPage++;
     await loadProducts(
       retailer: _currentRetailer!,
       store: _currentStore!,
-      category: category,
+      category: _currentCategory,
     );
   }
 
@@ -287,6 +297,8 @@ class LiveProductsNotifier
     _allProducts.clear();
     _currentRetailer = null;
     _currentStore = null;
+    _currentCategory = null;
+    _requestId++;
     state = const AsyncValue.data(LiveProductsResponse.empty);
   }
 }

@@ -1,12 +1,15 @@
 // lib/presentation/screens/products/live_browse_screen.dart
 //
 // REPLACES StoreSelectorScreen as the Browse tab (index 1).
-// Shows: retailer chips → store info bar → product grid (live API)
-// with search, infinite scroll, and DB fallback.
+// Shows: retailer chips → category chips → store info bar → product grid (live API)
+// with search, infinite scroll, sort/filter controls, and DB fallback.
 
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/constants/retailers.dart';
+import '../../../core/constants/product_categories.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../../data/models/nearby_store.dart';
 import '../../../data/models/live_product.dart';
 import '../../providers/store_provider.dart';
@@ -21,6 +24,77 @@ import '../../widgets/products/store_picker_sheet.dart';
 import 'live_product_detail_screen.dart';
 import '../compare/compare_sheet.dart';
 
+// ─────────────────────────────────────────────
+// Sort options
+// ─────────────────────────────────────────────
+
+enum SortOption {
+  relevance('Relevance'),
+  priceLow('Price: Low to High'),
+  priceHigh('Price: High to Low'),
+  alphabetical('A – Z');
+
+  final String label;
+  const SortOption(this.label);
+}
+
+// ─────────────────────────────────────────────
+// Unhealthy keyword set (for healthy-first sort)
+// ─────────────────────────────────────────────
+
+/// Returns true if a product name contains confectionery/snack keywords.
+/// Used to silently deprioritise unhealthy items on relevance sort (4c).
+bool isUnhealthyProduct(String name) {
+  final lower = name.toLowerCase();
+  const unhealthyKeywords = {
+    'chip', 'chips', 'crisp', 'crisps',
+    'chocolate', 'candy', 'sweet', 'sweets', 'lolly', 'lollipop',
+    'biscuit', 'cookie', 'wafer', 'snack bar', 'energy bar',
+    'soda', 'fizzy', 'cooldrink', 'cold drink', 'energy drink',
+    'gummy', 'gummies', 'jelly baby', 'jelly babies',
+    'popcorn', 'nacho', 'pretzel', 'cracker',
+    'ice cream', 'icecream', 'frozen dessert', 'sorbet',
+    'cake', 'doughnut', 'donut', 'muffin', 'brownie',
+    'pudding', 'toffee', 'fudge', 'nougat',
+  };
+  return unhealthyKeywords.any((kw) => lower.contains(kw));
+}
+
+/// Applies healthy-first deprioritisation: partitions products into
+/// [healthy, unhealthy] and returns them concatenated.
+List<LiveProduct> applyHealthyFirst(List<LiveProduct> products) {
+  final healthy = <LiveProduct>[];
+  final unhealthy = <LiveProduct>[];
+  for (final p in products) {
+    if (isUnhealthyProduct(p.name)) {
+      unhealthy.add(p);
+    } else {
+      healthy.add(p);
+    }
+  }
+  return [...healthy, ...unhealthy];
+}
+
+/// Applies the chosen [SortOption] to [products] (client-side).
+List<LiveProduct> applySort(List<LiveProduct> products, SortOption sort) {
+  final sorted = List<LiveProduct>.from(products);
+  switch (sort) {
+    case SortOption.relevance:
+      return applyHealthyFirst(sorted);
+    case SortOption.priceLow:
+      sorted.sort((a, b) => a.priceNumeric.compareTo(b.priceNumeric));
+    case SortOption.priceHigh:
+      sorted.sort((a, b) => b.priceNumeric.compareTo(a.priceNumeric));
+    case SortOption.alphabetical:
+      sorted.sort((a, b) => a.name.compareTo(b.name));
+  }
+  return sorted;
+}
+
+// ─────────────────────────────────────────────
+// Screen
+// ─────────────────────────────────────────────
+
 class LiveBrowseScreen extends ConsumerStatefulWidget {
   const LiveBrowseScreen({super.key});
 
@@ -34,14 +108,17 @@ class _LiveBrowseScreenState extends ConsumerState<LiveBrowseScreen> {
   Timer? _debounceTimer;
   bool _isSearching = false;
 
+  // Category state
+  ProductCategory? _selectedCategory;
+
+  // Sort & filter state
+  SortOption _sortOption = SortOption.relevance;
+  bool _promosOnly = false;
+
   @override
   void initState() {
     super.initState();
-
-    // Infinite scroll listener
     _scrollController.addListener(_onScroll);
-
-    // Load initial products after the widget is built
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadProductsForCurrentRetailer();
     });
@@ -56,40 +133,45 @@ class _LiveBrowseScreenState extends ConsumerState<LiveBrowseScreen> {
   }
 
   void _onScroll() {
-    if (_isSearching) return; // Don't paginate during search
-
+    if (_isSearching) return;
     if (_scrollController.position.pixels >=
         _scrollController.position.maxScrollExtent * 0.85) {
       ref.read(liveProductsProvider.notifier).loadNextPage();
     }
   }
 
-  /// Load products for the currently selected retailer + store.
   void _loadProductsForCurrentRetailer({bool refresh = false}) {
     final retailer = ref.read(selectedRetailerProvider);
     final storeState = ref.read(storeSelectionProvider);
+    final retailerConfig = Retailers.fromName(retailer);
+    final categoryValue = retailerConfig != null
+        ? _selectedCategory?.valueForRetailer(retailerConfig.slug)
+        : null;
 
     storeState.whenData((selection) {
       final store = selection.forRetailer(retailer);
       if (store != null) {
         ref
             .read(liveProductsProvider.notifier)
-            .loadProducts(retailer: retailer, store: store, refresh: refresh);
+            .loadProducts(
+              retailer: retailer,
+              store: store,
+              category: categoryValue,
+              refresh: refresh,
+            );
       }
     });
   }
 
-  /// Handle retailer change from chip bar.
   void _onRetailerChanged(String retailer) {
-    // Clear search when switching retailers
     _searchController.clear();
-    _isSearching = false;
+    setState(() {
+      _isSearching = false;
+      _selectedCategory = null; // Reset category on retailer change
+    });
     ref.read(liveSearchProvider.notifier).clear();
-
-    // Update selected retailer
     ref.read(selectedRetailerProvider.notifier).state = retailer;
 
-    // Load products for new retailer
     final storeState = ref.read(storeSelectionProvider);
     storeState.whenData((selection) {
       final store = selection.forRetailer(retailer);
@@ -101,11 +183,14 @@ class _LiveBrowseScreenState extends ConsumerState<LiveBrowseScreen> {
     });
   }
 
-  /// Show the store picker bottom sheet
+  void _onCategorySelected(ProductCategory? category) {
+    setState(() => _selectedCategory = category);
+    _loadProductsForCurrentRetailer(refresh: true);
+  }
+
   void _showStorePickerSheet(BuildContext context) {
     final storeState = ref.read(storeSelectionProvider);
     final selectedRetailer = ref.read(selectedRetailerProvider);
-
     storeState.whenData((selection) {
       showModalBottomSheet(
         context: context,
@@ -119,7 +204,6 @@ class _LiveBrowseScreenState extends ConsumerState<LiveBrowseScreen> {
     });
   }
 
-  /// Handle search input with debounce.
   void _onSearchChanged(String query) {
     _debounceTimer?.cancel();
 
@@ -134,7 +218,6 @@ class _LiveBrowseScreenState extends ConsumerState<LiveBrowseScreen> {
 
       final retailer = ref.read(selectedRetailerProvider);
       final storeState = ref.read(storeSelectionProvider);
-
       storeState.whenData((selection) {
         final store = selection.forRetailer(retailer);
         if (store != null) {
@@ -146,13 +229,35 @@ class _LiveBrowseScreenState extends ConsumerState<LiveBrowseScreen> {
     });
   }
 
+  bool get _hasActiveFilters => _promosOnly || _sortOption != SortOption.relevance;
+
+  void _showFilterSheet() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _FilterSortSheet(
+        isDark: isDark,
+        currentSort: _sortOption,
+        promosOnly: _promosOnly,
+        onApply: (sort, promos) {
+          setState(() {
+            _sortOption = sort;
+            _promosOnly = promos;
+          });
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final selectedRetailer = ref.watch(selectedRetailerProvider);
     final storeState = ref.watch(storeSelectionProvider);
 
-    // Get the current store for the info bar
     NearbyStore? currentStore;
     storeState.whenData((selection) {
       currentStore = selection.forRetailer(selectedRetailer);
@@ -162,6 +267,32 @@ class _LiveBrowseScreenState extends ConsumerState<LiveBrowseScreen> {
       appBar: AppBar(
         title: const Text('Browse'),
         automaticallyImplyLeading: false,
+        actions: [
+          // Filter icon with badge dot when filters are active
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.tune_rounded),
+                tooltip: 'Sort & Filter',
+                onPressed: _showFilterSheet,
+              ),
+              if (_hasActiveFilters)
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(
+                      color: AppColors.primary,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -170,6 +301,14 @@ class _LiveBrowseScreenState extends ConsumerState<LiveBrowseScreen> {
             selectedRetailer: selectedRetailer,
             onSelected: _onRetailerChanged,
           ),
+
+          // Category chip bar (hidden while searching)
+          if (!_isSearching)
+            _CategoryChipBar(
+              selectedRetailer: selectedRetailer,
+              selectedCategory: _selectedCategory,
+              onSelected: _onCategorySelected,
+            ),
 
           // Store info bar
           if (currentStore != null)
@@ -183,12 +322,20 @@ class _LiveBrowseScreenState extends ConsumerState<LiveBrowseScreen> {
           // Search bar
           _buildSearchBar(isDark),
 
+          // Active filter chips summary (compact, dismissible)
+          if (_hasActiveFilters && !_isSearching)
+            _ActiveFilterBar(
+              sortOption: _sortOption,
+              promosOnly: _promosOnly,
+              onClearSort: () => setState(() => _sortOption = SortOption.relevance),
+              onClearPromos: () => setState(() => _promosOnly = false),
+            ),
+
           // Products area
           Expanded(
             child: RefreshIndicator(
               onRefresh: () async {
                 _loadProductsForCurrentRetailer(refresh: true);
-                // Wait a bit for the refresh to complete
                 await Future.delayed(const Duration(milliseconds: 500));
               },
               child: _isSearching
@@ -233,7 +380,6 @@ class _LiveBrowseScreenState extends ConsumerState<LiveBrowseScreen> {
     );
   }
 
-  /// Build the browse (non-search) product grid.
   Widget _buildBrowseResults() {
     final productsState = ref.watch(liveProductsProvider);
 
@@ -248,9 +394,19 @@ class _LiveBrowseScreenState extends ConsumerState<LiveBrowseScreen> {
           );
         }
 
+        // Apply client-side sort & promo filter
+        var products = applySort(response.products, _sortOption);
+        if (_promosOnly) {
+          products = products.where((p) => p.hasPromo).toList();
+        }
+
+        if (products.isEmpty) {
+          return _buildNoPromoState();
+        }
+
         return _buildProductGrid(
-          products: response.products,
-          hasMore: response.hasMorePages,
+          products: products,
+          hasMore: response.hasMorePages && !_promosOnly,
         );
       },
       loading: () => const ProductGridSkeleton(),
@@ -258,7 +414,6 @@ class _LiveBrowseScreenState extends ConsumerState<LiveBrowseScreen> {
     );
   }
 
-  /// Build the search results grid.
   Widget _buildSearchResults() {
     final searchState = ref.watch(liveSearchProvider);
 
@@ -267,15 +422,10 @@ class _LiveBrowseScreenState extends ConsumerState<LiveBrowseScreen> {
         if (response.products.isEmpty && _searchController.text.isNotEmpty) {
           return const EmptyState(type: EmptyStateType.noSearchResults);
         }
+        if (response.products.isEmpty) return const SizedBox.shrink();
 
-        if (response.products.isEmpty) {
-          return const SizedBox.shrink();
-        }
-
-        return _buildProductGrid(
-          products: response.products,
-          hasMore: false, // Search doesn't paginate for now
-        );
+        final products = applySort(response.products, _sortOption);
+        return _buildProductGrid(products: products, hasMore: false);
       },
       loading: () => const ProductGridSkeleton(),
       error: (error, _) => _buildErrorState(error),
@@ -297,7 +447,6 @@ class _LiveBrowseScreenState extends ConsumerState<LiveBrowseScreen> {
       ),
       itemCount: products.length + (hasMore ? 1 : 0),
       itemBuilder: (context, index) {
-        // Loading indicator at the end
         if (index >= products.length) {
           return const ShimmerEffect(child: ProductCardSkeleton());
         }
@@ -315,48 +464,77 @@ class _LiveBrowseScreenState extends ConsumerState<LiveBrowseScreen> {
               );
             },
             onCompare: () => showCompareSheet(context, ref, product),
-            onLongPress: () {
-              // Match existing add-to-list logic from product_list_screen
-              double regularPrice = product.priceNumeric;
-              double? specialPrice;
-              Map<String, double>? multiBuyInfo;
-
-              if (product.hasPromo) {
-                multiBuyInfo = product.multiBuyInfo;
-
-                if (multiBuyInfo != null) {
-                  // Multi-buy promo: store deal info for smart calculation
-                  specialPrice = multiBuyInfo['pricePerItem'];
-                } else {
-                  // Try to parse promo price directly (e.g. "R29.99")
-                  final parsed = double.tryParse(
-                    product.promotionPrice
-                        .replaceAll('R', '')
-                        .replaceAll(',', '')
-                        .trim(),
-                  );
-                  // If we can't parse it (e.g. "Buy any 2 save R10"),
-                  // use the regular price as specialPrice so the PROMO
-                  // badge still shows in the shopping list.
-                  specialPrice = parsed ?? regularPrice;
-                }
-              }
-
-              showAddToListSheet(
-                context,
-                ref,
-                productName: product.name,
-                price: regularPrice,
-                retailer: product.retailer,
-                specialPrice: specialPrice,
-                imageUrl: product.imageUrl,
-                priceDisplay: product.price,
-                multiBuyInfo: multiBuyInfo,
-              );
-            },
+            onLongPress: () => _addToList(product),
           ),
         );
       },
+    );
+  }
+
+  void _addToList(LiveProduct product) {
+    double regularPrice = product.priceNumeric;
+    double? specialPrice;
+    Map<String, double>? multiBuyInfo;
+
+    if (product.hasPromo) {
+      multiBuyInfo = product.multiBuyInfo;
+      if (multiBuyInfo != null) {
+        specialPrice = multiBuyInfo['pricePerItem'];
+      } else {
+        final parsed = double.tryParse(
+          product.promotionPrice
+              .replaceAll('R', '')
+              .replaceAll(',', '')
+              .trim(),
+        );
+        specialPrice = parsed ?? regularPrice;
+      }
+    }
+
+    showAddToListSheet(
+      context,
+      ref,
+      productName: product.name,
+      price: regularPrice,
+      retailer: product.retailer,
+      specialPrice: specialPrice,
+      imageUrl: product.imageUrl,
+      priceDisplay: product.price,
+      multiBuyInfo: multiBuyInfo,
+    );
+  }
+
+  Widget _buildNoPromoState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.local_offer_outlined,
+              size: 56,
+              color: AppColors.textSecondary.withValues(alpha: 0.5),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'No promotions right now',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Check back later or browse all products.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 16),
+            TextButton(
+              onPressed: () => setState(() => _promosOnly = false),
+              child: const Text('Show all products'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -366,6 +544,481 @@ class _LiveBrowseScreenState extends ConsumerState<LiveBrowseScreen> {
       customMessage: 'Failed to load products. Pull down to retry.',
       actionLabel: 'Retry',
       onAction: () => _loadProductsForCurrentRetailer(refresh: true),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+// Category chip bar widget
+// ─────────────────────────────────────────────
+
+class _CategoryChipBar extends StatelessWidget {
+  final String selectedRetailer;
+  final ProductCategory? selectedCategory;
+  final ValueChanged<ProductCategory?> onSelected;
+
+  const _CategoryChipBar({
+    required this.selectedRetailer,
+    required this.selectedCategory,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final retailerConfig = Retailers.fromName(selectedRetailer);
+    final accentColor = retailerConfig?.color ?? AppColors.primary;
+
+    return SizedBox(
+      height: 44,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: ProductCategories.all.length + 1, // +1 for "All"
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          if (index == 0) {
+            // "All" chip
+            final isSelected = selectedCategory == null;
+            return _buildChip(
+              context: context,
+              label: 'All',
+              icon: Icons.grid_view_rounded,
+              isSelected: isSelected,
+              accentColor: accentColor,
+              isDark: isDark,
+              onTap: () => onSelected(null),
+            );
+          }
+
+          final category = ProductCategories.all[index - 1];
+          final isSelected = selectedCategory == category;
+          return _buildChip(
+            context: context,
+            label: category.displayName,
+            icon: category.icon,
+            isSelected: isSelected,
+            accentColor: accentColor,
+            isDark: isDark,
+            onTap: () => onSelected(isSelected ? null : category),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildChip({
+    required BuildContext context,
+    required String label,
+    required IconData icon,
+    required bool isSelected,
+    required Color accentColor,
+    required bool isDark,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeInOut,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? accentColor
+              : (isDark ? AppColors.surfaceDarkModeLight : AppColors.surface),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected
+                ? accentColor
+                : (isDark ? AppColors.dividerDark : AppColors.divider),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 14,
+              color: isSelected
+                  ? Colors.white
+                  : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondary),
+            ),
+            const SizedBox(width: 5),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                color: isSelected
+                    ? Colors.white
+                    : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondary),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+// Active filter summary bar
+// ─────────────────────────────────────────────
+
+class _ActiveFilterBar extends StatelessWidget {
+  final SortOption sortOption;
+  final bool promosOnly;
+  final VoidCallback onClearSort;
+  final VoidCallback onClearPromos;
+
+  const _ActiveFilterBar({
+    required this.sortOption,
+    required this.promosOnly,
+    required this.onClearSort,
+    required this.onClearPromos,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return SizedBox(
+      height: 36,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        children: [
+          if (sortOption != SortOption.relevance)
+            _FilterPill(
+              label: sortOption.label,
+              onRemove: onClearSort,
+              isDark: isDark,
+            ),
+          if (promosOnly)
+            _FilterPill(
+              label: 'Promos only',
+              onRemove: onClearPromos,
+              isDark: isDark,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FilterPill extends StatelessWidget {
+  final String label;
+  final VoidCallback onRemove;
+  final bool isDark;
+
+  const _FilterPill({
+    required this.label,
+    required this.onRemove,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(right: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppColors.primary.withValues(alpha: 0.4),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: AppColors.primary,
+            ),
+          ),
+          const SizedBox(width: 4),
+          GestureDetector(
+            onTap: onRemove,
+            child: const Icon(
+              Icons.close_rounded,
+              size: 14,
+              color: AppColors.primary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+// Filter / Sort bottom sheet
+// ─────────────────────────────────────────────
+
+class _FilterSortSheet extends StatefulWidget {
+  final bool isDark;
+  final SortOption currentSort;
+  final bool promosOnly;
+  final void Function(SortOption sort, bool promosOnly) onApply;
+
+  const _FilterSortSheet({
+    required this.isDark,
+    required this.currentSort,
+    required this.promosOnly,
+    required this.onApply,
+  });
+
+  @override
+  State<_FilterSortSheet> createState() => _FilterSortSheetState();
+}
+
+class _FilterSortSheetState extends State<_FilterSortSheet> {
+  late SortOption _sort;
+  late bool _promosOnly;
+
+  @override
+  void initState() {
+    super.initState();
+    _sort = widget.currentSort;
+    _promosOnly = widget.promosOnly;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = widget.isDark ? AppColors.surfaceDarkMode : Colors.white;
+    final textPrimary =
+        widget.isDark ? AppColors.textPrimaryDark : AppColors.textPrimary;
+    final textSecondary =
+        widget.isDark ? AppColors.textSecondaryDark : AppColors.textSecondary;
+    final divider = widget.isDark ? AppColors.dividerDark : AppColors.divider;
+
+    return Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.65,
+      ),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Handle
+          Container(
+            margin: const EdgeInsets.only(top: 12),
+            width: 36,
+            height: 4,
+            decoration: BoxDecoration(
+              color: divider,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+
+          // Header
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
+            child: Row(
+              children: [
+                Text(
+                  'Sort & Filter',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: textPrimary,
+                  ),
+                ),
+                const Spacer(),
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      _sort = SortOption.relevance;
+                      _promosOnly = false;
+                    });
+                  },
+                  child: Text(
+                    'Reset',
+                    style: TextStyle(color: textSecondary),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          Divider(color: divider, height: 1),
+
+          Flexible(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Filter section
+                  Text(
+                    'Filter',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: textSecondary,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+
+                  // Promos only toggle
+                  GestureDetector(
+                    onTap: () => setState(() => _promosOnly = !_promosOnly),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _promosOnly
+                            ? AppColors.primary.withValues(alpha: 0.08)
+                            : (widget.isDark
+                                ? AppColors.surfaceDarkModeLight
+                                : AppColors.surface),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: _promosOnly
+                              ? AppColors.primary.withValues(alpha: 0.4)
+                              : Colors.transparent,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.local_offer_rounded,
+                            size: 20,
+                            color: _promosOnly
+                                ? AppColors.primary
+                                : textSecondary,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Promotions only',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                color: _promosOnly ? AppColors.primary : textPrimary,
+                              ),
+                            ),
+                          ),
+                          Switch.adaptive(
+                            value: _promosOnly,
+                            onChanged: (v) => setState(() => _promosOnly = v),
+                            activeThumbColor: AppColors.primary,
+                            activeTrackColor: AppColors.primary.withValues(alpha: 0.4),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // Sort section
+                  Text(
+                    'Sort by',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: textSecondary,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+
+                  ...SortOption.values.map((option) {
+                    final isSelected = _sort == option;
+                    return GestureDetector(
+                      onTap: () => setState(() => _sort = option),
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 14,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? AppColors.primary.withValues(alpha: 0.08)
+                              : (widget.isDark
+                                  ? AppColors.surfaceDarkModeLight
+                                  : AppColors.surface),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isSelected
+                                ? AppColors.primary.withValues(alpha: 0.4)
+                                : Colors.transparent,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                option.label,
+                                style: TextStyle(
+                                  fontWeight: isSelected
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
+                                  color: isSelected
+                                      ? AppColors.primary
+                                      : textPrimary,
+                                ),
+                              ),
+                            ),
+                            if (isSelected)
+                              const Icon(
+                                Icons.check_circle_rounded,
+                                color: AppColors.primary,
+                                size: 20,
+                              ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            ),
+          ),
+
+          // Apply button
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+              child: SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () {
+                    widget.onApply(_sort, _promosOnly);
+                    Navigator.of(context).pop();
+                  },
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text(
+                    'Apply',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

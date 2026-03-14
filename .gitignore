@@ -116,6 +116,12 @@ env.dart
 **/env_config.dart
 **/supabase_config.dart
 
+# Supabase CLI temp files
+supabase/.temp/
+
+# Live test files (contain anon keys)
+database/edge_functions/test_live_categories.mjs
+
 # Keep example config
 !.env.example
 !**/env_config.example.dart

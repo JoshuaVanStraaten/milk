@@ -125,6 +125,7 @@ Choose the best model for each task based on complexity:
 **3e. Unmatched ingredients from device testing** ✅
 
 Fixed all three originally unmatched ingredients plus additional edge cases found during device testing:
+
 - Hyphen normalization ("stir-fry" → "stir fry")
 - Sibilant-aware stemming fix ("cakes" → "cake", not "cak")
 - Qualifier-aware containment: color/packaging words (brown, red, tinned, canned) are optional; core food words (powder, seeds) are required
@@ -135,6 +136,7 @@ Fixed all three originally unmatched ingredients plus additional edge cases foun
 - 77 tests total (up from 62)
 
 **Files modified:**
+
 - `lib/data/services/gemini_service.dart` — prompt tweaks if ingredient names are the issue
 - `test/product_matching_test.dart` — add test cases for hake, stir-fry veggies, sesame seeds
 
@@ -151,36 +153,44 @@ Fixed all three originally unmatched ingredients plus additional edge cases foun
 
 ---
 
-### Sprint 4: Sort, Filter & Category Browsing
+### Sprint 4: Sort, Filter & Category Browsing ✅ COMPLETE
 
-**Model:** Sonnet 4.6 (UI implementation) — Opus 4.6 if Edge Function changes needed
+**Model:** Opus 4.6 (Edge Function + architecture) → Sonnet 4.6 (UI implementation)
 **Goal:** Let users browse by category and filter/sort results.
 
-**4a. Category-based browsing**
+**4a-backend. Edge Function category support** ✅
 
-- **Investigation needed:** Check if Edge Functions return category data. The `browseProducts()` method already accepts a `category` param.
-- **If categories available:** Add category chip bar below retailer selector in `live_browse_screen.dart`
-- **If not:** May need to update Edge Functions to include category in response, or add `category` field to `LiveProduct` model
+All 4 edge functions updated and deployed with full subcategory chaining:
 
-**4b. Sort and filter controls**
+- **PnP** (`products-pnp/index.ts`): `PNP_CATEGORIES` map (8 categories), Hybris facet query
+- **Checkers** (`products-checkers/index.ts`): `CHECKERS_CATEGORIES` with full subcategory arrays. Multi-facet chaining in `buildProductUrl()`. Beverages routed to `/c-2256/All-Departments` (not food path) with facets: `drinks`, `soft_drinks`, `juices_and_smoothies`, `coffee`, `tea`, `sports_and_energy_drinks`, `bottled_water`
+- **Shoprite** (`products-shoprite/index.ts`): `SHOPRITE_CATEGORIES` with full subcategory arrays. Beverages routed to `/c-2256/All-Departments` with facets: `drinks`, `soft_drinks`, `juices_and_smoothies`, `coffee`, `tea`, `bottled_water`
+- **Woolworths**: Already supported — 17 ATG nav codes in `CATEGORIES` map
 
-- **File:** `lib/presentation/screens/products/live_browse_screen.dart`
-- **Features:**
-  - Filter: "Promos only" toggle
-  - Sort: Price low→high, high→low, alphabetical
-  - Category filter (if available from API)
-- **UI:** Filter/sort icon in app bar → bottom sheet with options
+Categories supported across all retailers:
+```
+Fruit & Veg | Dairy & Eggs | Meat & Poultry | Bakery
+Frozen | Food Cupboard | Snacks | Beverages
+```
 
-**4c. Show healthy items first**
+**4a-frontend. Category chip bar + sort/filter** ✅
 
-- **Approach:** When displaying search results, prioritize food items over confectionery/snacks
-- **Implementation:** Client-side sorting heuristic based on product name keywords, or category if available
+- `lib/core/constants/product_categories.dart` — cross-retailer category mapping
+- `lib/presentation/screens/products/live_browse_screen.dart` — animated category chip bar, sort/filter bottom sheet, active filter bar, healthy-first sort
+- `lib/presentation/providers/store_provider.dart` — `_currentCategory` tracking, `_requestId` stale-response discard pattern
+- `test/browse_filter_sort_test.dart` — 26 unit tests (sort, filter, category mapping)
+
+**4b-4c. Sort, filter, healthy-first** ✅
+
+- Filter: "Promos only" toggle
+- Sort: Relevance (default), Price low→high, high→low, A–Z
+- Healthy-first: keyword-based deprioritisation when sort = Relevance
 
 **4d. Deals per category on home screen**
 
 - **File:** `lib/presentation/screens/home/home_screen.dart`
-- **Approach:** Group deals by category with section headers (Dairy, Bakery, etc.)
-- **Depends on:** Whether API returns category data
+- **Approach:** Render `dealsByRetailer` map as retailer-grouped sections with colored headers via `Retailers.fromName()`
+- **Status:** Deferred to Sprint 11 polish pass
 
 ---
 
@@ -251,7 +261,7 @@ Fixed all three originally unmatched ingredients plus additional edge cases foun
 
 ### Sprint 9: Expand Store Database
 
-**Goal:** Improve store location coverage.
+**Goal:** Improve store location coverage. Look at the `database/edge_functions/stores-nearby` and also the `plans/checkers_near_stores.sh` such that we can expand our store db as we currently have much less checkers stores than others.
 
 - **Approach:** Research additional store data sources, update Supabase `retailer_stores` table
 - **Edge Function:** May need to increase search radius or add mall-specific entries
@@ -265,6 +275,7 @@ Fixed all three originally unmatched ingredients plus additional edge cases foun
 **Goal:** Give users full control when exporting a recipe to a shopping list — deselect items they already have, compare total cost across retailers, and swap individual products before committing.
 
 **10a. Ingredient deselection before export**
+
 - **Flow:** After matching, before export, show ingredient list with checkboxes (all selected by default)
 - **UX:** Clear messaging — "Deselect items you already have" or similar prompt
 - **Approach:** Add selection state to export flow, only export checked ingredients
@@ -272,7 +283,8 @@ Fixed all three originally unmatched ingredients plus additional edge cases foun
 - **Model:** Sonnet 4.6 (straightforward checkbox UI + state)
 
 **10b. Retailer cost comparison before export**
-- **Flow:** After ingredient selection, show a comparison view — each retailer as a dropdown/accordion with all matched products and prices, total per retailer, cheapest retailer highlighted
+
+- **Flow:** After ingredient selection users should be able to select if they want to compare or just continue with export, show a comparison view — each retailer as a dropdown/accordion with all matched products and prices, total per retailer, cheapest retailer highlighted
 - **UX:** Use `ui-ux-pro-max` skill for optimal layout — likely a bottom sheet or full-screen modal with retailer tabs/cards
 - **Approach:** Re-run ingredient matching against all retailers (or use cached results), calculate totals, rank by price
 - **Data:** Needs `SmartMatchingService` to match ingredients across all 4 retailers simultaneously
@@ -280,6 +292,7 @@ Fixed all three originally unmatched ingredients plus additional edge cases foun
 - **Model:** Opus 4.6 (comparison UX design, data flow architecture)
 
 **10c. Swap products per retailer in comparison view**
+
 - **Flow:** In the retailer comparison view, each matched product is tappable — user can search for alternatives or pick from other matches
 - **UX:** Tap a product → show search/alternatives sheet → select replacement → total updates live
 - **Approach:** Reuse existing `onMatchIngredient` flow and `IngredientMatchingNotifier` for product search
