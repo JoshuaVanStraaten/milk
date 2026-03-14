@@ -122,35 +122,32 @@ Choose the best model for each task based on complexity:
 - Section 1: Price Compare Matching (45 tests) — search queries, cross-retailer matches, non-matches, variant conflicts, size mismatches
 - Section 2: Recipe Ingredient Matching (17 tests) — correct matches, no-viable-match rejection, plural stemming
 
-#### Remaining 🔧
+**3e. Unmatched ingredients from device testing** ✅
 
-**3e. Unmatched ingredients from device testing**
-Three ingredients fail to match on device — need investigation and fixes:
+Fixed all three originally unmatched ingredients plus additional edge cases found during device testing:
+- Hyphen normalization ("stir-fry" → "stir fry")
+- Sibilant-aware stemming fix ("cakes" → "cake", not "cak")
+- Qualifier-aware containment: color/packaging words (brown, red, tinned, canned) are optional; core food words (powder, seeds) are required
+- Disqualifier additions: mustard, ketchup, cracker, pretzel, nacho
+- Prep word stripping: skinned, deboned, tinned, canned
+- Gemini prompt updated for shorter ingredient names
+- "Tap to find a match" UI hint for unmatched ingredients
+- 77 tests total (up from 62)
 
-1. **"Hake Fillets"** (Fish and Chips recipe) → no match found
-   - Likely cause: "hake" and "fillets" may not appear together in product names, or product names use different phrasing (e.g., "skinned and deboned Hake Fillets" vs API product names)
-   - **Action:** Search API for hake products, check what names come back, adjust matching or Gemini prompt
-
-2. **"Mixed Stir-fry Vegetables"** (Chicken Stir Fry recipe) → no match found
-   - Likely cause: compound name with hyphen, "stir-fry" may not match "stir fry" or "stirfry", plus "mixed" + "vegetables" is very generic
-   - **Action:** Add hyphen normalization to stemming, check API product names for stir-fry veggies
-
-3. **"Sesame Seeds"** (Chicken Stir Fry recipe) → no match found
-   - Likely cause: may be a niche product with few API results, or product names include extra words that trigger rejection
-   - **Action:** Check API results for "sesame seeds", may need to relax extra-word threshold for spice/seed ingredients
-
-**Files to modify:**
-
-- `lib/data/services/smart_matching_service.dart` — matching algorithm fixes
+**Files modified:**
 - `lib/data/services/gemini_service.dart` — prompt tweaks if ingredient names are the issue
 - `test/product_matching_test.dart` — add test cases for hake, stir-fry veggies, sesame seeds
 
-**3f. Quantity matching for price compare (similar products)**
+**3f. Quantity matching for price compare (similar products)** ✅
 
-- **Not yet started** — user requested that similar products must match quantity
-- E.g., 6x1L milk shouldn't show single 1L milk, 30-pack eggs shouldn't show 6-pack
-- Tolerant matching OK (400g ≈ 410g)
-- **Files:** `lib/data/services/smart_matching_service.dart`, `lib/data/services/product_name_parser.dart`
+- Size gate in ProductNameParser blocks mismatched quantities (6x1L ≠ 1L, 30-pack ≠ 6-pack)
+- Tolerant matching within 5% (400g ≈ 410g)
+
+**3g. UI polish** ✅
+
+- Renamed "Same Product" → "Best Matches" on detail screen
+- Cheapest badge on detail screen
+- Compare sheet redesigned
 
 ---
 
