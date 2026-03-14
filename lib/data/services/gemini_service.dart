@@ -62,7 +62,23 @@ class GeminiService {
     return '''
 You are a chef assistant helping South African home cooks. Generate a recipe based on the user's request.
 
-Format ingredient names like grocery store products (e.g., "Chicken Breast 500g", "Soy Sauce 250ml").
+Format ingredient names EXACTLY as they appear on South African grocery store shelves.
+Use common SA product names, not cooking terms. Examples:
+- "Large Eggs" not "beaten eggs" (unit: "units", not "each")
+- "Full Cream Milk" not "whole milk"
+- "Sunflower Oil" or "Vegetable Oil" not "cooking oil"
+- "Table Salt" not "pinch of salt"
+- "Cake Flour" or "Self Raising Flour" not just "flour"
+- "Unsalted Butter" not "melted butter"
+- "Baking Powder" (unit: "g", not "ml" — it's a powder)
+- "Caster Sugar" or "White Sugar" (unit: "g")
+- "Ground Cinnamon" (unit: "g", not "ml")
+Valid units: "g", "kg", "ml", "l", "units" (for countable items like eggs).
+Do NOT include quantities or sizes in the name field — put quantity in "quantity" and unit in "unit".
+Do NOT include preparation (diced, melted, beaten, sifted, skinned, deboned) in the name — put it in "preparation".
+Keep ingredient names SHORT — just the core product name as you'd search for it in a store.
+Good: "Hake Fillets", "Stir Fry Vegetables", "Sesame Seeds"
+Bad: "skinned and deboned Hake Fillets", "pre-cut Mixed Stir-fry Vegetables"
 
 User request: $recipeRequest
 Servings: $servings$dietaryNote
@@ -80,7 +96,7 @@ Respond ONLY with valid JSON (no markdown, no backticks):
   "meal_type": "Dinner",
   "dietary_tags": [],
   "ingredients": [
-    {"name": "Product Name 500g", "quantity": 500, "unit": "g", "preparation": "diced", "is_optional": false}
+    {"name": "Chicken Breast", "quantity": 500, "unit": "g", "preparation": "diced", "is_optional": false}
   ],
   "instructions": [
     "Step 1 instruction (keep concise)",
@@ -125,7 +141,11 @@ Suggest recipes that:
   }
 
   /// Call the Gemini API
-  Future<String> _callGemini(String prompt) async {
+  Future<String> _callGemini(
+    String prompt, {
+    double temperature = 0.7,
+    int maxOutputTokens = 8192,
+  }) async {
     final url = Uri.parse(
       '$_baseUrl/models/$_model:generateContent?key=$apiKey',
     );
@@ -139,10 +159,10 @@ Suggest recipes that:
         },
       ],
       'generationConfig': {
-        'temperature': 0.7,
+        'temperature': temperature,
         'topK': 40,
         'topP': 0.95,
-        'maxOutputTokens': 8192,
+        'maxOutputTokens': maxOutputTokens,
       },
     });
 
@@ -343,6 +363,113 @@ Suggest recipes that:
     }
   }
 
+  // ===========================================================================
+  // PRODUCT MATCHING
+  // ===========================================================================
+
+  /// Evaluate product matches using AI when algorithm confidence is low.
+  ///
+  /// Sends source product + candidates from multiple retailers to Gemini
+  /// and returns confidence scores for each candidate.
+  Future<List<GeminiMatchResult>> evaluateProductMatches({
+    required String sourceProductName,
+    required String sourceRetailer,
+    required String sourcePrice,
+    required Map<String, List<({int index, String name, String price})>>
+        candidatesByRetailer,
+  }) async {
+    final prompt = _buildMatchingPrompt(
+      sourceProductName: sourceProductName,
+      sourceRetailer: sourceRetailer,
+      sourcePrice: sourcePrice,
+      candidatesByRetailer: candidatesByRetailer,
+    );
+
+    final response = await _callGemini(
+      prompt,
+      temperature: 0.3,
+      maxOutputTokens: 2048,
+    );
+
+    return _parseMatchingResponse(response);
+  }
+
+  /// Build the product matching prompt for Gemini.
+  String _buildMatchingPrompt({
+    required String sourceProductName,
+    required String sourceRetailer,
+    required String sourcePrice,
+    required Map<String, List<({int index, String name, String price})>>
+        candidatesByRetailer,
+  }) {
+    final candidatesBlock = StringBuffer();
+    for (final entry in candidatesByRetailer.entries) {
+      candidatesBlock.writeln('--- ${entry.key} ---');
+      for (final c in entry.value) {
+        candidatesBlock.writeln('${c.index}. "${c.name}" - ${c.price}');
+      }
+    }
+
+    return '''
+You are a South African grocery product matching assistant. Given a source product and candidates from other retailers, determine which candidates are the SAME product.
+
+Key SA grocery rules:
+- "2L" = "2 Litre" = "2000ml" (same size, different naming)
+- "Full Cream" and "Low Fat" are DIFFERENT products
+- Store brands (PnP, Woolworths, Checkers Housebrand, No Name, Ritebrand) are NEVER the same as named brands (Clover, Parmalat, Albany, etc.)
+- Different sizes are DIFFERENT products (500ml is not 1L)
+- Ignore minor naming differences: "Koo Baked Beans in Tomato Sauce 410g" = "KOO Baked Beans In Tomato 410g"
+- Multi-packs: "6x200ml" = "6 x 200ml" (same thing)
+
+SOURCE PRODUCT:
+"$sourceProductName" from $sourceRetailer at $sourcePrice
+
+CANDIDATES:
+$candidatesBlock
+
+For each candidate, respond ONLY with a JSON array (no markdown, no explanation):
+[
+  {"index": 1, "retailer": "Retailer Name", "confidence": 0.85, "reason": "Same brand, size, variant"}
+]
+
+Confidence guide:
+- 0.8-1.0: Same product, just different naming/formatting
+- 0.5-0.79: Similar product but different variant or size
+- 0.0-0.49: Different product entirely
+''';
+  }
+
+  /// Parse the matching response from Gemini.
+  List<GeminiMatchResult> _parseMatchingResponse(String response) {
+    try {
+      var clean = response.trim();
+      if (clean.startsWith('```json')) clean = clean.substring(7);
+      if (clean.startsWith('```')) clean = clean.substring(3);
+      if (clean.endsWith('```')) {
+        clean = clean.substring(0, clean.length - 3);
+      }
+      clean = clean.trim();
+
+      // Fix trailing commas
+      clean = clean.replaceAll(RegExp(r',(\s*[\]\}])'), r'$1');
+
+      final list = jsonDecode(clean) as List;
+      return list.map((item) {
+        final m = item as Map<String, dynamic>;
+        return GeminiMatchResult(
+          candidateIndex: m['index'] as int? ?? 0,
+          retailer: m['retailer'] as String? ?? '',
+          confidence: (m['confidence'] as num?)?.toDouble() ?? 0.0,
+          reason: m['reason'] as String? ?? '',
+        );
+      }).toList();
+    } catch (e) {
+      debugPrint('Failed to parse matching response: $e');
+      debugPrint('Response was: $response');
+      return [];
+    }
+  }
+
   /// Attempt to repair common JSON issues from Gemini responses
   String _repairJson(String json) {
     var repaired = json;
@@ -431,6 +558,25 @@ class RecipeSuggestion {
   }
 
   bool get hasAllIngredients => missingIngredients.isEmpty;
+}
+
+/// Result from Gemini product match evaluation.
+class GeminiMatchResult {
+  final int candidateIndex;
+  final String retailer;
+  final double confidence;
+  final String reason;
+
+  const GeminiMatchResult({
+    required this.candidateIndex,
+    required this.retailer,
+    required this.confidence,
+    required this.reason,
+  });
+
+  @override
+  String toString() =>
+      'GeminiMatch(#$candidateIndex $retailer: $confidence - $reason)';
 }
 
 /// Custom exception for Gemini API errors

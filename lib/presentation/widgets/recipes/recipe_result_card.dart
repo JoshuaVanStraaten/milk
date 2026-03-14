@@ -361,90 +361,111 @@ class RecipeResultCard extends StatelessWidget {
     bool isMatching,
     bool isDark,
   ) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Bullet or checkbox
-          Container(
-            width: 24,
-            height: 24,
-            alignment: Alignment.center,
-            child: ingredient.isMatched
-                ? const Icon(
-                    Icons.check_circle,
-                    size: 18,
-                    color: AppColors.success,
-                  )
-                : Container(
-                    width: 6,
-                    height: 6,
-                    decoration: BoxDecoration(
-                      color: isDark
-                          ? AppColors.textSecondaryDark
-                          : AppColors.textSecondary,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-          ),
-          const SizedBox(width: 8),
-          // Ingredient details
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  ingredient.displayString,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: isDark
-                        ? AppColors.textPrimaryDark
-                        : AppColors.textPrimary,
-                  ),
-                ),
-                if (ingredient.isMatched &&
-                    ingredient.matchedProductName != null)
-                  Text(
-                    '${ingredient.matchedProductName} • ${ingredient.formattedPrice}',
-                    style: const TextStyle(
-                      fontSize: 12,
+    final showMatchInfo =
+        currentStep == RecipeGenerationStep.review || isMatching;
+    final isUnmatched = !ingredient.isMatched && showMatchInfo;
+
+    return InkWell(
+      onTap: isUnmatched && !ingredient.isOptional
+          ? () => onMatchIngredient(index)
+          : null,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Bullet or checkbox
+            Container(
+              width: 24,
+              height: 24,
+              alignment: Alignment.center,
+              child: ingredient.isMatched
+                  ? const Icon(
+                      Icons.check_circle,
+                      size: 18,
                       color: AppColors.success,
+                    )
+                  : Container(
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondary,
+                        shape: BoxShape.circle,
+                      ),
                     ),
-                  ),
-                if (ingredient.isOptional)
-                  Text(
-                    'Optional',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontStyle: FontStyle.italic,
-                      color: isDark
-                          ? AppColors.textSecondaryDark
-                          : AppColors.textSecondary,
-                    ),
-                  ),
-              ],
             ),
-          ),
-          // Match button (only in matching mode)
-          if (isMatching)
-            TextButton(
-              onPressed: () => onMatchIngredient(index),
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                minimumSize: const Size(0, 32),
+            const SizedBox(width: 8),
+            // Ingredient details
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    ingredient.displayString,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: isDark
+                          ? AppColors.textPrimaryDark
+                          : AppColors.textPrimary,
+                    ),
+                  ),
+                  if (ingredient.isMatched &&
+                      ingredient.matchedProductName != null)
+                    Text(
+                      '${ingredient.matchedProductName} • ${ingredient.formattedPrice}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.success,
+                      ),
+                    ),
+                  if (ingredient.isOptional)
+                    Text(
+                      'Optional',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontStyle: FontStyle.italic,
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondary,
+                      ),
+                    ),
+                  if (isUnmatched && !ingredient.isOptional)
+                    Text(
+                      'Tap to find a match',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontStyle: FontStyle.italic,
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondary,
+                      ),
+                    ),
+                ],
               ),
-              child: Text(
-                ingredient.isMatched ? 'Change' : 'Match',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: ingredient.isMatched
-                      ? AppColors.textSecondary
-                      : AppColors.primary,
+            ),
+            // Match button (only in matching mode)
+            if (isMatching)
+              TextButton(
+                onPressed: () => onMatchIngredient(index),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  minimumSize: const Size(0, 32),
+                ),
+                child: Text(
+                  ingredient.isMatched ? 'Change' : 'Match',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: ingredient.isMatched
+                        ? AppColors.textSecondary
+                        : AppColors.primary,
+                  ),
                 ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }

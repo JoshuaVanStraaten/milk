@@ -1,10 +1,13 @@
 # Milk App — Incremental Bug Fix & Enhancement Plan
 
 ## Context
+
 The app is in closed beta heading toward public launch. Focus is on fixing bugs, improving core matching, and polishing UI/UX. Work is split into incremental sprints — each sprint is tested manually on device/emulator, committed, then we move on.
 
 ## Model Selection Guide
+
 Choose the best model for each task based on complexity:
+
 - **Sonnet 4.6** — Bug fixes, unused import cleanup, padding fixes, simple UI tweaks, boilerplate code, repetitive changes
 - **Opus 4.6** — Architecture decisions, AI matching algorithm design, complex state management, prompt engineering, deep refactors, UI/UX design strategy
 
@@ -13,10 +16,12 @@ Choose the best model for each task based on complexity:
 ## Sprint Order (priority-based, dependencies respected)
 
 ### Sprint 1: Quick Bug Fixes (low risk, high impact)
+
 **Model:** Sonnet 4.6
 **Goal:** Fix 4 isolated bugs that don't touch core logic.
 
 **1a. Recipe save-then-export conflict** ⚠️ INCOMPLETE — needs second fix
+
 - **Bug:** User saves recipe manually, then matches ingredients, then exports → "Save Failed" error
 - **Root cause (deeper):** TWO code paths trigger the bug:
   1. `exportToShoppingList(saveRecipe: true)` — already guarded with `recipeId == null` check ✅
@@ -29,20 +34,24 @@ Choose the best model for each task based on complexity:
 - **Model:** Sonnet 4.6 (straightforward guard + upsert change)
 
 **1b. Extra bottom padding on lists**
+
 - **Bug:** Bottom of list screen cut off on some devices
 - **Fix in:** `lib/presentation/screens/lists/list_detail_screen.dart`
 - **Approach:** Add `padding: EdgeInsets.only(bottom: 80)` to the AnimatedList to account for FAB + safe area
 
 **1c. API retry with backoff**
+
 - **Bug:** Single API failure = no data shown
 - **Fix in:** `lib/data/services/live_api_service.dart`
 - **Approach:** Add `_retryWithBackoff()` helper — 3 attempts with exponential backoff (1s, 2s, 4s). Wrap all Edge Function calls.
 
 **1d. Fix `withOpacity` deprecation warnings** (86 info items)
+
 - **Fix in:** Multiple files (home_screen, skeleton_loaders, recipe widgets, etc.)
 - **Approach:** Replace `.withOpacity(x)` with `.withValues(alpha: x)` globally
 
 **1e. Cannot add compared products to list**
+
 - **Bug:** When user compares prices on a product, match cards are display-only — no way to add a cheaper match to a shopping list. User can only add the original product.
 - **Root cause:** `_buildMatchCard()` in `live_product_detail_screen.dart` (line ~685) returns a plain `Container` — no `InkWell`/`GestureDetector`, no `onTap` handler.
 - **Fix:** Wrap match card in `InkWell`, on tap call existing `showAddToListSheet()` with the matched product's data (name, price, retailer, imageUrl, promo price). All required data is already available on the `ComparisonMatch` object.
@@ -53,10 +62,12 @@ Choose the best model for each task based on complexity:
 ---
 
 ### Sprint 2: Product Card Redesign + Compare Button
+
 **Model:** Opus 4.6 (UI/UX design decisions) → Sonnet 4.6 (implementation)
 **Goal:** Smaller, more appealing product cards with inline compare button.
 
 **2a. Redesign LiveProductCard**
+
 - **Files:** `lib/presentation/widgets/products/live_product_card.dart`, `lib/presentation/screens/products/live_browse_screen.dart`
 - **Changes:**
   - Reduce card size — smaller image (not edge-to-edge), add padding inside card
@@ -67,59 +78,95 @@ Choose the best model for each task based on complexity:
 - **Reference:** Use `ui-ux-pro-max` skill for design guidance, look at Checkers/PnP apps for inspiration
 
 **2b. Add compare button on product cards**
+
 - **File:** `lib/presentation/widgets/products/live_product_card.dart`
 - **Approach:** Add a small compare icon button (e.g. `Icons.compare_arrows`) next to the quick-add button
 - **Action:** Calls `showCompareSheet(context, ref, product)` directly from card — already exists in `compare_sheet.dart`
 
 **2c. Less symmetry in card layout**
+
 - Break up the rigid 2-column grid feel — consider slightly varied spacing, rounded corners, card elevation differences between promo/non-promo items
 
 ---
 
 ### Sprint 3: Smart Product Matching (Core Feature)
+
 **Model:** Opus 4.6 (algorithm design, prompt engineering, architecture)
 **Goal:** Dramatically improve price comparison and recipe ingredient matching accuracy.
 **Strategy:** Gemini + algorithm hybrid — improve algorithm first, measure reliability, fall back to AI when confidence is low.
 
-**3a. Enhance ProductNameParser**
-- **File:** `lib/data/services/product_name_parser.dart`
-- **Improvements:**
-  - Better size normalization (handle "6x100g", "6 pack", "dozen", etc.)
-  - Improve brand extraction for multi-word brands
-  - Add variant detection (e.g., "low fat", "full cream", "lite")
-  - Add confidence score output to matching
+#### Completed ✅
 
-**3b. Improved algorithm with confidence scoring**
-- Enhance `classify()` and `_findBestMatch()` to return a confidence score (0.0-1.0)
-- Weight: brand match (0.3) + size match (0.25) + variant match (0.2) + name similarity (0.25)
-- **Threshold:** If confidence < 0.6, escalate to Gemini
+**3a. SmartMatchingService created** (`lib/data/services/smart_matching_service.dart`)
 
-**3c. AI-assisted matching (hybrid fallback)**
-- When algorithm confidence is below threshold:
-  1. Fetch candidates from all retailers (existing `compareProduct()`)
-  2. Send candidates + source product to Gemini with structured prompt
-  3. Gemini returns ranked matches with confidence scores
-  4. Use AI ranking to select best match per retailer
-- **Files:** New `smart_matching_service.dart`, reuse `GeminiService`
-- **Fallback:** If Gemini also fails, use best algorithm match regardless of confidence
-- **Validation:** Log match results to measure algorithm vs AI accuracy over time
+- Hybrid algorithm + AI matching with confidence scoring
+- `computeConfidence()` scores: brand (0.3) + size (0.25) + variant (0.2) + name similarity (0.25)
+- AI escalation via Gemini when confidence < 0.6
+- `matchIngredient()` method for recipe ingredient → product matching
 
-**3d. Improve ingredient matching for recipes**
-- **File:** `lib/presentation/providers/recipe_provider.dart` — `_findBestMatch()`, `_cleanIngredientForSearch()`
-- **Approach:** Use same hybrid matching from 3b/3c
+**3b. Recipe ingredient matching — plural stemming + disqualifiers**
+
+- Added `_stem()` for singular/plural normalization ("lemons"→"lemon", "eggs"→"egg")
+- Expanded `_disqualifyingWords` set (confectionery, baked goods, drinks, cleaning products, condiments, processed food)
+- Extra-word rejection for short ingredients (≤2 words with >3 extra product words → reject)
+- Disqualification override: nameScore=0 forces final score=0 (no rescue by algorithm confidence)
+- Re-weighted blending: 40% algorithm + 60% name score, with `max(blended, nameScore)` floor
+
+**3c. Gemini recipe prompt improvements** (`lib/data/services/gemini_service.dart`)
+
+- Updated prompt to output ingredient names matching real grocery products
+- "Table Salt" not "pinch Salt", "Large Eggs" not "beaten Large Eggs 2 units"
+
+**3d. Comprehensive test suite** (`test/product_matching_test.dart` — 62 tests)
+
+- Section 1: Price Compare Matching (45 tests) — search queries, cross-retailer matches, non-matches, variant conflicts, size mismatches
+- Section 2: Recipe Ingredient Matching (17 tests) — correct matches, no-viable-match rejection, plural stemming
+
+#### Remaining 🔧
+
+**3e. Unmatched ingredients from device testing**
+Three ingredients fail to match on device — need investigation and fixes:
+
+1. **"Hake Fillets"** (Fish and Chips recipe) → no match found
+   - Likely cause: "hake" and "fillets" may not appear together in product names, or product names use different phrasing (e.g., "skinned and deboned Hake Fillets" vs API product names)
+   - **Action:** Search API for hake products, check what names come back, adjust matching or Gemini prompt
+
+2. **"Mixed Stir-fry Vegetables"** (Chicken Stir Fry recipe) → no match found
+   - Likely cause: compound name with hyphen, "stir-fry" may not match "stir fry" or "stirfry", plus "mixed" + "vegetables" is very generic
+   - **Action:** Add hyphen normalization to stemming, check API product names for stir-fry veggies
+
+3. **"Sesame Seeds"** (Chicken Stir Fry recipe) → no match found
+   - Likely cause: may be a niche product with few API results, or product names include extra words that trigger rejection
+   - **Action:** Check API results for "sesame seeds", may need to relax extra-word threshold for spice/seed ingredients
+
+**Files to modify:**
+
+- `lib/data/services/smart_matching_service.dart` — matching algorithm fixes
+- `lib/data/services/gemini_service.dart` — prompt tweaks if ingredient names are the issue
+- `test/product_matching_test.dart` — add test cases for hake, stir-fry veggies, sesame seeds
+
+**3f. Quantity matching for price compare (similar products)**
+
+- **Not yet started** — user requested that similar products must match quantity
+- E.g., 6x1L milk shouldn't show single 1L milk, 30-pack eggs shouldn't show 6-pack
+- Tolerant matching OK (400g ≈ 410g)
+- **Files:** `lib/data/services/smart_matching_service.dart`, `lib/data/services/product_name_parser.dart`
 
 ---
 
 ### Sprint 4: Sort, Filter & Category Browsing
+
 **Model:** Sonnet 4.6 (UI implementation) — Opus 4.6 if Edge Function changes needed
 **Goal:** Let users browse by category and filter/sort results.
 
 **4a. Category-based browsing**
+
 - **Investigation needed:** Check if Edge Functions return category data. The `browseProducts()` method already accepts a `category` param.
 - **If categories available:** Add category chip bar below retailer selector in `live_browse_screen.dart`
 - **If not:** May need to update Edge Functions to include category in response, or add `category` field to `LiveProduct` model
 
 **4b. Sort and filter controls**
+
 - **File:** `lib/presentation/screens/products/live_browse_screen.dart`
 - **Features:**
   - Filter: "Promos only" toggle
@@ -128,10 +175,12 @@ Choose the best model for each task based on complexity:
 - **UI:** Filter/sort icon in app bar → bottom sheet with options
 
 **4c. Show healthy items first**
+
 - **Approach:** When displaying search results, prioritize food items over confectionery/snacks
 - **Implementation:** Client-side sorting heuristic based on product name keywords, or category if available
 
 **4d. Deals per category on home screen**
+
 - **File:** `lib/presentation/screens/home/home_screen.dart`
 - **Approach:** Group deals by category with section headers (Dairy, Bakery, etc.)
 - **Depends on:** Whether API returns category data
@@ -139,14 +188,17 @@ Choose the best model for each task based on complexity:
 ---
 
 ### Sprint 5: List Management Enhancements
+
 **Model:** Sonnet 4.6 (UI) → Opus 4.6 (browse+compare UX flow design)
 **Goal:** Multi-select delete, browse+manual add toggle from inside lists.
 
 **5a. Multi-select list deletion**
+
 - **File:** `lib/presentation/screens/lists/my_lists_screen.dart`
 - **Approach:** Long-press enters selection mode, checkboxes appear, bulk delete action in app bar
 
 **5b. Add items from inside list — browse toggle**
+
 - **File:** `lib/presentation/screens/lists/list_detail_screen.dart`
 - **Approach:** In the add-item FAB flow, add a toggle/tab: "Manual" vs "Browse"
   - Manual: Current `_AddItemSheet` behavior
@@ -156,10 +208,12 @@ Choose the best model for each task based on complexity:
 ---
 
 ### Sprint 6: Location & Address Support
+
 **Model:** Sonnet 4.6
 **Goal:** Let users enter addresses and save locations.
 
 **6a. Address input with geocoding**
+
 - **Files:** `lib/data/services/location_service.dart`, `lib/presentation/providers/store_provider.dart`
 - **Approach:**
   - Add geocoding package (e.g., `geocoding` or Google Places API)
@@ -168,6 +222,7 @@ Choose the best model for each task based on complexity:
 - **UI:** Add "Use address" option alongside "Use my location"
 
 **6b. Saved locations (Home/Work)**
+
 - **Storage:** `flutter_secure_storage` or SharedPreferences
 - **Files:** New saved locations provider, profile screen addition
 - **UI:** Profile screen → "My Locations" section with named locations
@@ -175,6 +230,7 @@ Choose the best model for each task based on complexity:
 ---
 
 ### Sprint 7: Walkthrough Tutorial
+
 **Model:** Sonnet 4.6
 **Goal:** Guide new users through the app on first launch.
 
@@ -186,6 +242,7 @@ Choose the best model for each task based on complexity:
 ---
 
 ### Sprint 8: Share Feature Polish
+
 **Model:** Sonnet 4.6
 **Goal:** Better UX when sharing/collaborating on lists.
 
@@ -196,6 +253,7 @@ Choose the best model for each task based on complexity:
 ---
 
 ### Sprint 9: Expand Store Database
+
 **Goal:** Improve store location coverage.
 
 - **Approach:** Research additional store data sources, update Supabase `retailer_stores` table
@@ -205,6 +263,7 @@ Choose the best model for each task based on complexity:
 ---
 
 ### Sprint 10: Final UI/UX Polish Pass
+
 **Model:** Opus 4.6 (design review & strategy) → Sonnet 4.6 (implementation)
 **Goal:** Professional, exciting look across the entire app.
 
@@ -219,12 +278,14 @@ Choose the best model for each task based on complexity:
 ---
 
 ## Future (Add to CLAUDE.md)
+
 - **FatSecret API** for nutritional information (fat, protein, carbs)
 - Diet plan curation and calorie tracking
 - Store price history trends
 - **Barcode scanner** — scan products in-store, compare prices (needs barcode data in DB first)
 
 ## Decisions Made
+
 - **AI matching:** Gemini + algorithm hybrid. Improve algorithm first, add confidence scoring, escalate to Gemini when confidence < 0.6
 - **Barcode scanner:** Skipped for now — deprioritized, added to future backlog
 - **Categories:** Need to investigate Edge Function responses before planning Sprint 4
@@ -233,6 +294,7 @@ Choose the best model for each task based on complexity:
 ---
 
 ## iOS Testing Suggestions
+
 - **Simulator:** Use Xcode iOS Simulator on a Mac (free)
 - **BrowserStack/Appetize.io:** Cloud-based iOS device testing
 - **MacInCloud/MacStadium:** Rent a remote Mac for Xcode builds
@@ -242,6 +304,7 @@ Choose the best model for each task based on complexity:
 ---
 
 ## Verification Per Sprint
+
 1. `flutter analyze` — zero warnings
 2. Manual test on emulator/physical Android
 3. Test both light and dark mode

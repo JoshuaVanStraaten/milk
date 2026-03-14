@@ -13,7 +13,7 @@ import '../../data/models/live_product.dart';
 import '../../data/repositories/recipe_repository.dart';
 import '../../data/services/gemini_service.dart';
 import '../../data/services/image_lookup_service.dart';
-import 'store_provider.dart';
+import 'store_provider.dart'; // includes smartMatchingServiceProvider
 
 // =============================================================================
 // SERVICE PROVIDERS
@@ -242,8 +242,14 @@ class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
 
         matches = _resolveImages(matches, retailerName);
 
-        // Smart match — use ProductNameParser to find the best match
-        final best = _findBestMatch(searchQuery, matches);
+        // Smart match — use enhanced scoring from SmartMatchingService
+        final smartMatcher = _ref.read(smartMatchingServiceProvider);
+        final best = await smartMatcher.matchIngredient(
+          ingredientName: searchQuery,
+          candidates: matches,
+          ingredientQuantity: ingredient.quantity,
+          ingredientUnit: ingredient.unit,
+        );
 
         if (best != null) {
           ingredients[i] = ingredient.copyWith(
@@ -498,16 +504,16 @@ class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
     // Remove prep instructions that add noise to search
     cleaned = cleaned.replaceAll(
       RegExp(
-        r'\b(finely|roughly|freshly|thinly)?\s*(chopped|diced|minced|sliced|grated|crushed|peeled|deseeded|trimmed|halved)\b',
+        r'\b(finely|roughly|freshly|thinly)?\s*(chopped|diced|minced|sliced|grated|crushed|peeled|deseeded|trimmed|halved|beaten|sifted|melted|softened|whisked|mixed|skinned|deboned|boned|pre-cut|toasted|roasted)\b',
         caseSensitive: false,
       ),
       '',
     );
 
-    // Remove common qualifiers that don't help search
+    // Remove common qualifiers and cooking measures that don't help search
     cleaned = cleaned.replaceAll(
       RegExp(
-        r'\b(fresh|dried|frozen|large|small|medium|to taste)\b',
+        r'\b(fresh|dried|frozen|tinned|canned|large|small|medium|to taste|pinch|dash|splash|handful|bunch|knob|drizzle|squeeze)\b',
         caseSensitive: false,
       ),
       '',
@@ -524,65 +530,6 @@ class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
     return cleaned;
   }
 
-  /// Find the best product match from API results using word similarity.
-  /// Returns null if no reasonable match found — prevents "mosquito killer"
-  /// matching "carrots".
-  LiveProduct? _findBestMatch(
-    String searchQuery,
-    List<LiveProduct> candidates,
-  ) {
-    if (candidates.isEmpty) return null;
-
-    final sourceWords = searchQuery
-        .toLowerCase()
-        .replaceAll(RegExp(r'[^\w\s]'), '')
-        .split(RegExp(r'\s+'))
-        .where((w) => w.length > 1)
-        .toSet();
-
-    if (sourceWords.isEmpty) return candidates.first;
-
-    final scored = <(LiveProduct, double)>[];
-
-    for (final product in candidates) {
-      final candidateWords = product.name
-          .toLowerCase()
-          .replaceAll(RegExp(r'[^\w\s]'), '')
-          .split(RegExp(r'\s+'))
-          .where((w) => w.length > 1)
-          .toSet();
-
-      if (candidateWords.isEmpty) continue;
-
-      // Jaccard similarity
-      final overlap = sourceWords.intersection(candidateWords).length;
-      final jaccard = overlap / sourceWords.union(candidateWords).length;
-
-      // Containment score: do all search words appear in the product name?
-      // "beef mince" → "Lean Beef Mince 500g" = 1.0
-      final containment = sourceWords.isEmpty
-          ? 0.0
-          : sourceWords
-                    .where((w) => candidateWords.any((cw) => cw.contains(w)))
-                    .length /
-                sourceWords.length;
-
-      // Combined score: weight containment higher (it's more important
-      // that "beef" and "mince" both appear than Jaccard overlap)
-      final score = (jaccard * 0.4) + (containment * 0.6);
-
-      // Minimum threshold — rejects totally unrelated products
-      if (score >= 0.2) {
-        scored.add((product, score));
-      }
-    }
-
-    if (scored.isEmpty) return null;
-
-    // Sort by score descending, return best
-    scored.sort((a, b) => b.$2.compareTo(a.$2));
-    return scored.first.$1;
-  }
 }
 
 /// Recipe generation provider

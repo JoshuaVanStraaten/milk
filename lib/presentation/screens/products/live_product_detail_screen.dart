@@ -14,6 +14,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../data/models/live_product.dart';
 import '../../../data/services/image_lookup_service.dart';
 import '../../../data/services/product_name_parser.dart';
+import '../../../data/services/smart_matching_service.dart';
 import '../../providers/store_provider.dart';
 import '../../widgets/products/add_to_list_sheet.dart';
 
@@ -32,6 +33,7 @@ class _LiveProductDetailScreenState
   // Comparison state
   List<ComparisonMatch>? _comparisonResults;
   bool _comparingPrices = false;
+  bool _verifyingWithAi = false;
   String? _compareError;
 
   @override
@@ -303,10 +305,12 @@ class _LiveProductDetailScreenState
     setState(() {
       _comparingPrices = true;
       _compareError = null;
+      _verifyingWithAi = false;
     });
 
     try {
       final api = ref.read(liveApiServiceProvider);
+      final smartMatcher = ref.read(smartMatchingServiceProvider);
       final storeSelection = ref.read(storeSelectionProvider).value;
 
       if (storeSelection == null) {
@@ -317,13 +321,9 @@ class _LiveProductDetailScreenState
         return;
       }
 
-      // Parse the source product
+      // Parse the source product for search query
       final sourceParsed = ProductNameParser.parse(widget.product.name);
-
-      // Build a clean search query
-      final searchQuery = sourceParsed.normalizedName.length >= 3
-          ? sourceParsed.normalizedName
-          : widget.product.name;
+      final searchQuery = sourceParsed.searchQuery;
 
       // Search all retailers in parallel
       final rawResults = await api.compareProduct(
@@ -337,80 +337,74 @@ class _LiveProductDetailScreenState
         resolvedResults[entry.key] = _resolveImages(entry.value, entry.key);
       }
 
-      // Classify all results
-      final matches = <ComparisonMatch>[];
-
+      // Remove self from source retailer results
+      final filteredResults = <String, List<LiveProduct>>{};
       for (final entry in resolvedResults.entries) {
-        final retailer = entry.key;
-        // Skip the source retailer
-        if (retailer == widget.product.retailer) continue;
-
-        for (final candidate in entry.value) {
-          final candidateParsed = ProductNameParser.parse(candidate.name);
-          final match = ProductNameParser.classify(
-            source: sourceParsed,
-            candidate: candidateParsed,
-            retailer: retailer,
-            name: candidate.name,
-            price: candidate.price,
-            priceNumeric: candidate.priceNumeric,
-            promotionPrice: candidate.hasPromo
-                ? candidate.promotionPrice
-                : null,
-            hasPromo: candidate.hasPromo,
-            imageUrl: candidate.imageUrl,
-            sourcePrice: widget.product.priceNumeric,
-          );
-          if (match != null) {
-            matches.add(match);
-          }
+        if (entry.key == widget.product.retailer) {
+          filteredResults[entry.key] = entry.value
+              .where((p) => p.name != widget.product.name)
+              .toList();
+        } else {
+          filteredResults[entry.key] = entry.value;
         }
       }
 
-      // Also include the source retailer's results (other products from same search)
-      final sourceRetailerResults =
-          resolvedResults[widget.product.retailer] ?? [];
-      for (final candidate in sourceRetailerResults) {
-        if (candidate.name == widget.product.name) continue; // Skip self
-        final candidateParsed = ProductNameParser.parse(candidate.name);
-        final match = ProductNameParser.classify(
-          source: sourceParsed,
-          candidate: candidateParsed,
-          retailer: widget.product.retailer,
-          name: candidate.name,
-          price: candidate.price,
-          priceNumeric: candidate.priceNumeric,
-          promotionPrice: candidate.hasPromo ? candidate.promotionPrice : null,
-          hasPromo: candidate.hasPromo,
-          imageUrl: candidate.imageUrl,
-          sourcePrice: widget.product.priceNumeric,
-        );
-        if (match != null) {
-          matches.add(match);
-        }
-      }
+      // Algorithm-only scoring (instant)
+      final algorithmResult = smartMatcher.findMatchesAlgorithm(
+        sourceProduct: widget.product,
+        candidatesByRetailer: filteredResults,
+      );
 
-      // Sort: exact > similar > fallback, then by price
-      matches.sort((a, b) {
-        final typeOrder = a.matchType.index.compareTo(b.matchType.index);
-        if (typeOrder != 0) return typeOrder;
-        return a.priceNumeric.compareTo(b.priceNumeric);
-      });
-
+      // Show algorithm results immediately
+      final algorithmMatches = _flattenAndSort(algorithmResult);
       if (mounted) {
         setState(() {
-          _comparisonResults = matches;
+          _comparisonResults = algorithmMatches;
           _comparingPrices = false;
         });
+      }
+
+      // If low-confidence matches exist, enhance with AI in background
+      if (algorithmResult.hasLowConfidence) {
+        if (mounted) setState(() => _verifyingWithAi = true);
+
+        final enhanced = await smartMatcher.enhanceWithAi(
+          sourceProduct: widget.product,
+          algorithmResult: algorithmResult,
+          candidatesByRetailer: filteredResults,
+        );
+
+        if (mounted) {
+          setState(() {
+            _comparisonResults = _flattenAndSort(enhanced);
+            _verifyingWithAi = false;
+          });
+        }
       }
     } catch (e) {
       if (mounted) {
         setState(() {
           _compareError = e.toString();
           _comparingPrices = false;
+          _verifyingWithAi = false;
         });
       }
     }
+  }
+
+  /// Flatten a SmartMatchResult into a sorted list for display.
+  List<ComparisonMatch> _flattenAndSort(SmartMatchResult result) {
+    final matches = <ComparisonMatch>[];
+    for (final list in result.allMatchesByRetailer.values) {
+      matches.addAll(list);
+    }
+    // Sort: exact > similar > fallback, then by price
+    matches.sort((a, b) {
+      final typeOrder = a.matchType.index.compareTo(b.matchType.index);
+      if (typeOrder != 0) return typeOrder;
+      return a.priceNumeric.compareTo(b.priceNumeric);
+    });
+    return matches;
   }
 
   List<LiveProduct> _resolveImages(
@@ -541,6 +535,13 @@ class _LiveProductDetailScreenState
         .where((m) => m.matchType == MatchType.fallback)
         .toList();
 
+    // Find cheapest exact match for badge
+    final cheapestExactPrice = exactMatches.isNotEmpty
+        ? exactMatches
+            .map((m) => m.priceNumeric)
+            .reduce((a, b) => a < b ? a : b)
+        : 0.0;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -568,71 +569,116 @@ class _LiveProductDetailScreenState
           '${results.length} result${results.length == 1 ? '' : 's'} found',
           style: TextStyle(fontSize: 13, color: subtitleColor),
         ),
+        if (_verifyingWithAi)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 12,
+                  height: 12,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 1.5,
+                    color: subtitleColor,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Verifying matches with AI...',
+                  style: TextStyle(fontSize: 12, color: subtitleColor),
+                ),
+              ],
+            ),
+          ),
         const SizedBox(height: 16),
 
         // Exact matches
         if (exactMatches.isNotEmpty) ...[
           _buildMatchSectionHeader(
-            'Same Product',
+            'Best Matches',
             Icons.check_circle,
             AppColors.success,
             exactMatches.length,
             isDark,
           ),
           const SizedBox(height: 8),
-          ...exactMatches.map((m) => _buildMatchCard(m, isDark)),
+          ...exactMatches.asMap().entries.map((e) => _buildMatchCard(
+                e.value,
+                isDark,
+                isCheapest: e.key == 0,
+                cheapestPrice: cheapestExactPrice,
+              )),
           const SizedBox(height: 16),
         ],
 
-        // Similar matches
-        if (similarMatches.isNotEmpty) ...[
-          _buildMatchSectionHeader(
-            'Similar Products',
-            Icons.content_copy,
-            AppColors.secondary,
-            similarMatches.length,
-            isDark,
-          ),
-          const SizedBox(height: 8),
-          ...similarMatches.map((m) => _buildMatchCard(m, isDark)),
-          const SizedBox(height: 16),
-        ],
-
-        // Fallback (only if no better matches)
-        if (fallbackMatches.isNotEmpty &&
-            exactMatches.isEmpty &&
-            similarMatches.isEmpty) ...[
-          _buildMatchSectionHeader(
-            'Related Products',
-            Icons.category,
-            subtitleColor,
-            fallbackMatches.length,
-            isDark,
-          ),
-          const SizedBox(height: 8),
-          ...fallbackMatches.map((m) => _buildMatchCard(m, isDark)),
-        ],
-
-        // Show fallback as expandable if we have better matches too
-        if (fallbackMatches.isNotEmpty &&
-            (exactMatches.isNotEmpty || similarMatches.isNotEmpty)) ...[
-          ExpansionTile(
-            title: Row(
+        // No exact matches — show info message
+        if (exactMatches.isEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Row(
               children: [
-                Icon(Icons.category, size: 16, color: subtitleColor),
+                Icon(Icons.info_outline, size: 16, color: subtitleColor),
                 const SizedBox(width: 8),
-                Text(
-                  'Related Products (${fallbackMatches.length})',
-                  style: TextStyle(fontSize: 14, color: subtitleColor),
+                Expanded(
+                  child: Text(
+                    'No exact matches found at other stores',
+                    style: TextStyle(fontSize: 13, color: subtitleColor),
+                  ),
                 ),
               ],
             ),
-            tilePadding: EdgeInsets.zero,
-            childrenPadding: const EdgeInsets.only(bottom: 8),
-            children: fallbackMatches
-                .map((m) => _buildMatchCard(m, isDark))
-                .toList(),
           ),
+        ],
+
+        // Similar matches — collapsed when exact matches exist
+        if (similarMatches.isNotEmpty) ...[
+          if (exactMatches.isNotEmpty)
+            _DetailCollapsibleSection(
+              title: 'Similar Products (${similarMatches.length})',
+              icon: Icons.content_copy,
+              color: AppColors.secondary,
+              isDark: isDark,
+              children: similarMatches
+                  .map((m) => _buildMatchCard(m, isDark))
+                  .toList(),
+            )
+          else ...[
+            _buildMatchSectionHeader(
+              'Similar Products',
+              Icons.content_copy,
+              AppColors.secondary,
+              similarMatches.length,
+              isDark,
+            ),
+            const SizedBox(height: 8),
+            ...similarMatches.map((m) => _buildMatchCard(m, isDark)),
+            const SizedBox(height: 16),
+          ],
+        ],
+
+        // Alternatives — collapsed when better matches exist, expanded otherwise
+        if (fallbackMatches.isNotEmpty) ...[
+          if (exactMatches.isNotEmpty || similarMatches.isNotEmpty)
+            _DetailCollapsibleSection(
+              title: 'Alternatives (${fallbackMatches.length})',
+              icon: Icons.category,
+              color: subtitleColor,
+              isDark: isDark,
+              children: fallbackMatches
+                  .map((m) => _buildMatchCard(m, isDark))
+                  .toList(),
+            )
+          else ...[
+            _buildMatchSectionHeader(
+              'Alternatives',
+              Icons.category,
+              subtitleColor,
+              fallbackMatches.length,
+              isDark,
+            ),
+            const SizedBox(height: 8),
+            ...fallbackMatches.map((m) => _buildMatchCard(m, isDark)),
+          ],
         ],
 
         const SizedBox(height: 16),
@@ -682,7 +728,12 @@ class _LiveProductDetailScreenState
     );
   }
 
-  Widget _buildMatchCard(ComparisonMatch match, bool isDark) {
+  Widget _buildMatchCard(
+    ComparisonMatch match,
+    bool isDark, {
+    bool isCheapest = false,
+    double cheapestPrice = 0,
+  }) {
     final config = Retailers.fromName(match.retailer);
     final retailerColor = config?.color ?? Colors.grey;
     final textColor = isDark
@@ -691,6 +742,11 @@ class _LiveProductDetailScreenState
     final subtitleColor = isDark
         ? AppColors.textSecondaryDark
         : AppColors.textSecondary;
+
+    final savings = cheapestPrice > 0
+        ? match.priceNumeric - cheapestPrice
+        : 0.0;
+    final showSavings = !isCheapest && savings > 0.50;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -721,8 +777,16 @@ class _LiveProductDetailScreenState
         child: Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: isDark ? AppColors.surfaceDarkMode : AppColors.surface,
+            color: isCheapest
+                ? AppColors.primary.withValues(alpha: isDark ? 0.15 : 0.06)
+                : (isDark ? AppColors.surfaceDarkMode : AppColors.surface),
             borderRadius: BorderRadius.circular(12),
+            border: isCheapest
+                ? Border.all(
+                    color: AppColors.primary.withValues(alpha: 0.4),
+                    width: 1.5,
+                  )
+                : null,
           ),
           child: Row(
           children: [
@@ -752,23 +816,49 @@ class _LiveProductDetailScreenState
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Retailer badge
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: retailerColor.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      match.retailer,
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                        color: retailerColor,
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: retailerColor.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          match.retailer,
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: retailerColor,
+                          ),
+                        ),
                       ),
-                    ),
+                      if (isCheapest) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text(
+                            'CHEAPEST',
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -802,12 +892,22 @@ class _LiveProductDetailScreenState
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: textColor,
+                    color: isCheapest ? AppColors.primary : textColor,
                   ),
                 ),
                 if (match.priceDifference != null) ...[
                   const SizedBox(height: 4),
                   _buildPriceDiffBadge(match),
+                ],
+                if (showSavings) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    '+R${savings.toStringAsFixed(2)}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppColors.error.withValues(alpha: 0.8),
+                    ),
+                  ),
                 ],
                 if (match.hasPromo && match.promotionPrice != null) ...[
                   const SizedBox(height: 4),
@@ -883,6 +983,93 @@ class _LiveProductDetailScreenState
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Styled collapsible section for similar/alternative matches.
+class _DetailCollapsibleSection extends StatefulWidget {
+  final String title;
+  final IconData icon;
+  final Color color;
+  final bool isDark;
+  final List<Widget> children;
+
+  const _DetailCollapsibleSection({
+    required this.title,
+    required this.icon,
+    required this.color,
+    required this.isDark,
+    required this.children,
+  });
+
+  @override
+  State<_DetailCollapsibleSection> createState() =>
+      _DetailCollapsibleSectionState();
+}
+
+class _DetailCollapsibleSectionState extends State<_DetailCollapsibleSection> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final borderColor = widget.isDark
+        ? Colors.grey.withValues(alpha: 0.2)
+        : Colors.grey.withValues(alpha: 0.15);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () => setState(() => _expanded = !_expanded),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: widget.color.withValues(alpha: widget.isDark ? 0.08 : 0.05),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: borderColor),
+            ),
+            child: Row(
+              children: [
+                Icon(widget.icon, size: 16, color: widget.color),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    widget.title,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: widget.isDark
+                          ? AppColors.textPrimaryDark
+                          : AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+                AnimatedRotation(
+                  turns: _expanded ? 0.5 : 0.0,
+                  duration: const Duration(milliseconds: 200),
+                  child: Icon(
+                    Icons.keyboard_arrow_down,
+                    size: 20,
+                    color: widget.color,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        AnimatedCrossFade(
+          firstChild: const SizedBox.shrink(),
+          secondChild: Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Column(children: widget.children),
+          ),
+          crossFadeState:
+              _expanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+          duration: const Duration(milliseconds: 200),
+        ),
+      ],
     );
   }
 }

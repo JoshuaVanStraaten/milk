@@ -10,6 +10,8 @@ import '../../data/services/live_api_service.dart';
 import '../../data/services/fallback_product_service.dart';
 import '../../data/services/live_product_image_resolver.dart';
 import '../../data/services/location_service.dart';
+import '../../data/services/smart_matching_service.dart';
+import 'recipe_provider.dart' show geminiServiceProvider;
 import 'theme_provider.dart'; // for sharedPreferencesProvider
 
 // =============================================================================
@@ -37,6 +39,12 @@ final fallbackProductServiceProvider = Provider<FallbackProductService>((ref) {
 /// Singleton [LocationService] instance.
 final locationServiceProvider = Provider<LocationService>((ref) {
   return LocationService();
+});
+
+/// Smart matching service — hybrid algorithm + AI product matching.
+final smartMatchingServiceProvider = Provider<SmartMatchingService>((ref) {
+  final gemini = ref.read(geminiServiceProvider);
+  return SmartMatchingService(gemini: gemini);
 });
 
 // =============================================================================

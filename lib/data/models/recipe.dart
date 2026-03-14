@@ -356,7 +356,13 @@ class RecipeIngredient {
     final unitStr = unit ?? '';
     final prepStr = preparation != null ? ', $preparation' : '';
 
-    return '$qtyStr$unitStr$prepStr'.trim();
+    // Add space before count-based units (e.g. "2 units" not "2units")
+    final sep = unitStr.isNotEmpty &&
+            !RegExp(r'^(g|kg|ml|l)$', caseSensitive: false).hasMatch(unitStr)
+        ? ' '
+        : '';
+
+    return '$qtyStr$sep$unitStr$prepStr'.trim();
   }
 
   /// Full display string (e.g., "500g Chicken Breast, diced")

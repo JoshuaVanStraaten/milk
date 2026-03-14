@@ -3,7 +3,7 @@
 // Cross-retailer price comparison sheet.
 // Opens when the user taps a product card in the Browse tab.
 // Searches all 4 retailers in parallel for the same product name
-// and displays matched results sorted by price.
+// and displays matched results categorized by match quality.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,7 +13,9 @@ import '../../../core/theme/app_colors.dart';
 import '../../../data/models/live_product.dart';
 import '../../../data/models/nearby_store.dart';
 import '../../../data/services/image_lookup_service.dart';
+import '../../../data/services/product_name_parser.dart';
 import '../../providers/store_provider.dart';
+import '../../widgets/products/add_to_list_sheet.dart';
 
 /// Show the comparison sheet as a modal bottom sheet.
 ///
@@ -96,23 +98,12 @@ class _CompareSheetState extends ConsumerState<CompareSheet> {
     }
   }
 
-  /// Build a clean search query from the product name.
-  /// Strips size/weight suffixes for better cross-retailer matching.
+  /// Build a clean search query using ProductNameParser.
+  /// Uses searchQuery (keeps brand + product words + size) instead of
+  /// normalizedName (which strips brand/size and is meant for Jaccard scoring).
   String _buildSearchQuery() {
-    var query = widget.product.name;
-    // Remove common size patterns like "2L", "500ml", "1kg", "6 x 330ml"
-    query = query.replaceAll(
-      RegExp(r'\d+\s*x\s*\d+\s*(ml|l|g|kg)\b', caseSensitive: false),
-      '',
-    );
-    query = query.replaceAll(
-      RegExp(r'\d+\.?\d*\s*(ml|l|g|kg|pack)\b', caseSensitive: false),
-      '',
-    );
-    query = query.trim();
-    // If stripping left us with very little, use the original
-    if (query.length < 3) query = widget.product.name;
-    return query;
+    final parsed = ProductNameParser.parse(widget.product.name);
+    return parsed.searchQuery;
   }
 
   /// Resolve Checkers/Shoprite images from the lookup cache.
@@ -190,6 +181,8 @@ class _CompareSheetState extends ConsumerState<CompareSheet> {
     final subtitleColor = isDark
         ? AppColors.textSecondaryDark
         : AppColors.textSecondary;
+    final config = Retailers.fromName(widget.product.retailer);
+    final retailerColor = config?.color ?? Colors.grey;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
@@ -215,7 +208,7 @@ class _CompareSheetState extends ConsumerState<CompareSheet> {
                 : const Icon(Icons.image_not_supported, size: 24),
           ),
           const SizedBox(width: 12),
-          // Product name + source retailer
+          // Product name + source retailer + price
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -231,9 +224,22 @@ class _CompareSheetState extends ConsumerState<CompareSheet> {
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 2),
-                Text(
-                  'Comparing prices across all stores',
-                  style: TextStyle(fontSize: 13, color: subtitleColor),
+                Row(
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: retailerColor,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${widget.product.retailer} · ${widget.product.price}',
+                      style: TextStyle(fontSize: 13, color: subtitleColor),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -288,71 +294,261 @@ class _CompareSheetState extends ConsumerState<CompareSheet> {
       );
     }
 
-    // Collect best match from each retailer and sort by price
-    final comparisons = <_ComparisonItem>[];
+    final subtitleColor = isDark
+        ? AppColors.textSecondaryDark
+        : AppColors.textSecondary;
 
-    for (final entry in _results!.entries) {
-      final retailer = entry.key;
-      final products = entry.value;
+    // Filter out source retailer — user already knows their product's price
+    final filteredResults = Map.of(_results!)
+      ..removeWhere((retailer, _) =>
+          retailer.toLowerCase() == widget.product.retailer.toLowerCase());
 
-      if (products.isEmpty) {
-        comparisons.add(
-          _ComparisonItem(retailer: retailer, product: null, matchQuality: 0),
-        );
-        continue;
-      }
-
-      // Find best match by name similarity
-      final bestMatch = _findBestMatch(products, widget.product.name);
-      comparisons.add(
-        _ComparisonItem(
-          retailer: retailer,
-          product: bestMatch,
-          matchQuality: _calculateSimilarity(
-            bestMatch.name.toLowerCase(),
-            widget.product.name.toLowerCase(),
-          ),
+    if (filteredResults.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.store, size: 48, color: subtitleColor),
+            const SizedBox(height: 12),
+            Text(
+              'No other retailers available to compare',
+              style: TextStyle(color: subtitleColor),
+              textAlign: TextAlign.center,
+            ),
+          ],
         ),
       );
     }
 
-    // Sort: available products first (by price), then unavailable
-    comparisons.sort((a, b) {
-      if (a.product == null && b.product == null) return 0;
-      if (a.product == null) return 1;
-      if (b.product == null) return -1;
-      return a.product!.priceNumeric.compareTo(b.product!.priceNumeric);
-    });
+    // Use SmartMatchingService for consistent matching across the app
+    final smartMatcher = ref.read(smartMatchingServiceProvider);
+    final result = smartMatcher.findMatchesAlgorithm(
+      sourceProduct: widget.product,
+      candidatesByRetailer: filteredResults,
+    );
 
-    // Find the cheapest for the savings badge
-    final cheapest = comparisons.where((c) => c.product != null).toList();
-    final cheapestPrice = cheapest.isNotEmpty
-        ? cheapest.first.product!.priceNumeric
+    // Flatten all matches across retailers, categorize by MatchType
+    final exactMatches = <ComparisonMatch>[];
+    final similarMatches = <ComparisonMatch>[];
+    final fallbackMatches = <ComparisonMatch>[];
+
+    for (final entry in result.allMatchesByRetailer.entries) {
+      for (final match in entry.value) {
+        switch (match.matchType) {
+          case MatchType.exact:
+            exactMatches.add(match);
+          case MatchType.similar:
+            similarMatches.add(match);
+          case MatchType.fallback:
+            fallbackMatches.add(match);
+        }
+      }
+    }
+
+    // Sort each category by price ascending
+    exactMatches.sort((a, b) => a.priceNumeric.compareTo(b.priceNumeric));
+    similarMatches.sort((a, b) => a.priceNumeric.compareTo(b.priceNumeric));
+    fallbackMatches.sort((a, b) => a.priceNumeric.compareTo(b.priceNumeric));
+
+    // Find cheapest exact match price for savings badge
+    final cheapestExactPrice = exactMatches.isNotEmpty
+        ? exactMatches.first.priceNumeric
         : 0.0;
 
-    return ListView.separated(
+    final hasExact = exactMatches.isNotEmpty;
+    final hasSimilar = similarMatches.isNotEmpty;
+    final hasFallback = fallbackMatches.isNotEmpty;
+
+    if (!hasExact && !hasSimilar && !hasFallback) {
+      return Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.search_off, size: 48, color: subtitleColor),
+            const SizedBox(height: 12),
+            Text(
+              'No matching products found at other retailers',
+              style: TextStyle(color: subtitleColor),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView(
       shrinkWrap: true,
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-      itemCount: comparisons.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
-      itemBuilder: (context, index) {
-        return _buildComparisonCard(
-          comparisons[index],
-          isDark,
-          isCheapest: index == 0 && comparisons[index].product != null,
-          cheapestPrice: cheapestPrice,
-        );
-      },
+      children: [
+        // Exact matches section — always prominent
+        if (hasExact) ...[
+          _buildSectionHeader(
+            'Best Matches',
+            Icons.check_circle,
+            AppColors.success,
+            exactMatches.length,
+            isDark,
+          ),
+          const SizedBox(height: 8),
+          ...exactMatches.asMap().entries.map((e) => Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: _buildMatchCard(
+              e.value,
+              isDark,
+              isCheapest: e.key == 0,
+              cheapestPrice: cheapestExactPrice,
+            ),
+          )),
+        ],
+
+        // Summary text when exact matches exist
+        if (hasExact && (hasSimilar || hasFallback))
+          Padding(
+            padding: const EdgeInsets.only(top: 4, bottom: 4),
+            child: Text(
+              '${exactMatches.length} best match${exactMatches.length == 1 ? '' : 'es'} found',
+              style: TextStyle(fontSize: 12, color: subtitleColor),
+            ),
+          ),
+
+        // No exact matches — show message
+        if (!hasExact) ...[
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, size: 16, color: subtitleColor),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'No exact matches found at other stores',
+                    style: TextStyle(fontSize: 13, color: subtitleColor),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+
+        // Similar matches
+        if (hasSimilar) ...[
+          if (hasExact)
+            // Collapsed when exact matches exist
+            _buildCollapsibleSection(
+              title: 'Similar Products (${similarMatches.length})',
+              icon: Icons.content_copy,
+              color: AppColors.secondary,
+              matches: similarMatches,
+              isDark: isDark,
+              initiallyExpanded: false,
+            )
+          else ...[
+            // Expanded when no exact matches
+            _buildSectionHeader(
+              'Similar Products',
+              Icons.content_copy,
+              AppColors.secondary,
+              similarMatches.length,
+              isDark,
+            ),
+            const SizedBox(height: 8),
+            ...similarMatches.map((m) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _buildMatchCard(m, isDark,
+                  isCheapest: false, cheapestPrice: 0),
+            )),
+          ],
+        ],
+
+        // Fallback/alternatives
+        if (hasFallback)
+          _buildCollapsibleSection(
+            title: 'Alternatives (${fallbackMatches.length})',
+            icon: Icons.category,
+            color: subtitleColor,
+            matches: fallbackMatches,
+            isDark: isDark,
+            initiallyExpanded: !hasExact && !hasSimilar,
+          ),
+      ],
     );
   }
 
-  Widget _buildComparisonCard(
-    _ComparisonItem item,
+  Widget _buildSectionHeader(
+    String title,
+    IconData icon,
+    Color color,
+    int count,
+    bool isDark,
+  ) {
+    final textColor = isDark
+        ? AppColors.textPrimaryDark
+        : AppColors.textPrimary;
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: color),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: textColor,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(
+            count.toString(),
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCollapsibleSection({
+    required String title,
+    required IconData icon,
+    required Color color,
+    required List<ComparisonMatch> matches,
+    required bool isDark,
+    required bool initiallyExpanded,
+  }) {
+    return _CollapsibleMatchSection(
+      title: title,
+      icon: icon,
+      color: color,
+      isDark: isDark,
+      initiallyExpanded: initiallyExpanded,
+      children: matches
+          .map((m) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _buildMatchCard(m, isDark,
+                    isCheapest: false, cheapestPrice: 0),
+              ))
+          .toList(),
+    );
+  }
+
+  Widget _buildMatchCard(
+    ComparisonMatch match,
     bool isDark, {
     required bool isCheapest,
     required double cheapestPrice,
   }) {
-    final config = Retailers.fromName(item.retailer);
+    final config = Retailers.fromName(match.retailer);
     final retailerColor = config?.color ?? Colors.grey;
     final cardColor = isDark ? AppColors.surfaceDarkMode : Colors.grey.shade50;
     final textColor = isDark
@@ -362,53 +558,36 @@ class _CompareSheetState extends ConsumerState<CompareSheet> {
         ? AppColors.textSecondaryDark
         : AppColors.textSecondary;
 
-    if (item.product == null) {
-      // No results for this retailer
-      return Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: cardColor,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.grey.withValues(alpha: 0.15)),
-        ),
-        child: Row(
-          children: [
-            _buildRetailerIcon(retailerColor, isDark),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.retailer,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      color: textColor,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Product not found',
-                    style: TextStyle(fontSize: 13, color: subtitleColor),
-                  ),
-                ],
-              ),
-            ),
-            Icon(
-              Icons.remove_circle_outline,
-              size: 20,
-              color: Colors.grey.withValues(alpha: 0.4),
-            ),
-          ],
-        ),
-      );
-    }
-
-    final product = item.product!;
-    final savings = product.priceNumeric - cheapestPrice;
+    final savings = cheapestPrice > 0
+        ? match.priceNumeric - cheapestPrice
+        : 0.0;
     final showSavings = !isCheapest && savings > 0.50;
 
-    return Container(
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: () {
+        double? specialPrice;
+        if (match.hasPromo && match.promotionPrice != null) {
+          specialPrice = double.tryParse(
+            match.promotionPrice!
+                .replaceAll('R', '')
+                .replaceAll(',', '')
+                .trim(),
+          );
+        }
+        showAddToListSheet(
+          context,
+          ref,
+          productName: match.name,
+          price: match.priceNumeric,
+          retailer: match.retailer,
+          specialPrice: specialPrice,
+          imageUrl: match.imageUrl,
+          priceDisplay: match.price,
+          multiBuyInfo: null,
+        );
+      },
+      child: Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: isCheapest
@@ -433,9 +612,9 @@ class _CompareSheetState extends ConsumerState<CompareSheet> {
               borderRadius: BorderRadius.circular(8),
             ),
             clipBehavior: Clip.antiAlias,
-            child: product.imageUrl != null
+            child: match.imageUrl != null
                 ? CachedNetworkImage(
-                    imageUrl: product.imageUrl!,
+                    imageUrl: match.imageUrl!,
                     fit: BoxFit.contain,
                     errorWidget: (_, __, ___) =>
                         _buildRetailerIcon(retailerColor, isDark),
@@ -444,7 +623,7 @@ class _CompareSheetState extends ConsumerState<CompareSheet> {
           ),
           const SizedBox(width: 12),
 
-          // Product name + retailer + store
+          // Product name + retailer
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -462,7 +641,7 @@ class _CompareSheetState extends ConsumerState<CompareSheet> {
                     const SizedBox(width: 6),
                     Flexible(
                       child: Text(
-                        item.retailer,
+                        match.retailer,
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
@@ -496,7 +675,7 @@ class _CompareSheetState extends ConsumerState<CompareSheet> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  product.name,
+                  match.name,
                   style: TextStyle(fontSize: 13, color: subtitleColor),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -510,9 +689,9 @@ class _CompareSheetState extends ConsumerState<CompareSheet> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              if (product.hasPromo) ...[
+              if (match.hasPromo && match.promotionPrice != null) ...[
                 Text(
-                  product.price,
+                  match.price,
                   style: TextStyle(
                     fontSize: 12,
                     color: subtitleColor,
@@ -520,7 +699,7 @@ class _CompareSheetState extends ConsumerState<CompareSheet> {
                   ),
                 ),
                 Text(
-                  product.promotionPrice,
+                  match.promotionPrice!,
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
@@ -529,7 +708,7 @@ class _CompareSheetState extends ConsumerState<CompareSheet> {
                 ),
               ] else
                 Text(
-                  product.price,
+                  match.price,
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
@@ -548,6 +727,7 @@ class _CompareSheetState extends ConsumerState<CompareSheet> {
           ),
         ],
       ),
+      ),
     );
   }
 
@@ -562,47 +742,99 @@ class _CompareSheetState extends ConsumerState<CompareSheet> {
       child: Icon(Icons.store, size: 18, color: retailerColor),
     );
   }
-
-  /// Find the best matching product by name similarity.
-  LiveProduct _findBestMatch(List<LiveProduct> products, String targetName) {
-    if (products.length == 1) return products.first;
-
-    final target = targetName.toLowerCase();
-    LiveProduct best = products.first;
-    double bestScore = 0;
-
-    for (final p in products) {
-      final score = _calculateSimilarity(p.name.toLowerCase(), target);
-      if (score > bestScore) {
-        bestScore = score;
-        best = p;
-      }
-    }
-
-    return best;
-  }
-
-  /// Word-overlap similarity score (0.0 to 1.0).
-  double _calculateSimilarity(String a, String b) {
-    final wordsA = a.split(RegExp(r'\s+')).toSet();
-    final wordsB = b.split(RegExp(r'\s+')).toSet();
-
-    if (wordsA.isEmpty || wordsB.isEmpty) return 0;
-
-    final overlap = wordsA.intersection(wordsB).length;
-    return overlap / wordsA.union(wordsB).length;
-  }
 }
 
-/// Internal model for sorting comparison results.
-class _ComparisonItem {
-  final String retailer;
-  final LiveProduct? product;
-  final double matchQuality;
+/// Styled collapsible section that looks like a tappable button when collapsed.
+class _CollapsibleMatchSection extends StatefulWidget {
+  final String title;
+  final IconData icon;
+  final Color color;
+  final bool isDark;
+  final bool initiallyExpanded;
+  final List<Widget> children;
 
-  _ComparisonItem({
-    required this.retailer,
-    this.product,
-    this.matchQuality = 0,
+  const _CollapsibleMatchSection({
+    required this.title,
+    required this.icon,
+    required this.color,
+    required this.isDark,
+    required this.initiallyExpanded,
+    required this.children,
   });
+
+  @override
+  State<_CollapsibleMatchSection> createState() =>
+      _CollapsibleMatchSectionState();
+}
+
+class _CollapsibleMatchSectionState extends State<_CollapsibleMatchSection> {
+  late bool _expanded;
+
+  @override
+  void initState() {
+    super.initState();
+    _expanded = widget.initiallyExpanded;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final borderColor = widget.isDark
+        ? Colors.grey.withValues(alpha: 0.2)
+        : Colors.grey.withValues(alpha: 0.15);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () => setState(() => _expanded = !_expanded),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: widget.color.withValues(alpha: widget.isDark ? 0.08 : 0.05),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: borderColor),
+            ),
+            child: Row(
+              children: [
+                Icon(widget.icon, size: 16, color: widget.color),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    widget.title,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: widget.isDark
+                          ? AppColors.textPrimaryDark
+                          : AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+                AnimatedRotation(
+                  turns: _expanded ? 0.5 : 0.0,
+                  duration: const Duration(milliseconds: 200),
+                  child: Icon(
+                    Icons.keyboard_arrow_down,
+                    size: 20,
+                    color: widget.color,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        AnimatedCrossFade(
+          firstChild: const SizedBox.shrink(),
+          secondChild: Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Column(children: widget.children),
+          ),
+          crossFadeState:
+              _expanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+          duration: const Duration(milliseconds: 200),
+        ),
+      ],
+    );
+  }
 }
