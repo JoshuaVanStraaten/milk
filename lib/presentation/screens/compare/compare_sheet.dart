@@ -14,6 +14,7 @@ import '../../../data/models/live_product.dart';
 import '../../../data/models/nearby_store.dart';
 import '../../../data/services/image_lookup_service.dart';
 import '../../../data/services/product_name_parser.dart';
+import '../../providers/list_provider.dart';
 import '../../providers/store_provider.dart';
 import '../../widgets/products/add_to_list_sheet.dart';
 
@@ -26,8 +27,10 @@ import '../../widgets/products/add_to_list_sheet.dart';
 void showCompareSheet(
   BuildContext context,
   WidgetRef ref,
-  LiveProduct product,
-) {
+  LiveProduct product, {
+  String? listId,
+  ScaffoldMessengerState? scaffoldMessenger,
+}) {
   final storeSelection = ref.read(storeSelectionProvider);
   final stores = storeSelection.value;
 
@@ -38,15 +41,28 @@ void showCompareSheet(
     isScrollControlled: true,
     useSafeArea: true,
     backgroundColor: Colors.transparent,
-    builder: (_) => CompareSheet(product: product, stores: stores),
+    builder: (_) => CompareSheet(
+      product: product,
+      stores: stores,
+      listId: listId,
+      scaffoldMessenger: scaffoldMessenger,
+    ),
   );
 }
 
 class CompareSheet extends ConsumerStatefulWidget {
   final LiveProduct product;
   final StoreSelection stores;
+  final String? listId;
+  final ScaffoldMessengerState? scaffoldMessenger;
 
-  const CompareSheet({super.key, required this.product, required this.stores});
+  const CompareSheet({
+    super.key,
+    required this.product,
+    required this.stores,
+    this.listId,
+    this.scaffoldMessenger,
+  });
 
   @override
   ConsumerState<CompareSheet> createState() => _CompareSheetState();
@@ -561,11 +577,18 @@ class _CompareSheetState extends ConsumerState<CompareSheet> {
     final savings = cheapestPrice > 0
         ? match.priceNumeric - cheapestPrice
         : 0.0;
-    final showSavings = !isCheapest && savings > 0.50;
 
-    return InkWell(
-      borderRadius: BorderRadius.circular(12),
-      onTap: () {
+    return _MatchCardTile(
+      match: match,
+      isDark: isDark,
+      isCheapest: isCheapest,
+      savings: savings,
+      cardColor: cardColor,
+      retailerColor: retailerColor,
+      textColor: textColor,
+      subtitleColor: subtitleColor,
+      retailerIcon: _buildRetailerIcon(retailerColor, isDark),
+      onTap: () async {
         double? specialPrice;
         if (match.hasPromo && match.promotionPrice != null) {
           specialPrice = double.tryParse(
@@ -575,159 +598,45 @@ class _CompareSheetState extends ConsumerState<CompareSheet> {
                 .trim(),
           );
         }
-        showAddToListSheet(
-          context,
-          ref,
-          productName: match.name,
-          price: match.priceNumeric,
-          retailer: match.retailer,
-          specialPrice: specialPrice,
-          imageUrl: match.imageUrl,
-          priceDisplay: match.price,
-          multiBuyInfo: null,
-        );
+
+        if (widget.listId != null) {
+          // Optimistic — close both sheets and show snackbar immediately
+          final nav = Navigator.of(context);
+          nav.pop();
+          nav.pop();
+          widget.scaffoldMessenger?.showSnackBar(
+            SnackBar(
+              content: Text('${match.name} added'),
+              backgroundColor: AppColors.primary,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              margin: const EdgeInsets.all(16),
+            ),
+          );
+          ref
+              .read(realtimeListItemsProvider(widget.listId!).notifier)
+              .addItem(
+                itemName: match.name,
+                itemPrice: match.priceNumeric,
+                itemRetailer: match.retailer,
+                itemSpecialPrice: specialPrice,
+              );
+        } else {
+          showAddToListSheet(
+            context,
+            ref,
+            productName: match.name,
+            price: match.priceNumeric,
+            retailer: match.retailer,
+            specialPrice: specialPrice,
+            imageUrl: match.imageUrl,
+            priceDisplay: match.price,
+            multiBuyInfo: null,
+          );
+        }
       },
-      child: Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: isCheapest
-            ? AppColors.primary.withValues(alpha: isDark ? 0.15 : 0.06)
-            : cardColor,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isCheapest
-              ? AppColors.primary.withValues(alpha: 0.4)
-              : Colors.grey.withValues(alpha: 0.15),
-          width: isCheapest ? 1.5 : 1,
-        ),
-      ),
-      child: Row(
-        children: [
-          // Product image
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: match.imageUrl != null
-                ? CachedNetworkImage(
-                    imageUrl: match.imageUrl!,
-                    fit: BoxFit.contain,
-                    errorWidget: (_, __, ___) =>
-                        _buildRetailerIcon(retailerColor, isDark),
-                  )
-                : _buildRetailerIcon(retailerColor, isDark),
-          ),
-          const SizedBox(width: 12),
-
-          // Product name + retailer
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: retailerColor,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Flexible(
-                      child: Text(
-                        match.retailer,
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: retailerColor,
-                        ),
-                      ),
-                    ),
-                    if (isCheapest) ...[
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: const Text(
-                          'CHEAPEST',
-                          style: TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  match.name,
-                  style: TextStyle(fontSize: 13, color: subtitleColor),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-
-          // Price column
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              if (match.hasPromo && match.promotionPrice != null) ...[
-                Text(
-                  match.price,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: subtitleColor,
-                    decoration: TextDecoration.lineThrough,
-                  ),
-                ),
-                Text(
-                  match.promotionPrice!,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: isCheapest ? AppColors.primary : AppColors.error,
-                  ),
-                ),
-              ] else
-                Text(
-                  match.price,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: isCheapest ? AppColors.primary : textColor,
-                  ),
-                ),
-              if (showSavings)
-                Text(
-                  '+R${savings.toStringAsFixed(2)}',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: AppColors.error.withValues(alpha: 0.8),
-                  ),
-                ),
-            ],
-          ),
-        ],
-      ),
-      ),
     );
   }
 
@@ -740,6 +649,228 @@ class _CompareSheetState extends ConsumerState<CompareSheet> {
         borderRadius: BorderRadius.circular(6),
       ),
       child: Icon(Icons.store, size: 18, color: retailerColor),
+    );
+  }
+}
+
+/// Animated match card — scales down on tap before calling onTap.
+class _MatchCardTile extends StatefulWidget {
+  final ComparisonMatch match;
+  final bool isDark;
+  final bool isCheapest;
+  final double savings;
+  final Color cardColor;
+  final Color retailerColor;
+  final Color textColor;
+  final Color subtitleColor;
+  final Widget retailerIcon;
+  final Future<void> Function() onTap;
+
+  const _MatchCardTile({
+    required this.match,
+    required this.isDark,
+    required this.isCheapest,
+    required this.savings,
+    required this.cardColor,
+    required this.retailerColor,
+    required this.textColor,
+    required this.subtitleColor,
+    required this.retailerIcon,
+    required this.onTap,
+  });
+
+  @override
+  State<_MatchCardTile> createState() => _MatchCardTileState();
+}
+
+class _MatchCardTileState extends State<_MatchCardTile>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 110),
+    );
+    _scale = Tween<double>(begin: 1.0, end: 0.95).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleTap() async {
+    await _controller.forward();
+    await _controller.reverse();
+    await widget.onTap();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final match = widget.match;
+    final isDark = widget.isDark;
+    final isCheapest = widget.isCheapest;
+    final showSavings = !isCheapest && widget.savings > 0.50;
+
+    return GestureDetector(
+      onTap: _handleTap,
+      child: ScaleTransition(
+        scale: _scale,
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: isCheapest
+                ? AppColors.primary.withValues(alpha: isDark ? 0.15 : 0.06)
+                : widget.cardColor,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isCheapest
+                  ? AppColors.primary.withValues(alpha: 0.4)
+                  : Colors.grey.withValues(alpha: 0.15),
+              width: isCheapest ? 1.5 : 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              // Product image
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: match.imageUrl != null
+                    ? CachedNetworkImage(
+                        imageUrl: match.imageUrl!,
+                        fit: BoxFit.contain,
+                        errorWidget: (_, __, ___) => widget.retailerIcon,
+                      )
+                    : widget.retailerIcon,
+              ),
+              const SizedBox(width: 12),
+
+              // Product name + retailer
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: widget.retailerColor,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            match.retailer,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: widget.retailerColor,
+                            ),
+                          ),
+                        ),
+                        if (isCheapest) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text(
+                              'CHEAPEST',
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      match.name,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: widget.subtitleColor,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+
+              // Price column
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  if (match.hasPromo && match.promotionPrice != null) ...[
+                    Text(
+                      match.price,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: widget.subtitleColor,
+                        decoration: TextDecoration.lineThrough,
+                      ),
+                    ),
+                    Text(
+                      match.promotionPrice!,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: isCheapest
+                            ? AppColors.primary
+                            : AppColors.error,
+                      ),
+                    ),
+                  ] else
+                    Text(
+                      match.price,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: isCheapest
+                            ? AppColors.primary
+                            : widget.textColor,
+                      ),
+                    ),
+                  if (showSavings)
+                    Text(
+                      '+R${widget.savings.toStringAsFixed(2)}',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppColors.error.withValues(alpha: 0.8),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

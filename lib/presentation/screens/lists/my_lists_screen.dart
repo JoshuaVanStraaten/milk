@@ -6,28 +6,114 @@ import '../../../core/theme/app_colors.dart';
 import '../../providers/list_provider.dart';
 import '../../widgets/skeleton_loaders.dart';
 import '../../widgets/animations.dart';
+import '../../widgets/common/app_snackbar.dart';
 import '../../widgets/common/empty_states.dart';
 
-class MyListsScreen extends ConsumerWidget {
+class MyListsScreen extends ConsumerStatefulWidget {
   const MyListsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MyListsScreen> createState() => _MyListsScreenState();
+}
+
+class _MyListsScreenState extends ConsumerState<MyListsScreen> {
+  final Set<String> _selectedIds = {};
+  bool get _isSelectionMode => _selectedIds.isNotEmpty;
+
+  void _exitSelectionMode() {
+    setState(() => _selectedIds.clear());
+  }
+
+  void _toggleSelection(String listId) {
+    setState(() {
+      if (_selectedIds.contains(listId)) {
+        _selectedIds.remove(listId);
+      } else {
+        _selectedIds.add(listId);
+      }
+    });
+    AppHaptics.lightTap();
+  }
+
+  void _enterSelectionMode(String listId) {
+    setState(() => _selectedIds.add(listId));
+    AppHaptics.lightTap();
+  }
+
+  Future<void> _confirmBulkDelete() async {
+    final count = _selectedIds.length;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Delete $count list${count > 1 ? 's' : ''}?'),
+        content: const Text('This cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    final idsToDelete = Set<String>.from(_selectedIds);
+    _exitSelectionMode();
+
+    for (final id in idsToDelete) {
+      await ref.read(listNotifierProvider.notifier).deleteList(id);
+    }
+
+    ref.invalidate(userListsProvider);
+
+    if (mounted) {
+      AppSnackbar.success(
+        context,
+        message: 'Deleted $count list${count > 1 ? 's' : ''}',
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final listsAsync = ref.watch(userListsProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('My Shopping Lists'),
+        title: _isSelectionMode
+            ? Text('${_selectedIds.length} selected')
+            : const Text('My Shopping Lists'),
         automaticallyImplyLeading: false,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () {
-              context.push('/lists/create');
-            },
-          ),
-        ],
+        leading: _isSelectionMode
+            ? IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: _exitSelectionMode,
+              )
+            : null,
+        backgroundColor: _isSelectionMode
+            ? AppColors.primary.withValues(alpha: 0.1)
+            : null,
+        actions: _isSelectionMode
+            ? [
+                IconButton(
+                  icon: const Icon(Icons.delete_outline),
+                  onPressed: _confirmBulkDelete,
+                  color: AppColors.error,
+                ),
+              ]
+            : [
+                IconButton(
+                  icon: const Icon(Icons.add),
+                  onPressed: () => context.push('/lists/create'),
+                ),
+              ],
       ),
       body: listsAsync.when(
         data: (lists) {
@@ -46,7 +132,14 @@ class MyListsScreen extends ConsumerWidget {
                 final list = lists[index];
                 return AnimatedListItem(
                   index: index,
-                  child: _ListCard(list: list),
+                  child: _ListCard(
+                    list: list,
+                    isSelected: _selectedIds.contains(list.shoppingListId),
+                    isSelectionMode: _isSelectionMode,
+                    onLongPress: () => _enterSelectionMode(list.shoppingListId),
+                    onToggleSelect: () =>
+                        _toggleSelection(list.shoppingListId),
+                  ),
                 );
               },
             ),
@@ -55,12 +148,12 @@ class MyListsScreen extends ConsumerWidget {
         loading: () => const ListCardsSkeleton(),
         error: (error, stack) => _buildErrorState(context, ref, error, isDark),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          context.push('/lists/create');
-        },
-        child: const Icon(Icons.add),
-      ),
+      floatingActionButton: _isSelectionMode
+          ? null
+          : FloatingActionButton(
+              onPressed: () => context.push('/lists/create'),
+              child: const Icon(Icons.add),
+            ),
     );
   }
 
@@ -120,8 +213,18 @@ class MyListsScreen extends ConsumerWidget {
 
 class _ListCard extends ConsumerWidget {
   final dynamic list;
+  final bool isSelected;
+  final bool isSelectionMode;
+  final VoidCallback onLongPress;
+  final VoidCallback onToggleSelect;
 
-  const _ListCard({required this.list});
+  const _ListCard({
+    required this.list,
+    required this.isSelected,
+    required this.isSelectionMode,
+    required this.onLongPress,
+    required this.onToggleSelect,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -133,11 +236,19 @@ class _ListCard extends ConsumerWidget {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
+      color: isSelected
+          ? AppColors.primary.withValues(alpha: isDark ? 0.2 : 0.08)
+          : null,
       child: InkWell(
         onTap: () {
-          AppHaptics.lightTap();
-          context.push('/lists/${list.shoppingListId}');
+          if (isSelectionMode) {
+            onToggleSelect();
+          } else {
+            AppHaptics.lightTap();
+            context.push('/lists/${list.shoppingListId}');
+          }
         },
+        onLongPress: isSelectionMode ? null : onLongPress,
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(16.0),
@@ -193,14 +304,24 @@ class _ListCard extends ConsumerWidget {
                 ),
               ),
 
-              // Arrow icon
-              Icon(
-                Icons.arrow_forward_ios,
-                size: 16,
-                color: isDark
-                    ? AppColors.textSecondaryDark
-                    : AppColors.textSecondary,
-              ),
+              // Selection indicator or arrow
+              if (isSelectionMode)
+                Icon(
+                  isSelected ? Icons.check_circle : Icons.circle_outlined,
+                  color: isSelected
+                      ? AppColors.primary
+                      : (isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondary),
+                )
+              else
+                Icon(
+                  Icons.arrow_forward_ios,
+                  size: 16,
+                  color: isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondary,
+                ),
             ],
           ),
         ),

@@ -1,14 +1,20 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/constants/retailers.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/list_item.dart';
+import '../../../data/models/live_product.dart';
 import '../../providers/list_provider.dart';
+import '../../providers/store_provider.dart';
 import '../../widgets/skeleton_loaders.dart';
 import '../../widgets/animations.dart';
 import '../../widgets/common/app_snackbar.dart';
 import '../../widgets/common/empty_states.dart';
+import '../compare/compare_sheet.dart';
 
 class ListDetailScreen extends ConsumerStatefulWidget {
   final String listId;
@@ -344,10 +350,18 @@ class _ListDetailScreenState extends ConsumerState<ListDetailScreen> {
   }
 
   void _showAddItemDialog(BuildContext context) {
+    final outerContext = context;
+    final messenger = ScaffoldMessenger.of(context);
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (context) => _AddItemSheet(listId: widget.listId),
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _AddItemTabbedSheet(
+        listId: widget.listId,
+        outerContext: outerContext,
+        scaffoldMessenger: messenger,
+      ),
     );
   }
 
@@ -1144,24 +1158,128 @@ class _EditItemSheetState extends ConsumerState<_EditItemSheet> {
   }
 }
 
-/// Bottom sheet for adding a new custom item
-class _AddItemSheet extends ConsumerStatefulWidget {
+/// Tabbed bottom sheet for adding items — Manual entry or Browse products
+class _AddItemTabbedSheet extends ConsumerStatefulWidget {
   final String listId;
+  final BuildContext outerContext;
+  final ScaffoldMessengerState scaffoldMessenger;
 
-  const _AddItemSheet({required this.listId});
+  const _AddItemTabbedSheet({
+    required this.listId,
+    required this.outerContext,
+    required this.scaffoldMessenger,
+  });
 
   @override
-  ConsumerState<_AddItemSheet> createState() => _AddItemSheetState();
+  ConsumerState<_AddItemTabbedSheet> createState() =>
+      _AddItemTabbedSheetState();
 }
 
-class _AddItemSheetState extends ConsumerState<_AddItemSheet> {
+class _AddItemTabbedSheetState extends ConsumerState<_AddItemTabbedSheet>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.9,
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.surfaceDarkMode : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        children: [
+          // Drag handle
+          Padding(
+            padding: const EdgeInsets.only(top: 12, bottom: 8),
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.3)
+                    : Colors.black.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+
+          // Tab bar
+          TabBar(
+            controller: _tabController,
+            labelColor: AppColors.primary,
+            unselectedLabelColor: isDark
+                ? AppColors.textSecondaryDark
+                : AppColors.textSecondary,
+            indicatorColor: AppColors.primary,
+            tabs: const [
+              Tab(icon: Icon(Icons.edit_note), text: 'Manual'),
+              Tab(icon: Icon(Icons.search), text: 'Browse'),
+            ],
+          ),
+
+          const Divider(height: 1),
+
+          // Tab content
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _ManualAddTab(
+                  listId: widget.listId,
+                  outerContext: widget.outerContext,
+                  scaffoldMessenger: widget.scaffoldMessenger,
+                ),
+                _BrowseAddTab(
+                  listId: widget.listId,
+                  outerContext: widget.outerContext,
+                  scaffoldMessenger: widget.scaffoldMessenger,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Manual item entry tab (preserved from original _AddItemSheet)
+class _ManualAddTab extends ConsumerStatefulWidget {
+  final String listId;
+  final BuildContext outerContext;
+  final ScaffoldMessengerState scaffoldMessenger;
+
+  const _ManualAddTab({
+    required this.listId,
+    required this.outerContext,
+    required this.scaffoldMessenger,
+  });
+
+  @override
+  ConsumerState<_ManualAddTab> createState() => _ManualAddTabState();
+}
+
+class _ManualAddTabState extends ConsumerState<_ManualAddTab> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _priceController = TextEditingController();
   final _quantityController = TextEditingController(text: '1');
   final _noteController = TextEditingController();
-  bool _isLoading = false;
-
   @override
   void dispose() {
     _nameController.dispose();
@@ -1174,34 +1292,37 @@ class _AddItemSheetState extends ConsumerState<_AddItemSheet> {
   Future<void> _handleAddItem() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() => _isLoading = true);
+    // Optimistic — close and show snackbar immediately, add in background
+    final itemName = _nameController.text.trim();
+    final itemPrice = double.parse(_priceController.text);
+    final itemQty = double.parse(_quantityController.text);
+    final itemNote = _noteController.text.trim().isEmpty
+        ? null
+        : _noteController.text.trim();
 
-    // Use realtime provider for adding
-    final item = await ref
+    Navigator.of(widget.outerContext).pop();
+    widget.scaffoldMessenger.showSnackBar(
+      SnackBar(
+        content: Text('$itemName added'),
+        backgroundColor: AppColors.primary,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
+      ),
+    );
+
+    ref
         .read(realtimeListItemsProvider(widget.listId).notifier)
         .addItem(
-          itemName: _nameController.text.trim(),
-          itemPrice: double.parse(_priceController.text),
-          itemQuantity: double.parse(_quantityController.text),
-          itemNote: _noteController.text.trim().isEmpty
-              ? null
-              : _noteController.text.trim(),
-        );
-
-    setState(() => _isLoading = false);
-
-    if (mounted && item != null) {
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Added ${item.itemName}'),
-          backgroundColor: AppColors.success,
-        ),
-      );
-      // Refresh the list to update total
+          itemName: itemName,
+          itemPrice: itemPrice,
+          itemQuantity: itemQty,
+          itemNote: itemNote,
+        )
+        .then((_) {
       ref.invalidate(listByIdProvider(widget.listId));
       ref.invalidate(userListsProvider);
-    }
+    });
   }
 
   @override
@@ -1296,22 +1417,583 @@ class _AddItemSheetState extends ConsumerState<_AddItemSheet> {
               const SizedBox(height: 24),
 
               ElevatedButton(
-                onPressed: _isLoading ? null : _handleAddItem,
+                onPressed: _handleAddItem,
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
-                child: _isLoading
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text('Add to List', style: TextStyle(fontSize: 16)),
+                child: const Text('Add to List', style: TextStyle(fontSize: 16)),
               ),
 
               const SizedBox(height: 16),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Browse products tab — search live products and add to list
+class _BrowseAddTab extends ConsumerStatefulWidget {
+  final String listId;
+  final BuildContext outerContext;
+  final ScaffoldMessengerState scaffoldMessenger;
+
+  const _BrowseAddTab({
+    required this.listId,
+    required this.outerContext,
+    required this.scaffoldMessenger,
+  });
+
+  @override
+  ConsumerState<_BrowseAddTab> createState() => _BrowseAddTabState();
+}
+
+class _BrowseAddTabState extends ConsumerState<_BrowseAddTab> {
+  final _searchController = TextEditingController();
+  Timer? _debounce;
+  String _selectedRetailer = '';
+  List<LiveProduct>? _results;
+  bool _searching = false;
+  String? _error;
+  final Set<String> _addedProductNames = {};
+
+  @override
+  void initState() {
+    super.initState();
+    // Default to the globally selected retailer
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        setState(() {
+          _selectedRetailer = ref.read(selectedRetailerProvider);
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _debounce?.cancel();
+    super.dispose();
+  }
+
+  void _onSearchChanged(String query) {
+    _debounce?.cancel();
+    if (query.trim().isEmpty) {
+      setState(() {
+        _results = null;
+        _searching = false;
+        _error = null;
+      });
+      return;
+    }
+    _debounce = Timer(const Duration(milliseconds: 500), () {
+      _performSearch(query.trim());
+    });
+  }
+
+  Future<void> _performSearch(String query) async {
+    final storeAsync = ref.read(storeSelectionProvider);
+    final selection = storeAsync.value;
+    if (selection == null) return;
+
+    final store = selection.forRetailer(_selectedRetailer);
+    if (store == null) {
+      setState(() => _error = 'No store found for $_selectedRetailer');
+      return;
+    }
+
+    setState(() {
+      _searching = true;
+      _error = null;
+    });
+
+    try {
+      final service = ref.read(fallbackProductServiceProvider);
+      final response = await service.searchProducts(
+        retailer: _selectedRetailer,
+        store: store,
+        query: query,
+      );
+
+      final products = response.products;
+
+      if (mounted) {
+        setState(() {
+          _results = products;
+          _searching = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = 'Search failed. Please try again.';
+          _searching = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _addProductToList(LiveProduct product) async {
+    double regularPrice = product.priceNumeric;
+    double? specialPrice;
+    Map<String, double>? multiBuyInfo;
+
+    if (product.hasPromo) {
+      multiBuyInfo = product.multiBuyInfo;
+      if (multiBuyInfo != null) {
+        specialPrice = multiBuyInfo['pricePerItem'];
+      } else {
+        final parsed = double.tryParse(
+          product.promotionPrice
+              .replaceAll('R', '')
+              .replaceAll(',', '')
+              .trim(),
+        );
+        specialPrice = parsed ?? regularPrice;
+      }
+    }
+
+    // Optimistic — close and show snackbar immediately, add in background
+    Navigator.of(widget.outerContext).pop();
+    widget.scaffoldMessenger.showSnackBar(
+      SnackBar(
+        content: Text('${product.name} added'),
+        backgroundColor: AppColors.primary,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
+      ),
+    );
+
+    ref
+        .read(realtimeListItemsProvider(widget.listId).notifier)
+        .addItem(
+          itemName: product.name,
+          itemPrice: regularPrice,
+          itemRetailer: product.retailer,
+          itemSpecialPrice: specialPrice,
+          multiBuyInfo: multiBuyInfo,
+        )
+        .then((_) {
+      ref.invalidate(listByIdProvider(widget.listId));
+      ref.invalidate(userListsProvider);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Column(
+      children: [
+        // Retailer chips
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: SizedBox(
+            height: 36,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              children: Retailers.names.map((name) {
+                final config = Retailers.fromName(name)!;
+                final isSelected = name == _selectedRetailer;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ChoiceChip(
+                    label: Text(name),
+                    selected: isSelected,
+                    selectedColor: config.color.withValues(alpha: 0.2),
+                    labelStyle: TextStyle(
+                      color: isSelected
+                          ? config.color
+                          : (isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textSecondary),
+                      fontWeight:
+                          isSelected ? FontWeight.w600 : FontWeight.normal,
+                      fontSize: 13,
+                    ),
+                    side: isSelected
+                        ? BorderSide(color: config.color)
+                        : null,
+                    onSelected: (_) {
+                      setState(() {
+                        _selectedRetailer = name;
+                        _results = null;
+                        _error = null;
+                        _addedProductNames.clear();
+                      });
+                      if (_searchController.text.trim().isNotEmpty) {
+                        _performSearch(_searchController.text.trim());
+                      }
+                    },
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ),
+
+        // Search field
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: TextField(
+            controller: _searchController,
+            onChanged: _onSearchChanged,
+            decoration: InputDecoration(
+              hintText: 'Search products...',
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: _searchController.text.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: () {
+                        _searchController.clear();
+                        setState(() {
+                          _results = null;
+                          _error = null;
+                        });
+                      },
+                    )
+                  : null,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              contentPadding: const EdgeInsets.symmetric(vertical: 12),
+            ),
+            textInputAction: TextInputAction.search,
+          ),
+        ),
+
+        const SizedBox(height: 12),
+
+        // Results
+        Expanded(child: _buildResults(isDark)),
+      ],
+    );
+  }
+
+  Widget _buildResults(bool isDark) {
+    if (_searching) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_error != null) {
+      return Center(
+        child: Text(
+          _error!,
+          style: TextStyle(
+            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+          ),
+        ),
+      );
+    }
+
+    if (_results == null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.search,
+              size: 48,
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondary,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Search for products to add',
+              style: TextStyle(
+                fontSize: 16,
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_results!.isEmpty) {
+      return Center(
+        child: Text(
+          'No products found',
+          style: TextStyle(
+            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+          ),
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      itemCount: _results!.length,
+      itemBuilder: (context, index) {
+        final product = _results![index];
+        final wasAdded = _addedProductNames.contains(product.name);
+        return _BrowseProductRow(
+          product: product,
+          isDark: isDark,
+          wasAdded: wasAdded,
+          onAdd: () => _addProductToList(product),
+          onCompare: () => showCompareSheet(
+            widget.outerContext,
+            ref,
+            product,
+            listId: widget.listId,
+            scaffoldMessenger: widget.scaffoldMessenger,
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Compact product row for browse-add results
+class _BrowseProductRow extends StatefulWidget {
+  final LiveProduct product;
+  final bool isDark;
+  final bool wasAdded;
+  final VoidCallback onAdd;
+  final VoidCallback onCompare;
+
+  const _BrowseProductRow({
+    required this.product,
+    required this.isDark,
+    required this.wasAdded,
+    required this.onAdd,
+    required this.onCompare,
+  });
+
+  @override
+  State<_BrowseProductRow> createState() => _BrowseProductRowState();
+}
+
+class _BrowseProductRowState extends State<_BrowseProductRow>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _addAnimController;
+  late Animation<double> _addScale;
+  bool _tapped = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _addAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 120),
+    );
+    _addScale = Tween<double>(begin: 1.0, end: 0.72).animate(
+      CurvedAnimation(parent: _addAnimController, curve: Curves.easeOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _addAnimController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleAddTap() async {
+    if (_tapped) return;
+    setState(() => _tapped = true);
+    await _addAnimController.forward();
+    await _addAnimController.reverse();
+    widget.onAdd();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasPromo = widget.product.hasPromo;
+    final isDark = widget.isDark;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: Row(
+          children: [
+            // Product image
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                width: 48,
+                height: 48,
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.1)
+                    : Colors.grey.withValues(alpha: 0.1),
+                child: (widget.product.imageUrl?.isNotEmpty ?? false)
+                    ? Image.network(
+                        widget.product.imageUrl!,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => Icon(
+                          Icons.image_not_supported_outlined,
+                          size: 24,
+                          color: isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textSecondary,
+                        ),
+                      )
+                    : Icon(
+                        Icons.shopping_basket_outlined,
+                        size: 24,
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondary,
+                      ),
+              ),
+            ),
+
+            const SizedBox(width: 12),
+
+            // Product info
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.product.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: isDark
+                          ? AppColors.textPrimaryDark
+                          : AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      if (hasPromo) ...[
+                        Flexible(
+                          child: Text(
+                            widget.product.price,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isDark
+                                  ? AppColors.textSecondaryDark
+                                  : AppColors.textSecondary,
+                              decoration: TextDecoration.lineThrough,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            widget.product.promotionPrice,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.error,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 1,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.error.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text(
+                            'SALE',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.error,
+                            ),
+                          ),
+                        ),
+                      ] else
+                        Flexible(
+                          child: Text(
+                            widget.product.price,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: isDark
+                                  ? AppColors.textPrimaryDark
+                                  : AppColors.textPrimary,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(width: 8),
+
+            // Compare + Add buttons
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Compare button
+                InkWell(
+                  onTap: widget.onCompare,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      border: Border.all(color: AppColors.primary),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.compare_arrows,
+                      color: AppColors.primary,
+                      size: 18,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                // Add button
+                widget.wasAdded
+                    ? Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: AppColors.success.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Icons.check,
+                          color: AppColors.success,
+                          size: 20,
+                        ),
+                      )
+                    : GestureDetector(
+                        onTap: _handleAddTap,
+                        child: ScaleTransition(
+                          scale: _addScale,
+                          child: Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: AppColors.primary,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(
+                              Icons.add_rounded,
+                              color: Colors.white,
+                              size: 20,
+                            ),
+                          ),
+                        ),
+                      ),
+              ],
+            ),
+          ],
         ),
       ),
     );
