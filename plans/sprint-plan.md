@@ -192,6 +192,16 @@ Frozen | Food Cupboard | Snacks | Beverages
 - **Approach:** Render `dealsByRetailer` map as retailer-grouped sections with colored headers via `Retailers.fromName()`
 - **Status:** Deferred to Sprint 11 polish pass
 
+**4e. Compact browse header** ✅
+
+- Merged retailer chip bar + store info bar into a single AppBar button (`_StoreAppBarButton`)
+- Button shows retailer icon (colored circle) + retailer name + store branch + chevron-down
+- Tap opens existing `StorePickerSheet` (handles both retailer + store switching)
+- Search moved to hero position (first element in body)
+- AppBar gets subtle retailer brand color tint
+- Header height reduced ~36% (~170px → ~108px)
+- **File:** `lib/presentation/screens/products/live_browse_screen.dart`
+
 ---
 
 ### Sprint 5: List Management Enhancements
