@@ -13,8 +13,6 @@ import '../../../core/theme/app_colors.dart';
 import '../../../data/models/nearby_store.dart';
 import '../../../data/models/live_product.dart';
 import '../../providers/store_provider.dart';
-import '../../widgets/common/retailer_selector.dart';
-import '../../widgets/products/store_info_bar.dart';
 import '../../widgets/products/live_product_card.dart';
 import '../../widgets/common/empty_states.dart';
 import '../../widgets/skeleton_loaders.dart';
@@ -257,6 +255,7 @@ class _LiveBrowseScreenState extends ConsumerState<LiveBrowseScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final selectedRetailer = ref.watch(selectedRetailerProvider);
     final storeState = ref.watch(storeSelectionProvider);
+    final retailerConfig = Retailers.fromName(selectedRetailer);
 
     NearbyStore? currentStore;
     storeState.whenData((selection) {
@@ -265,8 +264,16 @@ class _LiveBrowseScreenState extends ConsumerState<LiveBrowseScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Browse'),
+        titleSpacing: 12,
         automaticallyImplyLeading: false,
+        backgroundColor: isDark
+            ? retailerConfig?.color.withValues(alpha: 0.08)
+            : retailerConfig?.colorLight.withValues(alpha: 0.3),
+        title: _StoreAppBarButton(
+          retailerConfig: retailerConfig,
+          currentStore: currentStore,
+          onTap: () => _showStorePickerSheet(context),
+        ),
         actions: [
           // Filter icon with badge dot when filters are active
           Stack(
@@ -296,11 +303,8 @@ class _LiveBrowseScreenState extends ConsumerState<LiveBrowseScreen> {
       ),
       body: Column(
         children: [
-          // Retailer chip bar
-          RetailerSelector(
-            selectedRetailer: selectedRetailer,
-            onSelected: _onRetailerChanged,
-          ),
+          // Search bar (hero element — first in body)
+          _buildSearchBar(isDark),
 
           // Category chip bar (hidden while searching)
           if (!_isSearching)
@@ -309,18 +313,6 @@ class _LiveBrowseScreenState extends ConsumerState<LiveBrowseScreen> {
               selectedCategory: _selectedCategory,
               onSelected: _onCategorySelected,
             ),
-
-          // Store info bar
-          if (currentStore != null)
-            StoreInfoBar(
-              store: currentStore!,
-              onTap: () => _showStorePickerSheet(context),
-            ),
-
-          const SizedBox(height: 4),
-
-          // Search bar
-          _buildSearchBar(isDark),
 
           // Active filter chips summary (compact, dismissible)
           if (_hasActiveFilters && !_isSearching)
@@ -544,6 +536,90 @@ class _LiveBrowseScreenState extends ConsumerState<LiveBrowseScreen> {
       customMessage: 'Failed to load products. Pull down to retry.',
       actionLabel: 'Retry',
       onAction: () => _loadProductsForCurrentRetailer(refresh: true),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+// Store / retailer button for AppBar
+// ─────────────────────────────────────────────
+
+class _StoreAppBarButton extends StatelessWidget {
+  final RetailerConfig? retailerConfig;
+  final NearbyStore? currentStore;
+  final VoidCallback onTap;
+
+  const _StoreAppBarButton({
+    required this.retailerConfig,
+    required this.currentStore,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final color = retailerConfig?.color ?? AppColors.primary;
+    final name = retailerConfig?.name ?? 'Select Store';
+    final branch = currentStore?.storeName ?? 'Tap to choose';
+
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Retailer icon in colored circle
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              retailerConfig?.icon ?? Icons.store,
+              size: 18,
+              color: color,
+            ),
+          ),
+          const SizedBox(width: 10),
+          // Retailer name + store branch
+          Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  name,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  branch,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w400,
+                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 4),
+          Icon(
+            Icons.keyboard_arrow_down_rounded,
+            size: 20,
+            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+          ),
+        ],
+      ),
     );
   }
 }
