@@ -12,6 +12,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../data/models/nearby_store.dart';
 import '../../../data/services/location_service.dart';
 import '../../providers/store_provider.dart';
+import '../../widgets/common/address_search_field.dart';
 
 class StoreSelectionScreen extends ConsumerStatefulWidget {
   const StoreSelectionScreen({super.key});
@@ -25,6 +26,9 @@ class _StoreSelectionScreenState extends ConsumerState<StoreSelectionScreen> {
   bool _locating = true;
   String? _locationError;
   String? _selectedRetailer;
+
+  // Address input fallback (shown when GPS fails)
+  bool _useAddressMode = false;
 
   @override
   void initState() {
@@ -101,6 +105,20 @@ class _StoreSelectionScreenState extends ConsumerState<StoreSelectionScreen> {
           _locationError = 'Something went wrong: $e';
         });
       }
+    }
+  }
+
+  Future<void> _fetchFromCoords(double lat, double lng) async {
+    await ref
+        .read(storeSelectionProvider.notifier)
+        .fetchNearbyStores(lat, lng);
+
+    if (mounted) {
+      setState(() {
+        _locating = false;
+        _locationError = null;
+        _useAddressMode = false;
+      });
     }
   }
 
@@ -247,43 +265,69 @@ class _StoreSelectionScreenState extends ConsumerState<StoreSelectionScreen> {
 
   Widget _buildErrorState(bool isDark) {
     return Expanded(
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.location_off,
-              size: 56,
-              color: isDark
-                  ? AppColors.textSecondaryDark
-                  : AppColors.textSecondary,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              _locationError ?? 'Unknown error',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.location_off,
+                size: 56,
                 color: isDark
                     ? AppColors.textSecondaryDark
                     : AppColors.textSecondary,
-                height: 1.5,
               ),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: _fetchLocation,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Try Again'),
-            ),
-            const SizedBox(height: 12),
-            TextButton(
-              onPressed: () async {
-                await Geolocator.openAppSettings();
-              },
-              child: const Text('Open App Settings'),
-            ),
-          ],
+              const SizedBox(height: 16),
+              Text(
+                _locationError ?? 'Unknown error',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondary,
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: _fetchLocation,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Try Again'),
+              ),
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: () async {
+                  await Geolocator.openAppSettings();
+                },
+                child: const Text('Open App Settings'),
+              ),
+
+              // Address fallback
+              const SizedBox(height: 8),
+              TextButton.icon(
+                onPressed: () => setState(() {
+                  _useAddressMode = !_useAddressMode;
+                }),
+                icon: Icon(
+                  _useAddressMode ? Icons.keyboard_arrow_up : Icons.edit_location_alt_outlined,
+                  size: 18,
+                ),
+                label: Text(
+                  _useAddressMode ? 'Hide address input' : "Can't use GPS? Enter an address instead",
+                ),
+              ),
+
+              if (_useAddressMode) ...[
+                const SizedBox(height: 12),
+                AddressSearchField(
+                  autofocus: true,
+                  onSubmit: (result) => _fetchFromCoords(result.lat, result.lng),
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );

@@ -1,6 +1,7 @@
 // lib/data/services/location_service.dart
 
 import 'dart:async';
+import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:logger/logger.dart';
 
@@ -127,6 +128,29 @@ class LocationService {
     } catch (e) {
       _logger.e('Failed to get position: $e');
       rethrow;
+    }
+  }
+
+  /// Geocode a human-readable address string to lat/lng coordinates.
+  ///
+  /// Returns a record `({double lat, double lng})` on success, or `null`
+  /// if the address could not be resolved (not found, network error, etc.).
+  Future<({double lat, double lng})?> geocodeAddress(String address) async {
+    try {
+      final locations = await locationFromAddress(address);
+      if (locations.isEmpty) return null;
+      final first = locations.first;
+      _logger.i(
+        'Geocoded "$address" → (${first.latitude.toStringAsFixed(4)}, '
+        '${first.longitude.toStringAsFixed(4)})',
+      );
+      return (lat: first.latitude, lng: first.longitude);
+    } on NoResultFoundException {
+      _logger.w('No geocoding result for: "$address"');
+      return null;
+    } catch (e) {
+      _logger.e('Geocoding failed for "$address": $e');
+      return null;
     }
   }
 

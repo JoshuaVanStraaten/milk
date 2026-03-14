@@ -10,7 +10,9 @@ import '../../../core/constants/retailers.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/nearby_store.dart';
 import '../../../data/services/location_service.dart';
+import '../../providers/saved_locations_provider.dart';
 import '../../providers/store_provider.dart';
+import '../common/address_search_field.dart';
 
 class StorePickerSheet extends ConsumerStatefulWidget {
   final StoreSelection stores;
@@ -33,6 +35,8 @@ class _StorePickerSheetState extends ConsumerState<StorePickerSheet>
   bool _isRefreshing = false;
   late AnimationController _animController;
 
+  bool _showAddressField = false;
+
   @override
   void initState() {
     super.initState();
@@ -46,6 +50,23 @@ class _StorePickerSheetState extends ConsumerState<StorePickerSheet>
   void dispose() {
     _animController.dispose();
     super.dispose();
+  }
+
+  Future<void> _fetchFromCoords(double lat, double lng) async {
+    await ref
+        .read(storeSelectionProvider.notifier)
+        .fetchNearbyStores(lat, lng);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Stores updated to entered address'),
+          backgroundColor: AppColors.success,
+          duration: Duration(seconds: 2),
+        ),
+      );
+      Navigator.pop(context);
+    }
   }
 
   Future<void> _refreshLocation() async {
@@ -96,10 +117,11 @@ class _StorePickerSheetState extends ConsumerState<StorePickerSheet>
     final bottomPad = MediaQuery.of(context).padding.bottom;
     final retailers = Retailers.all.values.toList();
 
+    final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
+    final maxHeight = MediaQuery.of(context).size.height * 0.9;
+
     return Container(
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.65,
-      ),
+      constraints: BoxConstraints(maxHeight: maxHeight),
       decoration: BoxDecoration(
         color: isDark ? AppColors.backgroundDark : Colors.white,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
@@ -107,20 +129,30 @@ class _StorePickerSheetState extends ConsumerState<StorePickerSheet>
       child: SingleChildScrollView(
         physics: const ClampingScrollPhysics(),
         child: Padding(
-          padding: EdgeInsets.only(bottom: bottomPad > 0 ? bottomPad : 12),
+          padding: EdgeInsets.only(
+            bottom: keyboardHeight > 0 ? keyboardHeight + 12 : (bottomPad > 0 ? bottomPad : 12),
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // ── Handle ──
-              Container(
-                margin: const EdgeInsets.only(top: 12, bottom: 16),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? AppColors.textDisabledDark
-                      : AppColors.textDisabled,
-                  borderRadius: BorderRadius.circular(2),
+              // ── Handle (tap to dismiss) ──
+              GestureDetector(
+                onTap: () => Navigator.pop(context),
+                behavior: HitTestBehavior.opaque,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(0, 12, 0, 16),
+                  child: Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? AppColors.textDisabledDark
+                            : AppColors.textDisabled,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
                 ),
               ),
 
@@ -270,6 +302,145 @@ class _StorePickerSheetState extends ConsumerState<StorePickerSheet>
                   ),
                 ),
               ),
+
+              // ── Change location toggle ──
+              const SizedBox(height: 6),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Material(
+                  color: isDark ? AppColors.surfaceDarkMode : AppColors.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  child: InkWell(
+                    onTap: () => setState(() {
+                      _showAddressField = !_showAddressField;
+                    }),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isDark ? AppColors.dividerDark : AppColors.divider,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.location_on_outlined,
+                            size: 16,
+                            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Use a different address',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Icon(
+                            _showAddressField ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                            size: 16,
+                            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              if (_showAddressField) ...[
+                // ── Saved locations (compact rows) ──
+                Builder(builder: (context) {
+                  final savedLocations = ref.watch(savedLocationsProvider);
+                  if (savedLocations.isEmpty) return const SizedBox.shrink();
+
+                  IconData iconFor(String id) {
+                    if (id == 'home') return Icons.home_outlined;
+                    if (id == 'work') return Icons.work_outline;
+                    return Icons.location_on_outlined;
+                  }
+
+                  return Padding(
+                    padding: const EdgeInsets.only(left: 16, right: 16, top: 10),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: savedLocations.map((loc) {
+                        return InkWell(
+                          onTap: () => _fetchFromCoords(loc.latitude, loc.longitude),
+                          borderRadius: BorderRadius.circular(8),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  iconFor(loc.id),
+                                  size: 18,
+                                  color: AppColors.primary,
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    loc.label,
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                      color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+                                    ),
+                                  ),
+                                ),
+                                Icon(
+                                  Icons.arrow_forward_ios,
+                                  size: 12,
+                                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  );
+                }),
+
+                // ── Divider + search field ──
+                Builder(builder: (context) {
+                  final hasSaved = ref.watch(savedLocationsProvider).isNotEmpty;
+                  if (!hasSaved) return const SizedBox(height: 10);
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                    child: Row(
+                      children: [
+                        Expanded(child: Divider(color: isDark ? AppColors.dividerDark : AppColors.divider)),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          child: Text(
+                            'or search',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                            ),
+                          ),
+                        ),
+                        Expanded(child: Divider(color: isDark ? AppColors.dividerDark : AppColors.divider)),
+                      ],
+                    ),
+                  );
+                }),
+
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: AddressSearchField(
+                    autofocus: ref.watch(savedLocationsProvider).isEmpty,
+                    onSubmit: (result) => _fetchFromCoords(result.lat, result.lng),
+                  ),
+                ),
+              ],
             ],
           ),
         ),

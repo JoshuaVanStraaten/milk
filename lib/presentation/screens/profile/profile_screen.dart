@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../data/models/saved_location.dart';
 import '../../providers/auth_provider.dart';
+import '../../widgets/common/address_search_field.dart';
+import '../../providers/saved_locations_provider.dart';
 import '../../providers/theme_provider.dart';
 
 class ProfileScreen extends ConsumerWidget {
@@ -95,6 +99,13 @@ class ProfileScreen extends ConsumerWidget {
                   },
                   isDark: isDark,
                 ),
+
+                const SizedBox(height: 24),
+
+                // My Locations Section
+                _SectionHeader(title: 'My Locations', isDark: isDark),
+                const SizedBox(height: 12),
+                _LocationsCard(isDark: isDark),
 
                 const SizedBox(height: 24),
 
@@ -371,6 +382,358 @@ class _ThemeModeButton extends StatelessWidget {
                       : (isDark
                             ? AppColors.textSecondaryDark
                             : AppColors.textSecondary),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// My Locations card
+class _LocationsCard extends ConsumerWidget {
+  final bool isDark;
+  const _LocationsCard({required this.isDark});
+
+  IconData _iconFor(String id) {
+    if (id == 'home') return Icons.home_outlined;
+    if (id == 'work') return Icons.work_outline;
+    return Icons.location_on_outlined;
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final locations = ref.watch(savedLocationsProvider);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.surfaceDarkMode : AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          if (locations.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                'No saved locations yet.',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondary,
+                ),
+              ),
+            )
+          else
+            ...locations.map((loc) => Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          _iconFor(loc.id),
+                          color: AppColors.primary,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              loc.label,
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: isDark
+                                    ? AppColors.textPrimaryDark
+                                    : AppColors.textPrimary,
+                              ),
+                            ),
+                            Text(
+                              loc.address,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isDark
+                                    ? AppColors.textSecondaryDark
+                                    : AppColors.textSecondary,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        icon: Icon(
+                          Icons.delete_outline,
+                          size: 20,
+                          color: isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textSecondary,
+                        ),
+                        onPressed: () =>
+                            ref.read(savedLocationsProvider.notifier).delete(loc.id),
+                      ),
+                    ],
+                  ),
+                )),
+          const SizedBox(height: 4),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => _showAddLocationSheet(context, ref, isDark),
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('Add location'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primary,
+                side: BorderSide(
+                  color: isDark ? AppColors.dividerDark : AppColors.divider,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAddLocationSheet(BuildContext context, WidgetRef ref, bool isDark) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: isDark ? AppColors.backgroundDark : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => _AddLocationSheet(isDark: isDark, ref: ref),
+    );
+  }
+}
+
+class _AddLocationSheet extends StatefulWidget {
+  final bool isDark;
+  final WidgetRef ref;
+  const _AddLocationSheet({required this.isDark, required this.ref});
+
+  @override
+  State<_AddLocationSheet> createState() => _AddLocationSheetState();
+}
+
+class _AddLocationSheetState extends State<_AddLocationSheet> {
+  String _selectedId = 'home';
+  bool _isCustom = false;
+  final TextEditingController _labelController = TextEditingController(text: 'Home');
+
+  @override
+  void dispose() {
+    _labelController.dispose();
+    super.dispose();
+  }
+
+  void _onPreset(String id, String label) {
+    setState(() {
+      _selectedId = id;
+      _isCustom = false;
+      _labelController.text = label;
+    });
+  }
+
+  void _onCustom() {
+    setState(() {
+      _selectedId = const Uuid().v4();
+      _isCustom = true;
+      _labelController.text = '';
+    });
+  }
+
+  Future<void> _save({
+    required String address,
+    required double lat,
+    required double lng,
+  }) async {
+    final label = _labelController.text.trim();
+    if (_isCustom && label.isEmpty) return;
+
+    final location = SavedLocation(
+      id: _selectedId,
+      label: label.isEmpty
+          ? _selectedId[0].toUpperCase() + _selectedId.substring(1)
+          : label,
+      address: address,
+      latitude: lat,
+      longitude: lng,
+    );
+    await widget.ref.read(savedLocationsProvider.notifier).addOrUpdate(location);
+    if (mounted) Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = widget.isDark;
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 20,
+        right: 20,
+        top: 20,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.textDisabledDark : AppColors.textDisabled,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Add Location',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              _PresetButton(
+                id: 'home',
+                label: 'Home',
+                icon: Icons.home_outlined,
+                isSelected: _selectedId == 'home',
+                isDark: isDark,
+                onTap: () => _onPreset('home', 'Home'),
+              ),
+              const SizedBox(width: 10),
+              _PresetButton(
+                id: 'work',
+                label: 'Work',
+                icon: Icons.work_outline,
+                isSelected: _selectedId == 'work',
+                isDark: isDark,
+                onTap: () => _onPreset('work', 'Work'),
+              ),
+              const SizedBox(width: 10),
+              _PresetButton(
+                id: 'custom',
+                label: 'Other',
+                icon: Icons.add_location_alt_outlined,
+                isSelected: _isCustom,
+                isDark: isDark,
+                onTap: _onCustom,
+              ),
+            ],
+          ),
+          if (_isCustom) ...[
+            const SizedBox(height: 12),
+            TextField(
+              controller: _labelController,
+              autofocus: true,
+              textCapitalization: TextCapitalization.words,
+              decoration: InputDecoration(
+                labelText: 'Label',
+                hintText: 'e.g. Gym, Mom\'s house, Office',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+              ),
+            ),
+          ],
+          const SizedBox(height: 14),
+          AddressSearchField(
+            autofocus: !_isCustom,
+            onSubmit: (result) => _save(
+              address: result.address,
+              lat: result.lat,
+              lng: result.lng,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Select a suggestion to save the location.',
+            style: TextStyle(
+              fontSize: 12,
+              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PresetButton extends StatelessWidget {
+  final String id;
+  final String label;
+  final IconData icon;
+  final bool isSelected;
+  final bool isDark;
+  final VoidCallback onTap;
+
+  const _PresetButton({
+    required this.id,
+    required this.label,
+    required this.icon,
+    required this.isSelected,
+    required this.isDark,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? AppColors.primary.withValues(alpha: 0.1)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: isSelected
+                  ? AppColors.primary
+                  : (isDark ? AppColors.dividerDark : AppColors.divider),
+              width: isSelected ? 2 : 1,
+            ),
+          ),
+          child: Column(
+            children: [
+              Icon(
+                icon,
+                color: isSelected
+                    ? AppColors.primary
+                    : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondary),
+                size: 22,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                  color: isSelected
+                      ? AppColors.primary
+                      : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondary),
                 ),
               ),
             ],

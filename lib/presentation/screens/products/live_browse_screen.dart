@@ -193,6 +193,9 @@ class _LiveBrowseScreenState extends ConsumerState<LiveBrowseScreen> {
       showModalBottomSheet(
         context: context,
         backgroundColor: Colors.transparent,
+        isScrollControlled: true,
+        enableDrag: true,
+        isDismissible: true,
         builder: (_) => StorePickerSheet(
           stores: selection,
           selectedRetailer: selectedRetailer,

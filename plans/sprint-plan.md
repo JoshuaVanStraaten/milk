@@ -204,45 +204,55 @@ Frozen | Food Cupboard | Snacks | Beverages
 
 ---
 
-### Sprint 5: List Management Enhancements
+### Sprint 5: List Management Enhancements ✅ COMPLETE
 
 **Model:** Sonnet 4.6 (UI) → Opus 4.6 (browse+compare UX flow design)
 **Goal:** Multi-select delete, browse+manual add toggle from inside lists.
 
-**5a. Multi-select list deletion**
+**5a. Multi-select list deletion** ✅
 
 - **File:** `lib/presentation/screens/lists/my_lists_screen.dart`
-- **Approach:** Long-press enters selection mode, checkboxes appear, bulk delete action in app bar
+- Long-press enters selection mode, checkboxes appear, bulk delete in app bar
 
-**5b. Add items from inside list — browse toggle**
+**5b. Add items from inside list — browse toggle** ✅
 
 - **File:** `lib/presentation/screens/lists/list_detail_screen.dart`
-- **Approach:** In the add-item FAB flow, add a toggle/tab: "Manual" vs "Browse"
-  - Manual: Current `_AddItemSheet` behavior
-  - Browse: Inline product search with retailer selector, results grid, tap-to-add
-  - After adding, prompt: "Want to compare prices?" → opens compare sheet
+- Tabbed sheet: "Manual" vs "Browse" tabs
+  - Manual: form entry, optimistic close + snackbar
+  - Browse: retailer chips, live search, "+" and compare buttons per row
+  - Compare button opens compare sheet pre-wired to current list
+  - Selecting a match adds directly to the list — both sheets close, snackbar shown
+- **UX flow finalised:**
+  - `+` tap → scale-bounce animation → sheet closes instantly (optimistic) → snackbar
+  - Compare tap → compare sheet → select match → scale-bounce → both sheets close instantly → snackbar
+  - All adds are fire-and-forget (no 1-2s wait for Supabase round-trip)
+- **ScaffoldMessenger** captured before sheets open — snackbar always on main scaffold
+- **Overflow fix** on promo price row (Flexible + ellipsis)
 
 ---
 
-### Sprint 6: Location & Address Support
+### Sprint 6: Location & Address Support ✅ COMPLETE
 
-**Model:** Sonnet 4.6
+**Model:** Sonnet 4.6 → Opus 4.6 (autocomplete UX)
 **Goal:** Let users enter addresses and save locations.
 
-**6a. Address input with geocoding**
+**6a. Address input with geocoding** ✅
 
-- **Files:** `lib/data/services/location_service.dart`, `lib/presentation/providers/store_provider.dart`
-- **Approach:**
-  - Add geocoding package (e.g., `geocoding` or Google Places API)
-  - Address text field in store selection screen
-  - Geocode address → lat/lng → fetch nearby stores
-- **UI:** Add "Use address" option alongside "Use my location"
+- Added `geocoding: ^3.0.0` package (platform-native, free, no API key)
+- `LocationService.geocodeAddress()` — converts address → lat/lng
+- Nominatim (OpenStreetMap) autocomplete with platform geocoder fallback for exact addresses
+- Reusable `AddressSearchField` widget with inline suggestions, debounced search, "press search to use anyway" hint
+- **Onboarding** (`store_selection_screen.dart`): "Can't use GPS? Enter an address instead" toggle in error state
+- **Browse** (`store_picker_sheet.dart`): "Use a different address" expandable section with saved locations + search
+- Store picker sheet: `isScrollControlled: true`, keyboard-aware padding, drag handle tap-to-dismiss
 
-**6b. Saved locations (Home/Work)**
+**6b. Saved locations (Home/Work/Custom)** ✅
 
-- **Storage:** `flutter_secure_storage` or SharedPreferences
-- **Files:** New saved locations provider, profile screen addition
-- **UI:** Profile screen → "My Locations" section with named locations
+- `SavedLocation` model (`lib/data/models/saved_location.dart`)
+- `SavedLocationsNotifier` + `savedLocationsProvider` backed by SharedPreferences
+- Profile screen "My Locations" section with add/delete
+- Add location sheet: Home / Work / Other (custom label with UUID) presets
+- Store picker sheet: saved locations shown as compact rows inside the expandable address section, with "or search" divider
 
 ---
 
