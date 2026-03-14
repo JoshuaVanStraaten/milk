@@ -259,7 +259,36 @@ Fixed all three originally unmatched ingredients plus additional edge cases foun
 
 ---
 
-### Sprint 10: Final UI/UX Polish Pass
+### Sprint 10: Recipe Export — Ingredient Selection & Retailer Comparison
+
+**Model:** Opus 4.6 (UX flow design, comparison logic, state management) → Sonnet 4.6 (UI implementation)
+**Goal:** Give users full control when exporting a recipe to a shopping list — deselect items they already have, compare total cost across retailers, and swap individual products before committing.
+
+**10a. Ingredient deselection before export**
+- **Flow:** After matching, before export, show ingredient list with checkboxes (all selected by default)
+- **UX:** Clear messaging — "Deselect items you already have" or similar prompt
+- **Approach:** Add selection state to export flow, only export checked ingredients
+- **Files:** `lib/presentation/widgets/recipes/recipe_result_card.dart` (export dialog), `lib/presentation/providers/recipe_provider.dart` (export method)
+- **Model:** Sonnet 4.6 (straightforward checkbox UI + state)
+
+**10b. Retailer cost comparison before export**
+- **Flow:** After ingredient selection, show a comparison view — each retailer as a dropdown/accordion with all matched products and prices, total per retailer, cheapest retailer highlighted
+- **UX:** Use `ui-ux-pro-max` skill for optimal layout — likely a bottom sheet or full-screen modal with retailer tabs/cards
+- **Approach:** Re-run ingredient matching against all retailers (or use cached results), calculate totals, rank by price
+- **Data:** Needs `SmartMatchingService` to match ingredients across all 4 retailers simultaneously
+- **Files:** New widget (e.g., `lib/presentation/widgets/recipes/retailer_comparison_sheet.dart`), `lib/presentation/providers/recipe_provider.dart`
+- **Model:** Opus 4.6 (comparison UX design, data flow architecture)
+
+**10c. Swap products per retailer in comparison view**
+- **Flow:** In the retailer comparison view, each matched product is tappable — user can search for alternatives or pick from other matches
+- **UX:** Tap a product → show search/alternatives sheet → select replacement → total updates live
+- **Approach:** Reuse existing `onMatchIngredient` flow and `IngredientMatchingNotifier` for product search
+- **Files:** Retailer comparison widget, recipe provider
+- **Model:** Sonnet 4.6 (reuses existing search/match UI patterns)
+
+---
+
+### Sprint 11: Final UI/UX Polish Pass
 
 **Model:** Opus 4.6 (design review & strategy) → Sonnet 4.6 (implementation)
 **Goal:** Professional, exciting look across the entire app.
