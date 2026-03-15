@@ -256,15 +256,24 @@ Frozen | Food Cupboard | Snacks | Beverages
 
 ---
 
-### Sprint 7: Walkthrough Tutorial
+### Sprint 7: Walkthrough Tutorial ✅ COMPLETE
 
 **Model:** Sonnet 4.6
 **Goal:** Guide new users through the app on first launch.
 
-- **Package:** `tutorial_coach_mark` or `showcaseview`
-- **Files:** Main screens (home, browse, lists, recipes)
-- **Approach:** Highlight key UI elements with tooltips on first launch
-- **Storage:** `SharedPreferences` flag `'tutorial_completed'`
+**Package:** `tutorial_coach_mark: ^1.2.11`
+
+**Completed:**
+
+- `lib/data/services/tutorial_service.dart` — SharedPreferences wrapper (home/browse/recipes/skip-all/reset flags)
+- `lib/presentation/providers/tutorial_provider.dart` — Riverpod provider
+- `lib/presentation/widgets/tutorial/tutorial_targets.dart` — `TutorialTooltip` (themed card, step progress dots, tap-to-advance), `buildHomeTutorialTargets`, `buildBrowseTutorialTargets`, `buildRecipesTutorialTargets`
+- **Home** (3 steps): welcome dialog → savings banner → hot deals → bottom nav
+- **Browse** (4 steps): store selector → search bar → category chips → filter icon
+- **Recipes** (1 step): mode selector tooltip on first visit
+- **Profile**: "Replay Tutorial" row — resets all flags, navigates to home
+- Welcome dialog always white background (consistent contrast in both light/dark mode)
+- Race condition fix: `_startTutorialOverlay()` retries every 300ms until GlobalKeys are rendered — handles both fresh load and replay-tutorial flow
 
 ---
 
