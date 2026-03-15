@@ -277,14 +277,19 @@ Frozen | Food Cupboard | Snacks | Beverages
 
 ---
 
-### Sprint 8: Share Feature Polish
+### Sprint 8: Share Feature Polish ✅ COMPLETE
 
-**Model:** Sonnet 4.6
+**Model:** Opus 4.6
 **Goal:** Better UX when sharing/collaborating on lists.
 
-- **File:** `lib/presentation/screens/lists/list_detail_screen.dart`
-- **Approach:** Show confirmation dialog/snackbar when list is shared
-- **UI:** Use `ui-ux-pro-max` skill for share dialog design
+**Completed:**
+
+- **Share bottom sheet** (`lib/presentation/widgets/lists/share_list_sheet.dart`) — Replaced plain AlertDialog with full bottom sheet: email input with validation, collaborator list, remove buttons, owner badge with "Owner" pill, inline status banners (success/error) that display within the sheet
+- **Sharing metadata on model** (`lib/data/models/shopping_list.dart`) — Added `ownerEmail` (for shared-with-me lists) and `sharedCount` (for owned lists) transient fields
+- **Repository enrichment** (`lib/data/repositories/list_repository.dart`) — `getUserLists()` batch-fetches share counts for owned lists and owner emails for shared-with-me lists
+- **Provider additions** (`lib/presentation/providers/list_provider.dart`) — `sharedUsersProvider` (family by listId), `shareList()` now rethrows specific error messages
+- **List card indicators** (`lib/presentation/screens/lists/my_lists_screen.dart`) — Cards show "Shared with N person/people" (owned) or "Shared by owner@email" (shared-with-me)
+- **Specific error messages** — "No user found with email", "cannot share with yourself", "already shared" surfaced inline
 
 ---
 
