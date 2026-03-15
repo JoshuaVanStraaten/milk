@@ -7,18 +7,21 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 import '../../../core/constants/retailers.dart';
 import '../../../core/constants/product_categories.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/nearby_store.dart';
 import '../../../data/models/live_product.dart';
 import '../../providers/store_provider.dart';
+import '../../providers/tutorial_provider.dart';
 import '../../widgets/products/live_product_card.dart';
 import '../../widgets/common/empty_states.dart';
 import '../../widgets/skeleton_loaders.dart';
 import '../../widgets/animations.dart';
 import '../../widgets/products/add_to_list_sheet.dart';
 import '../../widgets/products/store_picker_sheet.dart';
+import '../../widgets/tutorial/tutorial_targets.dart';
 import 'live_product_detail_screen.dart';
 import '../compare/compare_sheet.dart';
 
@@ -105,6 +108,14 @@ class _LiveBrowseScreenState extends ConsumerState<LiveBrowseScreen> {
   final TextEditingController _searchController = TextEditingController();
   Timer? _debounceTimer;
   bool _isSearching = false;
+  TutorialCoachMark? _tutorialCoachMark;
+  bool _tutorialTriggered = false;
+
+  // Tutorial GlobalKeys
+  final _storeButtonKey = GlobalKey();
+  final _searchBarKey = GlobalKey();
+  final _categoryChipKey = GlobalKey();
+  final _filterIconKey = GlobalKey();
 
   // Category state
   ProductCategory? _selectedCategory;
@@ -124,10 +135,51 @@ class _LiveBrowseScreenState extends ConsumerState<LiveBrowseScreen> {
 
   @override
   void dispose() {
+    _tutorialCoachMark?.finish();
     _scrollController.dispose();
     _searchController.dispose();
     _debounceTimer?.cancel();
     super.dispose();
+  }
+
+  void _tryShowBrowseTutorial() {
+    if (_tutorialTriggered) return;
+    final tutorialService = ref.read(tutorialServiceProvider);
+    if (tutorialService.isBrowseTutorialCompleted) return;
+    _tutorialTriggered = true;
+
+    Future.delayed(const Duration(milliseconds: 600), () {
+      if (!mounted) return;
+
+      final targets = buildBrowseTutorialTargets(
+        storeButtonKey: _storeButtonKey,
+        searchBarKey: _searchBarKey,
+        categoryChipKey: _categoryChipKey,
+        filterIconKey: _filterIconKey,
+      );
+
+      _tutorialCoachMark = TutorialCoachMark(
+        targets: targets,
+        colorShadow: Colors.black,
+        opacityShadow: 0.8,
+        textSkip: 'SKIP',
+        textStyleSkip: const TextStyle(
+          color: AppColors.primary,
+          fontWeight: FontWeight.w600,
+          fontSize: 14,
+        ),
+        paddingFocus: 10,
+        focusAnimationDuration: const Duration(milliseconds: 300),
+        unFocusAnimationDuration: const Duration(milliseconds: 300),
+        onFinish: () {
+          ref.read(tutorialServiceProvider).completeBrowseTutorial();
+        },
+        onSkip: () {
+          ref.read(tutorialServiceProvider).skipAll();
+          return true;
+        },
+      )..show(context: context);
+    });
   }
 
   void _onScroll() {
@@ -265,6 +317,9 @@ class _LiveBrowseScreenState extends ConsumerState<LiveBrowseScreen> {
       currentStore = selection.forRetailer(selectedRetailer);
     });
 
+    // Trigger browse tutorial on first visit
+    WidgetsBinding.instance.addPostFrameCallback((_) => _tryShowBrowseTutorial());
+
     return Scaffold(
       appBar: AppBar(
         titleSpacing: 12,
@@ -272,14 +327,18 @@ class _LiveBrowseScreenState extends ConsumerState<LiveBrowseScreen> {
         backgroundColor: isDark
             ? retailerConfig?.color.withValues(alpha: 0.08)
             : retailerConfig?.colorLight.withValues(alpha: 0.3),
-        title: _StoreAppBarButton(
-          retailerConfig: retailerConfig,
-          currentStore: currentStore,
-          onTap: () => _showStorePickerSheet(context),
+        title: Container(
+          key: _storeButtonKey,
+          child: _StoreAppBarButton(
+            retailerConfig: retailerConfig,
+            currentStore: currentStore,
+            onTap: () => _showStorePickerSheet(context),
+          ),
         ),
         actions: [
           // Filter icon with badge dot when filters are active
           Stack(
+            key: _filterIconKey,
             clipBehavior: Clip.none,
             children: [
               IconButton(
@@ -307,14 +366,20 @@ class _LiveBrowseScreenState extends ConsumerState<LiveBrowseScreen> {
       body: Column(
         children: [
           // Search bar (hero element — first in body)
-          _buildSearchBar(isDark),
+          Container(
+            key: _searchBarKey,
+            child: _buildSearchBar(isDark),
+          ),
 
           // Category chip bar (hidden while searching)
           if (!_isSearching)
-            _CategoryChipBar(
-              selectedRetailer: selectedRetailer,
-              selectedCategory: _selectedCategory,
-              onSelected: _onCategorySelected,
+            Container(
+              key: _categoryChipKey,
+              child: _CategoryChipBar(
+                selectedRetailer: selectedRetailer,
+                selectedCategory: _selectedCategory,
+                onSelected: _onCategorySelected,
+              ),
             ),
 
           // Active filter chips summary (compact, dismissible)

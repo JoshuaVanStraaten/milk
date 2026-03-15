@@ -9,13 +9,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 import '../../../core/constants/retailers.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/live_product.dart';
 import '../../../data/services/image_lookup_service.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/store_provider.dart';
+import '../../providers/tutorial_provider.dart';
 import '../../widgets/products/add_to_list_sheet.dart';
+import '../../widgets/tutorial/tutorial_targets.dart';
 import '../products/live_product_detail_screen.dart';
 import '../compare/compare_sheet.dart';
 
@@ -277,6 +280,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _fadeController;
   bool _dealsLoaded = false;
+  TutorialCoachMark? _tutorialCoachMark;
+  bool _tutorialTriggered = false;
+
+  // Tutorial GlobalKeys
+  final _savingsBannerKey = GlobalKey();
+  final _hotDealsKey = GlobalKey();
 
   @override
   void initState() {
@@ -289,8 +298,87 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   @override
   void dispose() {
+    _tutorialCoachMark?.finish();
     _fadeController.dispose();
     super.dispose();
+  }
+
+  void _tryShowTutorial() {
+    if (_tutorialTriggered) return;
+    final tutorialService = ref.read(tutorialServiceProvider);
+    if (tutorialService.isHomeTutorialCompleted) return;
+
+    // Keys must be rendered before we can show the dialog
+    if (_savingsBannerKey.currentContext == null ||
+        _hotDealsKey.currentContext == null) return;
+
+    _tutorialTriggered = true;
+
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (!mounted) return;
+      showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => _WelcomeDialog(
+          onStart: () {
+            Navigator.of(context).pop();
+            _startTutorialOverlay();
+          },
+          onSkip: () {
+            Navigator.of(context).pop();
+            ref.read(tutorialServiceProvider).skipAll();
+          },
+        ),
+      );
+    });
+  }
+
+  /// Waits until both target keys are rendered, then starts the overlay.
+  /// Handles the case where "Start tour" is tapped before deals finish loading.
+  void _startTutorialOverlay() {
+    if (!mounted) return;
+
+    if (_savingsBannerKey.currentContext == null ||
+        _hotDealsKey.currentContext == null) {
+      Future.delayed(const Duration(milliseconds: 300), () {
+        if (mounted) { _startTutorialOverlay(); }
+      });
+      return;
+    }
+
+    final targets = buildHomeTutorialTargets(
+      savingsBannerKey: _savingsBannerKey,
+      hotDealsKey: _hotDealsKey,
+    );
+    targets.last = TargetFocus(
+      identify: 'bottom_nav',
+      targetPosition: bottomNavTargetPosition(context),
+      shape: ShapeLightFocus.RRect,
+      radius: 0,
+      contents: targets.last.contents ?? [],
+    );
+
+    _tutorialCoachMark = TutorialCoachMark(
+      targets: targets,
+      colorShadow: Colors.black,
+      opacityShadow: 0.8,
+      textSkip: 'SKIP',
+      textStyleSkip: const TextStyle(
+        color: AppColors.primary,
+        fontWeight: FontWeight.w600,
+        fontSize: 14,
+      ),
+      paddingFocus: 10,
+      focusAnimationDuration: const Duration(milliseconds: 300),
+      unFocusAnimationDuration: const Duration(milliseconds: 300),
+      onFinish: () {
+        ref.read(tutorialServiceProvider).completeHomeTutorial();
+      },
+      onSkip: () {
+        ref.read(tutorialServiceProvider).skipAll();
+        return true;
+      },
+    )..show(context: context);
   }
 
   void _loadDealsOnce() {
@@ -315,6 +403,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     // Animate in once deals are loaded
     if (!dealsState.isLoading && dealsState.hotDeals.isNotEmpty) {
       _fadeController.forward();
+      // Trigger tutorial after deals have rendered
+      WidgetsBinding.instance.addPostFrameCallback((_) => _tryShowTutorial());
     }
 
     return Scaffold(
@@ -333,10 +423,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             // ─── SAVINGS BANNER ───
             if (!dealsState.isLoading && dealsState.totalDealsCount > 0)
               SliverToBoxAdapter(
-                child: _SavingsBanner(
-                  totalDeals: dealsState.totalDealsCount,
-                  totalSavings: dealsState.totalPotentialSavings,
-                  isDark: isDark,
+                child: Container(
+                  key: _savingsBannerKey,
+                  child: _SavingsBanner(
+                    totalDeals: dealsState.totalDealsCount,
+                    totalSavings: dealsState.totalPotentialSavings,
+                    isDark: isDark,
+                  ),
                 ),
               ),
 
@@ -347,9 +440,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               SliverToBoxAdapter(
                 child: FadeTransition(
                   opacity: _fadeController,
-                  child: _HotDealsSection(
-                    deals: dealsState.hotDeals,
-                    isDark: isDark,
+                  child: Container(
+                    key: _hotDealsKey,
+                    child: _HotDealsSection(
+                      deals: dealsState.hotDeals,
+                      isDark: isDark,
+                    ),
                   ),
                 ),
               ),
@@ -1359,6 +1455,93 @@ class _DealsLoadingAnimationState extends State<_DealsLoadingAnimation>
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// =============================================================================
+// WELCOME DIALOG — shown before the tutorial overlay so timing is decoupled
+// =============================================================================
+
+class _WelcomeDialog extends StatelessWidget {
+  final VoidCallback onStart;
+  final VoidCallback onSkip;
+
+  const _WelcomeDialog({required this.onStart, required this.onSkip});
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Padding(
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.waving_hand_rounded,
+                color: AppColors.primary,
+                size: 32,
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Welcome to Milk!',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              "Let's take a quick tour — we'll show you how to find the best grocery deals near you. Each tab has its own tip on first visit.",
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                color: AppColors.textSecondary,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                TextButton(
+                  onPressed: onSkip,
+                  child: Text(
+                    'Skip',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+                TextButton(
+                  onPressed: onStart,
+                  child: const Text(
+                    'Start tour',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

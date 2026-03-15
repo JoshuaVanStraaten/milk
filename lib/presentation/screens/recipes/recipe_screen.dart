@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../providers/recipe_provider.dart';
 import '../../providers/list_provider.dart';
+import '../../providers/tutorial_provider.dart';
 import '../../../data/models/recipe.dart';
 import '../../widgets/recipes/recipe_input_card.dart';
 import '../../widgets/recipes/recipe_result_card.dart';
@@ -11,6 +13,7 @@ import '../../widgets/recipes/ingredient_matching_sheet.dart';
 import '../../widgets/recipes/ingredients_input_card.dart';
 import '../../widgets/recipes/recipe_suggestions_card.dart';
 import '../../widgets/common/ai_error_dialog.dart';
+import '../../widgets/tutorial/tutorial_targets.dart';
 
 /// Main screen for AI recipe generation
 class RecipeScreen extends ConsumerStatefulWidget {
@@ -67,6 +70,52 @@ class _GenerateRecipeTab extends ConsumerStatefulWidget {
 
 class _GenerateRecipeTabState extends ConsumerState<_GenerateRecipeTab> {
   bool _useIngredientsMode = false;
+  TutorialCoachMark? _tutorialCoachMark;
+  bool _tutorialTriggered = false;
+  final _modeSelectorKey = GlobalKey();
+
+  @override
+  void dispose() {
+    _tutorialCoachMark?.finish();
+    super.dispose();
+  }
+
+  void _tryShowRecipesTutorial() {
+    if (_tutorialTriggered) return;
+    final tutorialService = ref.read(tutorialServiceProvider);
+    if (tutorialService.isRecipesTutorialCompleted) return;
+    _tutorialTriggered = true;
+
+    Future.delayed(const Duration(milliseconds: 600), () {
+      if (!mounted) return;
+      // Only show if mode selector is currently visible
+      if (_modeSelectorKey.currentContext == null) return;
+
+      _tutorialCoachMark = TutorialCoachMark(
+        targets: buildRecipesTutorialTargets(
+          modeSelectorKey: _modeSelectorKey,
+        ),
+        colorShadow: Colors.black,
+        opacityShadow: 0.8,
+        textSkip: 'SKIP',
+        textStyleSkip: const TextStyle(
+          color: AppColors.primary,
+          fontWeight: FontWeight.w600,
+          fontSize: 14,
+        ),
+        paddingFocus: 10,
+        focusAnimationDuration: const Duration(milliseconds: 300),
+        unFocusAnimationDuration: const Duration(milliseconds: 300),
+        onFinish: () {
+          ref.read(tutorialServiceProvider).completeRecipesTutorial();
+        },
+        onSkip: () {
+          ref.read(tutorialServiceProvider).completeRecipesTutorial();
+          return true;
+        },
+      )..show(context: context);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -100,6 +149,14 @@ class _GenerateRecipeTabState extends ConsumerState<_GenerateRecipeTab> {
     final suggestionsState = ref.watch(recipeSuggestionsProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
+    // Trigger recipes tutorial when mode selector is visible
+    final showModeSelector = state.currentStep == RecipeGenerationStep.input &&
+        !suggestionsState.isLoading &&
+        suggestionsState.suggestions.isEmpty;
+    if (showModeSelector) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _tryShowRecipesTutorial());
+    }
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -107,10 +164,11 @@ class _GenerateRecipeTabState extends ConsumerState<_GenerateRecipeTab> {
         children: [
           // Mode selector (Recipe from name vs From ingredients)
           // Only show when in input step
-          if (state.currentStep == RecipeGenerationStep.input &&
-              !suggestionsState.isLoading &&
-              suggestionsState.suggestions.isEmpty)
-            _buildModeSelector(context, isDark),
+          if (showModeSelector)
+            Container(
+              key: _modeSelectorKey,
+              child: _buildModeSelector(context, isDark),
+            ),
 
           const SizedBox(height: 16),
 
