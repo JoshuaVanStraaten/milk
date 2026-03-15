@@ -12,7 +12,6 @@ import '../../data/models/recipe.dart';
 import '../../data/models/live_product.dart';
 import '../../data/repositories/recipe_repository.dart';
 import '../../data/services/gemini_service.dart';
-import '../../data/services/image_lookup_service.dart';
 import '../../core/constants/retailers.dart';
 import 'store_provider.dart'; // includes smartMatchingServiceProvider
 
@@ -244,8 +243,6 @@ class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
           );
           matches = response.products;
         }
-
-        matches = _resolveImages(matches, retailerName);
 
         // Smart match — use enhanced scoring from SmartMatchingService
         final smartMatcher = _ref.read(smartMatchingServiceProvider);
@@ -527,26 +524,6 @@ class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
     state = const RecipeGenerationState();
   }
 
-  List<LiveProduct> _resolveImages(
-    List<LiveProduct> products,
-    String retailer,
-  ) {
-    final lookup = ImageLookupService.instance;
-    if (!lookup.isReady) return products;
-    final lower = retailer.toLowerCase();
-    if (!lower.contains('checkers') && !lower.contains('shoprite')) {
-      return products;
-    }
-    return products.map((p) {
-      final cached = lookup.lookupImage(
-        retailer: retailer,
-        productName: p.name,
-      );
-      if (cached != null) return p.copyWith(imageUrl: cached);
-      return p;
-    }).toList();
-  }
-
   /// Clean an ingredient name for API search.
   /// Strips quantities, units, and prep instructions so the search
   /// focuses on the actual food item.
@@ -691,7 +668,6 @@ class IngredientMatchingNotifier
           pageSize: 10,
         );
         products = response.products;
-        products = _resolveImages(products, retailer);
       } else {
         // Search all retailers in parallel
         final results = await api.compareProduct(
@@ -701,8 +677,7 @@ class IngredientMatchingNotifier
 
         products = [];
         for (final entry in results.entries) {
-          final resolved = _resolveImages(entry.value, entry.key);
-          products.addAll(resolved);
+          products.addAll(entry.value);
         }
       }
 
@@ -735,25 +710,6 @@ class IngredientMatchingNotifier
     state = const IngredientMatchingState();
   }
 
-  List<LiveProduct> _resolveImages(
-    List<LiveProduct> products,
-    String retailer,
-  ) {
-    final lookup = ImageLookupService.instance;
-    if (!lookup.isReady) return products;
-    final lower = retailer.toLowerCase();
-    if (!lower.contains('checkers') && !lower.contains('shoprite')) {
-      return products;
-    }
-    return products.map((p) {
-      final cached = lookup.lookupImage(
-        retailer: retailer,
-        productName: p.name,
-      );
-      if (cached != null) return p.copyWith(imageUrl: cached);
-      return p;
-    }).toList();
-  }
 }
 
 /// Ingredient matching provider
@@ -939,7 +895,6 @@ class RetailerComparisonNotifier
 
     final api = _ref.read(liveApiServiceProvider);
     final smartMatcher = _ref.read(smartMatchingServiceProvider);
-    final imageLookup = ImageLookupService.instance;
 
     Future<void> fetchRetailer(String retailerName) async {
       final store = storeSelection.stores[retailerName];
@@ -975,19 +930,7 @@ class RetailerComparisonNotifier
               )
               .timeout(const Duration(seconds: 12));
 
-          var products = response.products;
-          // Resolve images for Checkers/Shoprite
-          final lower = retailerName.toLowerCase();
-          if (imageLookup.isReady &&
-              (lower.contains('checkers') || lower.contains('shoprite'))) {
-            products = products.map((p) {
-              final cached = imageLookup.lookupImage(
-                retailer: retailerName,
-                productName: p.name,
-              );
-              return cached != null ? p.copyWith(imageUrl: cached) : p;
-            }).toList();
-          }
+          final products = response.products;
 
           final best = await smartMatcher.matchIngredient(
             ingredientName: query,

@@ -5,7 +5,6 @@ import 'core/config/supabase_config.dart';
 import 'core/theme/app_theme.dart';
 import 'data/local/hive_database.dart';
 import 'data/services/connectivity_service.dart';
-import 'data/services/image_lookup_service.dart';
 import 'data/services/sync_service.dart';
 import 'presentation/providers/theme_provider.dart';
 import 'presentation/routes/app_router.dart';
@@ -22,9 +21,6 @@ void main() async {
 
   // Initialize Supabase
   await SupabaseConfig.initialize();
-
-  // Initialize Checkers/Shoprite image lookup cache (bundled asset)
-  await ImageLookupService.instance.initialize();
 
   // Initialize connectivity service
   final connectivityService = ConnectivityService();

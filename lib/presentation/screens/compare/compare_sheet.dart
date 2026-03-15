@@ -12,7 +12,6 @@ import '../../../core/constants/retailers.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/live_product.dart';
 import '../../../data/models/nearby_store.dart';
-import '../../../data/services/image_lookup_service.dart';
 import '../../../data/services/product_name_parser.dart';
 import '../../providers/list_provider.dart';
 import '../../providers/store_provider.dart';
@@ -92,15 +91,9 @@ class _CompareSheetState extends ConsumerState<CompareSheet> {
         stores: widget.stores.stores,
       );
 
-      // Resolve images for Checkers/Shoprite results
-      final resolvedResults = <String, List<LiveProduct>>{};
-      for (final entry in results.entries) {
-        resolvedResults[entry.key] = _resolveImages(entry.value, entry.key);
-      }
-
       if (mounted) {
         setState(() {
-          _results = resolvedResults;
+          _results = results;
           _loading = false;
         });
       }
@@ -120,29 +113,6 @@ class _CompareSheetState extends ConsumerState<CompareSheet> {
   String _buildSearchQuery() {
     final parsed = ProductNameParser.parse(widget.product.name);
     return parsed.searchQuery;
-  }
-
-  /// Resolve Checkers/Shoprite images from the lookup cache.
-  List<LiveProduct> _resolveImages(
-    List<LiveProduct> products,
-    String retailer,
-  ) {
-    final lookup = ImageLookupService.instance;
-    if (!lookup.isReady) return products;
-
-    final lower = retailer.toLowerCase();
-    if (!lower.contains('checkers') && !lower.contains('shoprite')) {
-      return products;
-    }
-
-    return products.map((p) {
-      final cached = lookup.lookupImage(
-        retailer: retailer,
-        productName: p.name,
-      );
-      if (cached != null) return p.copyWith(imageUrl: cached);
-      return p;
-    }).toList();
   }
 
   @override

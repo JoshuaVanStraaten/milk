@@ -15,6 +15,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const BASE_URL = "https://products.checkers.co.za";
+const IMAGE_PROXY_BASE = "https://pjqbvrluyvqvpegxumsd.supabase.co/functions/v1/image-proxy";
 const BROWSE_PATH = "/c-2413/All-Departments/Food";
 const DRINKS_BROWSE_PATH = "/c-2256/All-Departments"; // Beverages live under all-departments, not food
 
@@ -166,6 +167,17 @@ function extractProductListJson(html: string): string | null {
   return m ? m[1].trim() : null;
 }
 
+// Rewrite a retailer image URL to use the image proxy (which auto-caches to Storage).
+// Returns proxy URL that will check cache, fetch if needed, and cache for next time.
+function rewriteImageUrl(originalUrl: string): string {
+  // Only rewrite URLs that contain a recognizable product code
+  const codeMatch = originalUrl.match(/(\d{5,}[A-Z]{2}(?:[Vv]\d)?)/);
+  if (codeMatch) {
+    return `${IMAGE_PROXY_BASE}?url=${encodeURIComponent(originalUrl)}`;
+  }
+  return originalUrl;
+}
+
 function parseProductsFromHtml(
   html: string,
 ): Array<{
@@ -193,7 +205,12 @@ ga.unit_sale_price || ga.price
 : "Price not available";
       let imageUrl = ga.product_image_url || null;
       if (imageUrl && !imageUrl.startsWith("http"))
-imageUrl = `${BASE_URL}${imageUrl}`;
+        imageUrl = `${BASE_URL}${imageUrl}`;
+
+      // Rewrite to proxy URL — the proxy auto-caches to Supabase Storage
+      if (imageUrl) {
+        imageUrl = rewriteImageUrl(imageUrl);
+      }
 
       products.push({
         name: ga.name

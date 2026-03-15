@@ -110,7 +110,6 @@ flutter:
   # Add this to load .env file
   assets:
     - .env
-    - assets/image_lookup_cache.json
     - assets/images/app_icon.png
 
   # To add assets to your application, add an assets section, like this:

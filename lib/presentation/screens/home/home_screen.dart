@@ -13,7 +13,6 @@ import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 import '../../../core/constants/retailers.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/live_product.dart';
-import '../../../data/services/image_lookup_service.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/store_provider.dart';
 import '../../providers/tutorial_provider.dart';
@@ -160,22 +159,7 @@ class HomeDealsNotifier extends StateNotifier<HomeDealsState> {
               if (response.products.length < 20) break;
             }
 
-            // Resolve Checkers/Shoprite images from bundled cache
-            var products = allPageProducts;
-            final lookup = ImageLookupService.instance;
-            if (lookup.isReady) {
-              final lower = entry.key.toLowerCase();
-              if (lower.contains('checkers') || lower.contains('shoprite')) {
-                products = products.map((p) {
-                  final cached = lookup.lookupImage(
-                    retailer: entry.key,
-                    productName: p.name,
-                  );
-                  if (cached != null) return p.copyWith(imageUrl: cached);
-                  return p;
-                }).toList();
-              }
-            }
+            final products = allPageProducts;
 
             final promos = products.where((p) => p.hasPromo).map((p) {
               // Calculate savings

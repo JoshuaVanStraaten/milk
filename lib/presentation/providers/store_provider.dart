@@ -8,7 +8,6 @@ import '../../data/models/nearby_store.dart';
 import '../../data/models/live_product.dart';
 import '../../data/services/live_api_service.dart';
 import '../../data/services/fallback_product_service.dart';
-import '../../data/services/live_product_image_resolver.dart';
 import '../../data/services/location_service.dart';
 import '../../data/services/smart_matching_service.dart';
 import 'recipe_provider.dart' show geminiServiceProvider;
@@ -253,12 +252,7 @@ class LiveProductsNotifier
       // Discard if a newer request has started (category/retailer changed mid-flight)
       if (requestId != _requestId) return;
 
-      // Resolve Checkers/Shoprite images from bundled cache
-      final resolvedProducts = resolveProductImages(
-        response.products,
-        retailer,
-      );
-      _allProducts.addAll(resolvedProducts);
+      _allProducts.addAll(response.products);
 
       state = AsyncValue.data(
         LiveProductsResponse(
@@ -348,11 +342,9 @@ class LiveSearchNotifier
         store: store,
         query: query,
       );
-      // Resolve Checkers/Shoprite images from bundled cache
-      final resolved = resolveProductImages(response.products, retailer);
       state = AsyncValue.data(
         LiveProductsResponse(
-          products: resolved,
+          products: response.products,
           currentPage: response.currentPage,
           totalPages: response.totalPages,
           totalResults: response.totalResults,

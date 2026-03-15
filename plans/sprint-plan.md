@@ -323,35 +323,44 @@ Frozen | Food Cupboard | Snacks | Beverages
 
 ---
 
-### Sprint 10: Recipe Export — Ingredient Selection & Retailer Comparison
+### Sprint 10: Recipe Export — Ingredient Selection & Retailer Comparison ✅ COMPLETE
 
 **Model:** Opus 4.6 (UX flow design, comparison logic, state management) → Sonnet 4.6 (UI implementation)
 **Goal:** Give users full control when exporting a recipe to a shopping list — deselect items they already have, compare total cost across retailers, and swap individual products before committing.
 
-**10a. Ingredient deselection before export**
+**Completed:**
 
-- **Flow:** After matching, before export, show ingredient list with checkboxes (all selected by default)
-- **UX:** Clear messaging — "Deselect items you already have" or similar prompt
-- **Approach:** Add selection state to export flow, only export checked ingredients
-- **Files:** `lib/presentation/widgets/recipes/recipe_result_card.dart` (export dialog), `lib/presentation/providers/recipe_provider.dart` (export method)
-- **Model:** Sonnet 4.6 (straightforward checkbox UI + state)
+- **Auto-match on generation** — removed manual "Match Ingredients to Products" button; `generateRecipe()` now lands directly on `matching` step so ingredients are ready immediately after generation
+- **10a. Export preparation sheet** (`lib/presentation/widgets/recipes/export_preparation_sheet.dart`) — replaces old AlertDialog; ingredient checklist with checkboxes (matched ✓, unmatched greyed/disabled), list name field, save recipe toggle, "Compare Prices" and "Export" action buttons
+- **10b. Retailer comparison sheet** (`lib/presentation/widgets/recipes/retailer_comparison_sheet.dart`) — 4-tab view (PnP, Woolworths, Checkers, Shoprite) with per-retailer basket totals, auto-jumps to cheapest tab on load, ★ badge on cheapest, "Shop at X" confirm button
+- **10c. Product swap** — each ingredient row in comparison sheet is tappable; opens `IngredientMatchingSheet` pre-filtered to that retailer; selecting a product updates the basket total live
+- **New data models** (`lib/data/models/recipe.dart`) — `RetailerBasket`, `RetailerComparisonState`
+- **New provider** (`lib/presentation/providers/recipe_provider.dart`) — `RetailerComparisonNotifier` + `retailerComparisonProvider` (autoDispose); `exportToShoppingList` gains `selectedIngredientIds` param; new `exportRecipeDirectly` for comparison-path export
+- **Bug fix: API flood** — comparison previously fired 4×N parallel requests (e.g. 68 for a 17-ingredient recipe), saturating Edge Functions and slowing home/browse/price compare; fixed by making per-retailer ingredient searches sequential (max 4 concurrent)
+- **Bug fix: tab overflow + "Shop at" button** — tab bar `Column` overflow fixed with `Tab(height: 48)`; button label now updates correctly on auto-jump and manual tab switch via `_tabController` listener
 
-**10b. Retailer cost comparison before export**
+---
 
-- **Flow:** After ingredient selection users should be able to select if they want to compare or just continue with export, show a comparison view — each retailer as a dropdown/accordion with all matched products and prices, total per retailer, cheapest retailer highlighted
-- **UX:** Use `ui-ux-pro-max` skill for optimal layout — likely a bottom sheet or full-screen modal with retailer tabs/cards
-- **Approach:** Re-run ingredient matching against all retailers (or use cached results), calculate totals, rank by price
-- **Data:** Needs `SmartMatchingService` to match ingredients across all 4 retailers simultaneously
-- **Files:** New widget (e.g., `lib/presentation/widgets/recipes/retailer_comparison_sheet.dart`), `lib/presentation/providers/recipe_provider.dart`
-- **Model:** Opus 4.6 (comparison UX design, data flow architecture)
+### Sprint 10.5: Checkers/Shoprite Image Fix ✅ COMPLETE
 
-**10c. Swap products per retailer in comparison view**
+**Model:** Opus 4.6
+**Goal:** Fix broken product images for Checkers and Shoprite — replace static 5.2MB lookup cache with server-side image proxy + auto-cache.
 
-- **Flow:** In the retailer comparison view, each matched product is tappable — user can search for alternatives or pick from other matches
-- **UX:** Tap a product → show search/alternatives sheet → select replacement → total updates live
-- **Approach:** Reuse existing `onMatchIngredient` flow and `IngredientMatchingNotifier` for product search
-- **Files:** Retailer comparison widget, recipe provider
-- **Model:** Sonnet 4.6 (reuses existing search/match UI patterns)
+**Root cause:** Checkers/Shoprite image URLs return 403 Forbidden without session cookies (CloudFront cookie-gating). Flutter's `Image.network()` can't send cookies.
+
+**Completed:**
+
+- **Image proxy Edge Function** (`supabase/functions/image-proxy/index.ts`) — accepts GET request with retailer image URL, checks Supabase Storage cache first (302 redirect if cached), otherwise creates session with cookies, fetches image, uploads to Storage for future requests, returns image bytes
+- **Product code extraction** — regex `(\d{5,}[A-Z]{2}(?:[Vv]\d)?)` handles all 3 Checkers/Shoprite URL patterns (code-first, code-after-size, code-after-medias)
+- **Session caching** — in-memory cookie cache (20min TTL) avoids repeated homepage fetches; stale session auto-retry
+- **Checkers/Shoprite Edge Functions updated** — `rewriteImageUrl()` rewrites raw retailer image URLs to proxy URLs in `parseProductsFromHtml()`
+- **Client-side cleanup** — deleted `image_lookup_cache.json` (-5.2MB APK), `ImageLookupService`, `live_product_image_resolver.dart`, removed all call sites (main.dart, store_provider, recipe_provider, home_screen, compare_sheet, live_product_detail_screen)
+- **Deployed** with `--no-verify-jwt` (image widgets can't send auth headers), `IMAGE_STORAGE_SERVICE_KEY` secret set for Storage uploads
+
+**User experience:**
+- Cached images (most products over time): instant from Supabase Storage CDN
+- First-time images: ~500ms (proxy fetch + auto-cache)
+- APK size: ~5MB smaller
 
 ---
 

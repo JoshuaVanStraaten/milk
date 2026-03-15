@@ -12,7 +12,6 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/constants/retailers.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/live_product.dart';
-import '../../../data/services/image_lookup_service.dart';
 import '../../../data/services/product_name_parser.dart';
 import '../../../data/services/smart_matching_service.dart';
 import '../../providers/store_provider.dart';
@@ -331,15 +330,9 @@ class _LiveProductDetailScreenState
         stores: storeSelection.stores,
       );
 
-      // Resolve images for Checkers/Shoprite
-      final resolvedResults = <String, List<LiveProduct>>{};
-      for (final entry in rawResults.entries) {
-        resolvedResults[entry.key] = _resolveImages(entry.value, entry.key);
-      }
-
       // Remove self from source retailer results
       final filteredResults = <String, List<LiveProduct>>{};
-      for (final entry in resolvedResults.entries) {
+      for (final entry in rawResults.entries) {
         if (entry.key == widget.product.retailer) {
           filteredResults[entry.key] = entry.value
               .where((p) => p.name != widget.product.name)
@@ -405,26 +398,6 @@ class _LiveProductDetailScreenState
       return a.priceNumeric.compareTo(b.priceNumeric);
     });
     return matches;
-  }
-
-  List<LiveProduct> _resolveImages(
-    List<LiveProduct> products,
-    String retailer,
-  ) {
-    final lookup = ImageLookupService.instance;
-    if (!lookup.isReady) return products;
-    final lower = retailer.toLowerCase();
-    if (!lower.contains('checkers') && !lower.contains('shoprite')) {
-      return products;
-    }
-    return products.map((p) {
-      final cached = lookup.lookupImage(
-        retailer: retailer,
-        productName: p.name,
-      );
-      if (cached != null) return p.copyWith(imageUrl: cached);
-      return p;
-    }).toList();
   }
 
   void _addToList() {
