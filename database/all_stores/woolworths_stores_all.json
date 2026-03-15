@@ -1,0 +1,1092 @@
+[
+  {
+    "retailer": "woolworths",
+    "store_code": "1004",
+    "store_name": "Plattekloof",
+    "latitude": -33.866,
+    "longitude": 18.572,
+    "province": "Western Cape",
+    "city": "Cape Town Ward 1",
+    "address": "Cnr Plattekloof Road and Baronetcy Boulevard, Plattekloof Village Shopping Centre, Plattekloof "
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "1009",
+    "store_name": "Woolworths Worcester (Mountain Mill)",
+    "latitude": -33.63,
+    "longitude": 19.43,
+    "province": "Western Cape",
+    "city": "Breede Valley Local Municipality",
+    "address": "Mountain Mill Mall, Shop 102, 13 Mountain Mill Avenue, Worcester"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "1010",
+    "store_name": "Woolworths Blue Route",
+    "latitude": -34.064,
+    "longitude": 18.454,
+    "province": "Western Cape",
+    "city": "Cape Town",
+    "address": "Blue Route Mall, Tokai"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "1020",
+    "store_name": "Woolworths Village SQ Durbanville",
+    "latitude": -33.83,
+    "longitude": 18.647,
+    "province": "Western Cape",
+    "city": "Durbanville",
+    "address": "Corner of Oxford and Queen Street, Durbanville"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "1039",
+    "store_name": "Woolworths Okavango Crossing CT",
+    "latitude": -33.838,
+    "longitude": 18.697,
+    "province": "Western Cape",
+    "city": "Kraaifontein",
+    "address": "Shop no.16, 37086, Langeberg Road, Langeberg Ridge"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "1040",
+    "store_name": "Woolworths Table Bay Mall",
+    "latitude": -33.789,
+    "longitude": 18.474,
+    "province": "Western Cape",
+    "city": "Cape Town Ward 23",
+    "address": "Intersection of Big Bay Boulevard and R27, Bloubergstrand, Cape Town"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "1042",
+    "store_name": "Laborie",
+    "latitude": -33.764,
+    "longitude": 18.961,
+    "province": "Western Cape",
+    "city": "Paarl",
+    "address": "Shop 10 Laborie Centre, 43 Main Street, Paarl"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "1044",
+    "store_name": "The Sanctuary",
+    "latitude": -34.088,
+    "longitude": 18.821,
+    "province": "Western Cape",
+    "city": "Somerset West",
+    "address": "Cnr of De Beers Avenue, Somerset West"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "1047",
+    "store_name": "Whale Coast Mall",
+    "latitude": -34.419,
+    "longitude": 19.221,
+    "province": "Western Cape",
+    "city": "Overstrand Local Municipality",
+    "address": "R43 Whale Coast Village Mall, Hermanus Cape Town"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "1049",
+    "store_name": "Simons Town",
+    "latitude": -34.173,
+    "longitude": 18.428,
+    "province": "Western Cape",
+    "city": "Simon's Town",
+    "address": "The Refinery Shopping Centre, Corner of Main and Dido Valley Road, Simons Town"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "105",
+    "store_name": "Woolworths V&A Waterfront",
+    "latitude": -33.903,
+    "longitude": 18.422,
+    "province": "Western Cape",
+    "city": "Cape Town",
+    "address": "V&A Shopping Centre, Breakwater Blvd, Cape Town"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "1055",
+    "store_name": "Constantia Emporium",
+    "latitude": -34.029,
+    "longitude": 18.445,
+    "province": "Western Cape",
+    "city": "Cape Town",
+    "address": "Spaanschemat River Roads, Constantia Main Road, Constantia"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "1062",
+    "store_name": "Gugulethu Sq W Edit Ct",
+    "latitude": -33.983,
+    "longitude": 18.566,
+    "province": "Western Cape",
+    "city": "Guguletu",
+    "address": " Shop 57 Gugulethu Square Shopping Mall, Corner NY1 Steve Biko Drive, Gugulethu"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "119",
+    "store_name": "Woolworths Tygervalley",
+    "latitude": -33.875,
+    "longitude": 18.635,
+    "province": "Western Cape",
+    "city": "Bellville",
+    "address": "Tygervalley Shopping Centre, Durban Rd, Tyger Valley"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "123",
+    "store_name": "Woolworths Hout Bay",
+    "latitude": -34.043,
+    "longitude": 18.357,
+    "province": "Western Cape",
+    "city": "Hout Bay",
+    "address": "Fishermans World Shopping Centre, Off Princes Rd, Hout Bay"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "124",
+    "store_name": "Gardens",
+    "latitude": -33.934,
+    "longitude": 18.418,
+    "province": "Western Cape",
+    "city": "Cape Town",
+    "address": "Gardens Centre, Cnr Buitenkant St & Mill St, Gardens"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "126",
+    "store_name": "Woolworths Somerset Mall",
+    "latitude": -34.082,
+    "longitude": 18.822,
+    "province": "Western Cape",
+    "city": "Somerset West",
+    "address": "Somerset Mall, Cnr N2 & R44, Somerset West"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "127",
+    "store_name": "Woolworths Canal Walk",
+    "latitude": -33.894,
+    "longitude": 18.511,
+    "province": "Western Cape",
+    "city": "Milnerton",
+    "address": "Canal Walk Shopping Centre, Century Boulevard, Century City"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "131",
+    "store_name": "Woolworths Kenilworth Centre",
+    "latitude": -33.989,
+    "longitude": 18.486,
+    "province": "Western Cape",
+    "city": "Cape Town",
+    "address": "Shop 25  Kenilworth Centre, Chichester Rd, Kenilworth"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "168",
+    "store_name": "Long Beach Mall",
+    "latitude": -34.123,
+    "longitude": 18.391,
+    "province": "Western Cape",
+    "city": "Cape Town Ward 69",
+    "address": "Cnr Buller Louw Dr & Sunnydale Rd, Noordhoek, Sun Valley"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "2001",
+    "store_name": "Hemingways",
+    "latitude": -32.971,
+    "longitude": 27.898,
+    "province": "Eastern Cape",
+    "city": "KuGompo",
+    "address": "N2 Highway and                , Western Services Road         "
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "222",
+    "store_name": "Woolworths Walmer Park",
+    "latitude": -33.979,
+    "longitude": 25.559,
+    "province": "Eastern Cape",
+    "city": "Gqeberha",
+    "address": "Main Rd, Walmer"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "223",
+    "store_name": "Greenacres",
+    "latitude": -33.95,
+    "longitude": 25.579,
+    "province": "Eastern Cape",
+    "city": "Gqeberha",
+    "address": "Greenacres Shopping Centre, Cape Road, Port Elizabeth"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "231",
+    "store_name": "Howick",
+    "latitude": -29.485,
+    "longitude": 30.234,
+    "province": "KwaZulu-Natal",
+    "city": "uMgeni Local Municipality",
+    "address": "The Falls Shopping Centre, 21 Main Rd, Howick"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "239",
+    "store_name": "Magaliesview",
+    "latitude": -25.695,
+    "longitude": 27.254,
+    "province": "North West",
+    "city": "Rustenburg",
+    "address": "Magalies View Centre 8 Korokoro Street , Waterval East X16 Rustenburg, Rustenburg"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "243",
+    "store_name": "Plettenberg Bay",
+    "latitude": -34.042,
+    "longitude": 23.369,
+    "province": "Western Cape",
+    "city": "Garden Route District Municipality",
+    "address": "Market Square Shopping Centre, Beacon Way, Plettenberg Bay"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "248",
+    "store_name": "Glen Garry",
+    "latitude": -33.856,
+    "longitude": 18.672,
+    "province": "Western Cape",
+    "city": "Vredekloof",
+    "address": "Everglen Shopping Centre, Cnr Vredekloof Rd & De Bron Rd, Brackenfell"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "249",
+    "store_name": "Westcoast Village",
+    "latitude": -33.804,
+    "longitude": 18.484,
+    "province": "Western Cape",
+    "city": "Cape Town Ward 107",
+    "address": "Shop 21 West Coast Mall, Cnr West Coast Rd R27 & Sandown, Sunningdale"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "250",
+    "store_name": "Piazza St Johns",
+    "latitude": -33.918,
+    "longitude": 18.389,
+    "province": "Western Cape",
+    "city": "Cape Town",
+    "address": "Cnr St Johns Rd and Main Rd, Sea Point"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "2509",
+    "store_name": "Woolworths Richards Bay",
+    "latitude": -28.754,
+    "longitude": 32.049,
+    "province": "KwaZulu-Natal",
+    "city": "Richards Bay",
+    "address": "Broadwalk Centre, 11 Mark Strasse, Richards Bay"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "252",
+    "store_name": "Woolworths Stellenbosch SQ",
+    "latitude": -33.977,
+    "longitude": 18.844,
+    "province": "Western Cape",
+    "city": "Stellenbosch Local Municipality",
+    "address": "Stellenbosch Square, Cnr Webersvallei Rd & R44, Jamestown"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "2521",
+    "store_name": "Watercrest (FOREST HILLS)",
+    "latitude": -29.749,
+    "longitude": 30.814,
+    "province": "KwaZulu-Natal",
+    "city": "Pinetown",
+    "address": "301 Upper Level, Watercrest Mall Shopping Centre, 141 Inanda Road, Waterfall"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "2524",
+    "store_name": "Ballito Lifestyle Centre",
+    "latitude": -29.527,
+    "longitude": 31.201,
+    "province": "KwaZulu-Natal",
+    "city": "KwaDukuza Local Municipality",
+    "address": "43 Lifestyle Centre,, Ballito Bay, Durban"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "253",
+    "store_name": "Old Bakery",
+    "latitude": -34.091,
+    "longitude": 18.461,
+    "province": "Western Cape",
+    "city": "Cape Town Ward 64",
+    "address": "Shop 14  Attwells Village Centre, Cnr Main Rd & Lincoln St, Lakeside"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "2540",
+    "store_name": "Woolworths Ballito Junction",
+    "latitude": -29.527,
+    "longitude": 31.207,
+    "province": "KwaZulu-Natal",
+    "city": "KwaDukuza Local Municipality",
+    "address": "Ballito Junction Mall ERF 1692, Simbitha Drive, Ballitoville"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "2541",
+    "store_name": "Woolworths Cornubia",
+    "latitude": -29.712,
+    "longitude": 31.054,
+    "province": "KwaZulu-Natal",
+    "city": "Umhlanga Rocks",
+    "address": "Erf 607 Situated along the M41, Cornubia Township, Durban"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "256",
+    "store_name": "Woolworths Paarl Mall",
+    "latitude": -33.767,
+    "longitude": 18.966,
+    "province": "Western Cape",
+    "city": "Paarl",
+    "address": "Shop 43  Paarl Mall, Cnr Cecilia Rd & Vlei St, Paarl"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "257",
+    "store_name": "Knysna",
+    "latitude": -34.036,
+    "longitude": 23.046,
+    "province": "Western Cape",
+    "city": "Garden Route District Municipality",
+    "address": "Knysna Mall, Cnr Nelson St & Grey St, Knysna"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "258",
+    "store_name": "Pinelands",
+    "latitude": -33.933,
+    "longitude": 18.51,
+    "province": "Western Cape",
+    "city": "Cape Town",
+    "address": "Shop 473  Howard Centre, Forest Dr, Pinelands"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "262",
+    "store_name": "Willowbridge",
+    "latitude": -33.869,
+    "longitude": 18.632,
+    "province": "Western Cape",
+    "city": "Bellville",
+    "address": "Shop 46  Willowbridge Shopping Centre, Carel Cronje Rd, Tyger Valley"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "265",
+    "store_name": "Grassy Park",
+    "latitude": -34.053,
+    "longitude": 18.489,
+    "province": "Western Cape",
+    "city": "Cafda Village",
+    "address": "Cnr Prince George Dr & 5th Ave, Grassy Park"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "271",
+    "store_name": "Woolworths Palmyra",
+    "latitude": -33.98,
+    "longitude": 18.467,
+    "province": "Western Cape",
+    "city": "Cape Town",
+    "address": "1 Palmyra Shopping Centre, Palmyra Road, Claremont"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "3008",
+    "store_name": "Woolworths Mall of The North",
+    "latitude": -23.874,
+    "longitude": 29.51,
+    "province": "Limpopo",
+    "city": "Polokwane",
+    "address": "Bendor Ext 99, Modjajiskloof Rd and N1, Polokwane"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "3039",
+    "store_name": "Grayston Centre",
+    "latitude": -26.1,
+    "longitude": 28.066,
+    "province": "Gauteng",
+    "city": "Sandton",
+    "address": "Grayston Drive Shopping Centre, Cnr Grayston Dr & Helen St, Sandton"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "3057",
+    "store_name": "Tzaneen",
+    "latitude": -23.824,
+    "longitude": 30.162,
+    "province": "Limpopo",
+    "city": "Greater Tzaneen Local Municipality",
+    "address": "Shop 1 Tzaneen Mall           , Agatha Street                 "
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "3065",
+    "store_name": "Cradlestone",
+    "latitude": -26.061,
+    "longitude": 27.837,
+    "province": "Gauteng",
+    "city": "Krugersdorp",
+    "address": "Cradlestone Centre, Cnr N14 and Hendrik Potgieter, Krugersdorp"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "3084",
+    "store_name": "Woolworths Mall Of The South",
+    "latitude": -26.315,
+    "longitude": 28.061,
+    "province": "Gauteng",
+    "city": "Johannesburg",
+    "address": "Mall of the South, 1 Klipriver Drive, Aspen Lakes x9, Johannesburg"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "3088",
+    "store_name": "Woolworths Rosebank Mall",
+    "latitude": -26.143,
+    "longitude": 28.054,
+    "province": "Gauteng",
+    "city": "Rosebank",
+    "address": "Corner Baker & Cradock Avenues, Rosebank"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "3089",
+    "store_name": "The Club (Dely Rd)",
+    "latitude": -25.778,
+    "longitude": 28.257,
+    "province": "Gauteng",
+    "city": "Pretoria",
+    "address": "The Club, Erf 147, C/o Pinaster Ave & 18th Street , Waterkloof, Pretoria"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "3090",
+    "store_name": "Woolworths Mall Of Africa",
+    "latitude": -26.015,
+    "longitude": 28.107,
+    "province": "Gauteng",
+    "city": "Johannesburg",
+    "address": "Lone Creek Crescent & Magwa Crescent, Waterval 5 - Ir, Midrand"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "3093",
+    "store_name": "Broadacres",
+    "latitude": -26.001,
+    "longitude": 27.983,
+    "province": "Gauteng",
+    "city": "Randburg",
+    "address": "Broadacres Shopping Centre, Cnr Of Cedar & Valley Rd, Sandton"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "3132",
+    "store_name": "Kyalami",
+    "latitude": -25.983,
+    "longitude": 28.075,
+    "province": "Gauteng",
+    "city": "Johannesburg Ward 94",
+    "address": "Cnr of M71 and R55 Roads, Kyalami Estate, Johannesburg"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "3138",
+    "store_name": "Jean Crossing",
+    "latitude": -25.841,
+    "longitude": 28.186,
+    "province": "Gauteng",
+    "city": "Centurion",
+    "address": "CNR Jean Avenue & Rabie Street, N1 Highway"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "3143",
+    "store_name": "Lemontree",
+    "latitude": -26.281,
+    "longitude": 28.124,
+    "province": "Gauteng",
+    "city": "Alberton",
+    "address": "Shop 550 Lemontree Shopping Centre, 18 Lincoln Road, New Market Park, Alberton"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "3151",
+    "store_name": "Rynfield",
+    "latitude": -26.147,
+    "longitude": 28.342,
+    "province": "Gauteng",
+    "city": "Rynfield",
+    "address": "Cnr Richard and Pretoria Streets, Rynfield"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "3155",
+    "store_name": "Woolworths Musina Mall",
+    "latitude": -22.339,
+    "longitude": 30.041,
+    "province": "Limpopo",
+    "city": "Musina",
+    "address": "ERF 1628 Messina Ext 9, Cnr N1 Highway & Smelter Avenue, Musina"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "3167",
+    "store_name": "Makhado Crossing",
+    "latitude": -23.073,
+    "longitude": 29.858,
+    "province": "Limpopo",
+    "city": "Louis Trichardt",
+    "address": "Makhado Crossing Mall, Portion 88 A Portion of , Portion 7 of Farm Bergvliet 288LS"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "3168",
+    "store_name": "Northridge Mall",
+    "latitude": -29.106,
+    "longitude": 26.193,
+    "province": "Free State",
+    "city": "Bloemfontein",
+    "address": "Kenneth Kaunda Road & Christo Groenewald St, Helicon Heights, Bloemfontein"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "3174",
+    "store_name": "Olympus Village",
+    "latitude": -25.799,
+    "longitude": 28.331,
+    "province": "Gauteng",
+    "city": "Tshwane Ward 101",
+    "address": "Olympus Village Mall, 2029 Olympus Street, Boardwalk  X 5, Pretoria"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "3189",
+    "store_name": "W Edit Irene Link",
+    "latitude": -25.861,
+    "longitude": 28.214,
+    "province": "Gauteng",
+    "city": "Irene",
+    "address": "Irene Link, Corner Alexandra Road and Impala Street, Pretoria"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "323",
+    "store_name": "Westwood",
+    "latitude": -29.828,
+    "longitude": 30.961,
+    "province": "KwaZulu-Natal",
+    "city": "Durban",
+    "address": "Westwood Centre   Cnr N2 & M13, Palmiet, Westville"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "324",
+    "store_name": "Scottburgh",
+    "latitude": -30.294,
+    "longitude": 30.739,
+    "province": "KwaZulu-Natal",
+    "city": "uMdoni Local Municipality",
+    "address": "Scottburgh Shopping Centre, Main Rd, Scottburgh"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "337",
+    "store_name": "Woolworths Musgrave",
+    "latitude": -29.85,
+    "longitude": 30.999,
+    "province": "KwaZulu-Natal",
+    "city": "Durban",
+    "address": "Musgrave Centre, Musgrave Rd, Durban"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "340",
+    "store_name": "La Lucia",
+    "latitude": -29.754,
+    "longitude": 31.066,
+    "province": "KwaZulu-Natal",
+    "city": "Umhlanga Rocks",
+    "address": "La Lucia Mall, William Campbell Dr, La Lucia"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "342",
+    "store_name": "Woolworths Westville Pavilion",
+    "latitude": -29.849,
+    "longitude": 30.934,
+    "province": "KwaZulu-Natal",
+    "city": "Queensburgh",
+    "address": "Westville Pavillion Shopping Centre, Spine Rd, Westville"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "349",
+    "store_name": "Westville Mall",
+    "latitude": -29.836,
+    "longitude": 30.918,
+    "province": "KwaZulu-Natal",
+    "city": "Durban",
+    "address": "Westville Mall Shopping Centre, Buckingham Terrace, Westville"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "350",
+    "store_name": "Delcairn",
+    "latitude": -29.796,
+    "longitude": 30.84,
+    "province": "KwaZulu-Natal",
+    "city": "Kloof",
+    "address": "12-16 Village Rd, Kloof"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "354",
+    "store_name": "Woolworths Midlands Mall",
+    "latitude": -29.581,
+    "longitude": 30.378,
+    "province": "KwaZulu-Natal",
+    "city": "Pietermaritzburg",
+    "address": "Shop 126  Midlands Mall, Sanctuary Rd, Pietermaritzburg"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "355",
+    "store_name": "Galleria",
+    "latitude": -30.033,
+    "longitude": 30.899,
+    "province": "KwaZulu-Natal",
+    "city": "Umbogintwini",
+    "address": "Shop 55, Galleria Shopp Cntr  , c/o Moss-Kolnick & N2 Highway "
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "361",
+    "store_name": "Meyersdal",
+    "latitude": -26.288,
+    "longitude": 28.104,
+    "province": "Gauteng",
+    "city": "Alberton",
+    "address": "Shop 1  Meyersdal Square, Cnr Michelle St & Jochen van Bruggen St, Randhart"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "364",
+    "store_name": "Zambezi Junction",
+    "latitude": -25.682,
+    "longitude": 28.273,
+    "province": "Gauteng",
+    "city": "Pretoria",
+    "address": "Zambezi Junction Shopping Centre   , Cnr Breed Rd & Zambezi Dr, Montanapark"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "376",
+    "store_name": "Woolworths Vaal Mall",
+    "latitude": -26.71,
+    "longitude": 27.822,
+    "province": "Gauteng",
+    "city": "Emfuleni Local Municipality",
+    "address": "Cnr Barrage Rd And Rossini Blvd, Vanderbijlpark"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "378",
+    "store_name": "Columbine Sq",
+    "latitude": -26.272,
+    "longitude": 28.03,
+    "province": "Gauteng",
+    "city": "Johannesburg",
+    "address": "Columbine Square Centre   , Columbine Ave Winchester Hills, Johannesburg"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "383",
+    "store_name": "Trade Route Mall",
+    "latitude": -26.327,
+    "longitude": 27.869,
+    "province": "Gauteng",
+    "city": "Lenasia",
+    "address": "Shop 65  Trade Route Mall Shopping Centre, Cnr Klipspruit Rd & Nirvana Rd, Lenasia"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "395",
+    "store_name": "Chilli Lane",
+    "latitude": -26.03,
+    "longitude": 28.06,
+    "province": "Gauteng",
+    "city": "Johannesburg",
+    "address": "Cnr Rivonia Rd Ext & Leeukop Rd, Ext 142, Sunninghill"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "404",
+    "store_name": "Bedfordview",
+    "latitude": -26.184,
+    "longitude": 28.134,
+    "province": "Gauteng",
+    "city": "Oriel",
+    "address": "Village View Shopping Centre, Cnr Van Buuren Rd & Kloof Rd, Bedfordview"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "405",
+    "store_name": "Woolworths Brooklyn",
+    "latitude": -25.773,
+    "longitude": 28.234,
+    "province": "Gauteng",
+    "city": "Pretoria",
+    "address": "Brooklyn Mall   338 Bronkhorst St, New Muckleneuk, Brooklyn"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "413",
+    "store_name": "Douglasdale",
+    "latitude": -26.041,
+    "longitude": 27.993,
+    "province": "Gauteng",
+    "city": "Randburg",
+    "address": "Village Shopping Centre, Cnr Douglas & Leslie Rd, Douglasdale"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "414",
+    "store_name": "Woolworths Montana",
+    "latitude": -25.682,
+    "longitude": 28.252,
+    "province": "Gauteng",
+    "city": "Pretoria",
+    "address": "Kolonade Shopping Centre, Zambezi Dr, Pretoria North"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "415",
+    "store_name": "River Square",
+    "latitude": -26.663,
+    "longitude": 27.971,
+    "province": "Gauteng",
+    "city": "Emfuleni Local Municipality",
+    "address": "River Square Centre, Nile Dr, Three Rivers"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "420",
+    "store_name": "Sunward Park",
+    "latitude": -26.257,
+    "longitude": 28.264,
+    "province": "Gauteng",
+    "city": "Sunward Park",
+    "address": "Kingfisher Corner, Cnr Kingfisher Rd & Nicholson Rd, Sunward Park"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "429",
+    "store_name": "Greenside",
+    "latitude": -26.148,
+    "longitude": 28.012,
+    "province": "Gauteng",
+    "city": "Rosebank",
+    "address": "127 Greenways Rd, Greenside"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "430",
+    "store_name": "Northcliff",
+    "latitude": -26.145,
+    "longitude": 27.952,
+    "province": "Gauteng",
+    "city": "Johannesburg",
+    "address": "14th Avenue, Northcliff  , Mountain View Centre, Cresta"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "431",
+    "store_name": "Northwold - Boskruin",
+    "latitude": -26.087,
+    "longitude": 27.959,
+    "province": "Gauteng",
+    "city": "Randburg",
+    "address": "Boskruin Village Shopping Centre, Corner Hawken Road & Pres Fouche Drive, Randpark Ridge"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "432",
+    "store_name": "Woolworths Sammy Marks",
+    "latitude": -25.744,
+    "longitude": 28.194,
+    "province": "Gauteng",
+    "city": "Pretoria",
+    "address": "Sammy Marks Square, Church Street, Pretoria"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "436",
+    "store_name": "Woolworths Ilanga Mall",
+    "latitude": -25.469,
+    "longitude": 30.956,
+    "province": "Mpumalanga",
+    "city": "Mbombela",
+    "address": "Shop U32 Ilanga Mall, Cnr of Bitterbessie and Flamboyant Str, West Acres"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "437",
+    "store_name": "Woolworths Fourways",
+    "latitude": -26.02,
+    "longitude": 28.005,
+    "province": "Gauteng",
+    "city": "Randburg",
+    "address": "Fourways Mall, Cnr William Nichol Dr & Witkoppen Rd, Four Ways"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "452",
+    "store_name": "Woolworths Cresta",
+    "latitude": -26.13,
+    "longitude": 27.974,
+    "province": "Gauteng",
+    "city": "Johannesburg",
+    "address": "Shop U18  Cresta Shopping Centre, Ext 4, Cresta"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "464",
+    "store_name": "Town Square",
+    "latitude": -26.137,
+    "longitude": 27.918,
+    "province": "Gauteng",
+    "city": "Roodepoort",
+    "address": "Hendrik Potgieter  & Albert Rd, Weltevredenpark"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "471",
+    "store_name": "Killarney Mall",
+    "latitude": -26.167,
+    "longitude": 28.054,
+    "province": "Gauteng",
+    "city": "Johannesburg",
+    "address": "Killarney Shopping Centre, 60 Riviera Rd, Killarney"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "473",
+    "store_name": "Woolworths Eastgate",
+    "latitude": -26.18,
+    "longitude": 28.116,
+    "province": "Gauteng",
+    "city": "Johannesburg",
+    "address": "Eastgate Shopping Mall, 43 Bradford Rd, Bedfordview"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "475",
+    "store_name": "Woolworths Sandton City",
+    "latitude": -26.11,
+    "longitude": 28.051,
+    "province": "Gauteng",
+    "city": "Johannesburg",
+    "address": "Sandton City, 79 Rivonia Rd, Sandton"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "489",
+    "store_name": "Rivonia",
+    "latitude": -26.059,
+    "longitude": 28.061,
+    "province": "Gauteng",
+    "city": "Sandton",
+    "address": "Mutual Village, Rivonia Blvd, Rivonia"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "490",
+    "store_name": "Woolworths Melrose Arch",
+    "latitude": -26.132,
+    "longitude": 28.07,
+    "province": "Gauteng",
+    "city": "Johannesburg",
+    "address": "Cnr Athol Oaklands Rd, Corlett Dr & M1, Melrose North"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "498",
+    "store_name": "Woolworths East Rand Mall",
+    "latitude": -26.182,
+    "longitude": 28.238,
+    "province": "Gauteng",
+    "city": "Dunmadley",
+    "address": "East Rand Mall, Bentel Ave, Boksburg"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "502",
+    "store_name": "Norwood",
+    "latitude": -26.147,
+    "longitude": 28.079,
+    "province": "Gauteng",
+    "city": "Johannesburg",
+    "address": "Norwood Shopping Centre, Cnr Sarie Marais Rd & Africa Ave, Norwood"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "529",
+    "store_name": "Mooiriver Mall",
+    "latitude": -26.714,
+    "longitude": 27.104,
+    "province": "North West",
+    "city": "Potchefstroom",
+    "address": "Cnr Mooiriver Ave & Lombard St, Potchefstroom"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "531",
+    "store_name": "Woolworths The Grove",
+    "latitude": -25.766,
+    "longitude": 28.325,
+    "province": "Gauteng",
+    "city": "Tshwane Ward 85",
+    "address": "The Grove, c/o Lynnwood Rd    , & Vermooten Drive, Die Wilgers"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "533",
+    "store_name": "Proposed Hazeldene",
+    "latitude": -25.785,
+    "longitude": 28.354,
+    "province": "Gauteng",
+    "city": "Shere",
+    "address": "Hazeldene Shopping Centre, Silver Lakes Rd, Pretoria"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "536",
+    "store_name": "Woolworths Greenstone Hill",
+    "latitude": -26.12,
+    "longitude": 28.141,
+    "province": "Gauteng",
+    "city": "Johannesburg",
+    "address": "Cnr Modderfontein Rd & Van Riebeek Ave, Edenvale Ext 1"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "543",
+    "store_name": "Doringkloof",
+    "latitude": -25.856,
+    "longitude": 28.216,
+    "province": "Gauteng",
+    "city": "Irene",
+    "address": "Doringkloof Shopping Centre, Cnr Asther Rd & Protea Rd, Doringkloof"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "552",
+    "store_name": "Woolworths Loch Logan",
+    "latitude": -29.117,
+    "longitude": 26.21,
+    "province": "Free State",
+    "city": "Bloemfontein",
+    "address": "Loch Logan Waterfront, Cnr 1st Ave & 103-105 Henry St, Bloemfontein"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "554",
+    "store_name": "Diamond Mall",
+    "latitude": -28.764,
+    "longitude": 24.766,
+    "province": "Northern Cape",
+    "city": "Sol Plaatje Local Municipality",
+    "address": "Cnr Oliver Rd & Crulkshank Rd, Monument Heights"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "566",
+    "store_name": "Woolworths Centurion Mall",
+    "latitude": -25.857,
+    "longitude": 28.187,
+    "province": "Gauteng",
+    "city": "Pretoria",
+    "address": "Shop1 Centurion Park          , Btwn Gordon Hood & Crawford Rd"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "567",
+    "store_name": "Woolworths Clearwater Mall",
+    "latitude": -26.127,
+    "longitude": 27.907,
+    "province": "Gauteng",
+    "city": "Roodepoort",
+    "address": "Cnr Christiaan De Wet Rd & Hendrik Potgieter Rd, Strubens Valley"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "568",
+    "store_name": "Lynnwood road",
+    "latitude": -25.758,
+    "longitude": 28.242,
+    "province": "Gauteng",
+    "city": "Pretoria",
+    "address": "Shop 8, Hillcrest Boulevard Shopping Centre, cnr Lynnwood & Durbury Rd, Hillcrest, Pretoria"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "570",
+    "store_name": "Woodbridge",
+    "latitude": -26.079,
+    "longitude": 28.247,
+    "province": "Gauteng",
+    "city": "Kempton Park",
+    "address": "Shop 17  Woodbridge Mall, Cnr Monument Rd & Dann Rd, Glenmarais"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "573",
+    "store_name": "Farramere",
+    "latitude": -26.163,
+    "longitude": 28.303,
+    "province": "Gauteng",
+    "city": "Farrarmere Gardens",
+    "address": "The Square at Farrarmere Shopping Centre, Cnr Kei Rd & Maalstroom Rd, Farrarmere"
+  },
+  {
+    "retailer": "woolworths",
+    "store_code": "574",
+    "store_name": "Woolworths Northgate",
+    "latitude": -26.06,
+    "longitude": 27.946,
+    "province": "Gauteng",
+    "city": "Randburg",
+    "address": "Northgate Shopping Centre, Cnr Norththumberland Rd & Olivenhout Rd, Randburg"
+  }
+]

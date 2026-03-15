@@ -293,13 +293,33 @@ Frozen | Food Cupboard | Snacks | Beverages
 
 ---
 
-### Sprint 9: Expand Store Database
+### Sprint 9: Expand Store Database ✅ COMPLETE
 
-**Goal:** Improve store location coverage. Look at the `database/edge_functions/stores-nearby` and also the `plans/checkers_near_stores.sh` such that we can expand our store db as we currently have much less checkers stores than others.
+**Goal:** Improve store location coverage across all 4 retailers.
 
-- **Approach:** Research additional store data sources, update Supabase `retailer_stores` table
-- **Edge Function:** May need to increase search radius or add mall-specific entries
-- **Not code-heavy:** Mostly data collection and DB updates
+**Completed:**
+
+- **Store count: 394 → 1,394 (3.5x increase)**
+  - PnP: 69 → **741** (10.7x) — normalized from existing `pnp_stores_v2.json` (2473 entries, filtered to SA grocery stores)
+  - Checkers: 119 → **275** (2.3x) — scraped via Hybris `findStores` endpoint from 112 query points
+  - Shoprite: 97 → **250** (2.6x) — scraped via Hybris `findStores` endpoint from 71 query points
+  - Woolworths: 109 → **109** — `validatePlace` API returning 500 errors, existing data preserved
+- **API discovery:** Checkers/Shoprite `findStores` endpoint works without auth (just `x-requested-with: XMLHttpRequest`). PnP OCC basesites endpoint provided full store list. Woolworths `getPrediction` + `validatePlace` two-step flow.
+- **Data enrichment:** Nominatim reverse geocoding for province/city on stores missing that data
+- **Data quality:** Filtered non-SA stores (Eswatini, Botswana, Lesotho), validated coordinate bounds, normalized province names
+- **PostGIS fix:** Populated `location` geography column for all new stores (`ST_SetSRID(ST_MakePoint(longitude, latitude), 4326)::geography`) — required for `find_all_nearest_stores` RPC distance calculations
+- **Verified:** `stores-nearby` edge function returns correct nearest store per retailer from multiple test locations (Irene, Cape Town CBD, Durban CBD)
+
+**Scripts created** (`database/all_stores/`):
+
+| Script | Purpose |
+|--------|---------|
+| `scrape_checkers_stores.py` | Scrape Checkers via Hybris findStores (112 query points) |
+| `scrape_shoprite_stores.py` | Scrape Shoprite via Hybris findStores (71 query points) |
+| `scrape_woolworths_stores.py` | Scrape Woolworths via getPrediction + validatePlace |
+| `normalize_pnp_stores.py` | Convert pnp_stores_v2.json to standard format |
+| `merge_all_stores.py` | Merge all retailers + Nominatim enrichment |
+| `import_to_supabase.mjs` | Upsert all_stores_combined.json to Supabase |
 
 ---
 
