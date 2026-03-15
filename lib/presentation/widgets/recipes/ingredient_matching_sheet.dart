@@ -17,10 +17,14 @@ class IngredientMatchingSheet extends ConsumerStatefulWidget {
   final RecipeIngredient ingredient;
   final Function(IngredientProductMatch) onSelectMatch;
 
+  /// Pre-selects a retailer chip when the sheet opens (used by comparison swap flow).
+  final String? initialRetailer;
+
   const IngredientMatchingSheet({
     super.key,
     required this.ingredient,
     required this.onSelectMatch,
+    this.initialRetailer,
   });
 
   @override
@@ -37,6 +41,9 @@ class _IngredientMatchingSheetState
   void initState() {
     super.initState();
     _searchController.text = widget.ingredient.ingredientName;
+    if (widget.initialRetailer != null) {
+      _selectedRetailer = widget.initialRetailer;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _searchMatches();
     });

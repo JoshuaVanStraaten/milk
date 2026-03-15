@@ -13,6 +13,7 @@ import '../../data/models/live_product.dart';
 import '../../data/repositories/recipe_repository.dart';
 import '../../data/services/gemini_service.dart';
 import '../../data/services/image_lookup_service.dart';
+import '../../core/constants/retailers.dart';
 import 'store_provider.dart'; // includes smartMatchingServiceProvider
 
 // =============================================================================
@@ -153,7 +154,11 @@ class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
 
       state = state.copyWith(
         isLoading: false,
-        currentStep: RecipeGenerationStep.review,
+        // Skip the review step — land directly on matching so users can
+        // immediately see matched ingredients and export without an extra tap.
+        currentStep: autoMatch
+            ? RecipeGenerationStep.matching
+            : RecipeGenerationStep.review,
         matchedRetailer: preferredRetailer,
       );
     } on GeminiException catch (e) {
@@ -386,11 +391,15 @@ class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
     }
   }
 
-  /// Export recipe to shopping list
+  /// Export recipe to shopping list.
+  ///
+  /// [selectedIngredientIds] — if provided, only these ingredients are exported.
+  /// Pass null to export all matched ingredients (legacy behaviour).
   Future<String?> exportToShoppingList({
     required String listName,
     String? storeName,
     bool saveRecipe = false,
+    Set<String>? selectedIngredientIds,
   }) async {
     if (state.generatedRecipe == null) return null;
 
@@ -404,9 +413,20 @@ class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
         await this.saveRecipe();
       }
 
+      // Filter ingredients to selected set (if provided)
+      final recipe = selectedIngredientIds != null
+          ? state.generatedRecipe!.copyWith(
+              ingredients: state.generatedRecipe!.ingredients
+                  .where((i) =>
+                      i.ingredientId != null &&
+                      selectedIngredientIds.contains(i.ingredientId))
+                  .toList(),
+            )
+          : state.generatedRecipe!;
+
       // Determine store name from matched ingredients
       if (storeName == null || storeName.isEmpty) {
-        final matchedRetailers = state.generatedRecipe!.ingredients
+        final matchedRetailers = recipe.ingredients
             .where((i) => i.matchedRetailer != null)
             .map((i) => i.matchedRetailer!)
             .toList();
@@ -423,7 +443,7 @@ class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
       }
 
       final listId = await _repository.exportToShoppingList(
-        recipe: state.generatedRecipe!,
+        recipe: recipe,
         listName: listName,
         storeName: storeName ?? 'Mixed Stores',
       );
@@ -436,6 +456,63 @@ class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
       return listId;
     } catch (e) {
       debugPrint('Error exporting to shopping list: $e');
+      state = state.copyWith(
+        isLoading: false,
+        error: 'Failed to export to shopping list.',
+        errorTitle: 'Export Failed',
+        currentStep: RecipeGenerationStep.review,
+      );
+      return null;
+    }
+  }
+
+  /// Export a fully-built [recipe] directly to a shopping list.
+  ///
+  /// Used by the retailer comparison flow (Sprint 10b) where the caller
+  /// has already assembled the ingredient list with the chosen retailer's
+  /// matches applied.
+  Future<String?> exportRecipeDirectly({
+    required Recipe recipe,
+    required String listName,
+    bool saveRecipe = false,
+  }) async {
+    state = state.copyWith(
+      isLoading: true,
+      currentStep: RecipeGenerationStep.export,
+    );
+
+    try {
+      if (saveRecipe && state.generatedRecipe?.recipeId == null) {
+        await this.saveRecipe();
+      }
+
+      final storeName = recipe.ingredients
+              .where((i) => i.matchedRetailer != null)
+              .map((i) => i.matchedRetailer!)
+              .fold<Map<String, int>>({}, (map, r) {
+                map[r] = (map[r] ?? 0) + 1;
+                return map;
+              })
+              .entries
+              .fold<MapEntry<String, int>?>(null,
+                  (best, e) => best == null || e.value > best.value ? e : best)
+              ?.key ??
+          'Mixed Stores';
+
+      final listId = await _repository.exportToShoppingList(
+        recipe: recipe,
+        listName: listName,
+        storeName: storeName,
+      );
+
+      state = state.copyWith(
+        isLoading: false,
+        currentStep: RecipeGenerationStep.complete,
+      );
+
+      return listId;
+    } catch (e) {
+      debugPrint('Error exporting recipe directly: $e');
       state = state.copyWith(
         isLoading: false,
         error: 'Failed to export to shopping list.',
@@ -823,3 +900,160 @@ final recipeSuggestionsProvider =
       final geminiService = ref.watch(geminiServiceProvider);
       return RecipeSuggestionsNotifier(geminiService);
     });
+
+// =============================================================================
+// RETAILER COMPARISON (Sprint 10b — multi-retailer basket comparison)
+// =============================================================================
+
+class RetailerComparisonNotifier
+    extends StateNotifier<RetailerComparisonState> {
+  final Ref _ref;
+
+  RetailerComparisonNotifier(this._ref)
+      : super(const RetailerComparisonState());
+
+  /// Search all 4 retailers in parallel for [selectedIngredients] and build
+  /// a cost basket per retailer. Results stream in as each retailer completes.
+  Future<void> runComparison({
+    required List<RecipeIngredient> selectedIngredients,
+  }) async {
+    if (selectedIngredients.isEmpty) return;
+
+    final storeSelection = _ref.read(storeSelectionProvider).value;
+    if (storeSelection == null) return;
+
+    // Initialise all baskets as loading
+    final initialBaskets = Map.fromEntries(
+      Retailers.all.keys.map(
+        (name) => MapEntry(
+          name,
+          RetailerBasket(
+            retailerName: name,
+            matches: {},
+            isLoading: true,
+          ),
+        ),
+      ),
+    );
+    state = RetailerComparisonState(isLoading: true, baskets: initialBaskets);
+
+    final api = _ref.read(liveApiServiceProvider);
+    final smartMatcher = _ref.read(smartMatchingServiceProvider);
+    final imageLookup = ImageLookupService.instance;
+
+    Future<void> fetchRetailer(String retailerName) async {
+      final store = storeSelection.stores[retailerName];
+      if (store == null) {
+        final basket = RetailerBasket(
+          retailerName: retailerName,
+          matches: {
+            for (final i in selectedIngredients) i.ingredientId!: null,
+          },
+          isLoading: false,
+          error: 'Not available nearby',
+        );
+        state = state.copyWith(
+          baskets: {...state.baskets, retailerName: basket},
+        );
+        return;
+      }
+
+      // Process ingredients sequentially to avoid flooding the Edge Functions
+      // with too many parallel requests (4 retailers × N ingredients = 4N calls).
+      final results = <MapEntry<String, IngredientProductMatch?>>[];
+      for (final ingredient in selectedIngredients) {
+        try {
+          final query = RecipeGenerationNotifier._cleanIngredientForSearch(
+            ingredient.ingredientName,
+          );
+          final response = await api
+              .searchProducts(
+                query: query,
+                store: store,
+                retailer: retailerName,
+                pageSize: 10,
+              )
+              .timeout(const Duration(seconds: 12));
+
+          var products = response.products;
+          // Resolve images for Checkers/Shoprite
+          final lower = retailerName.toLowerCase();
+          if (imageLookup.isReady &&
+              (lower.contains('checkers') || lower.contains('shoprite'))) {
+            products = products.map((p) {
+              final cached = imageLookup.lookupImage(
+                retailer: retailerName,
+                productName: p.name,
+              );
+              return cached != null ? p.copyWith(imageUrl: cached) : p;
+            }).toList();
+          }
+
+          final best = await smartMatcher.matchIngredient(
+            ingredientName: query,
+            candidates: products,
+          );
+
+          if (best == null) {
+            results.add(MapEntry(ingredient.ingredientId!, null));
+          } else {
+            results.add(MapEntry(
+              ingredient.ingredientId!,
+              IngredientProductMatch(
+                productIndex: '${best.retailer}:${best.name}',
+                productName: best.name,
+                productPrice: best.price,
+                productImageUrl: best.imageUrl,
+                retailer: best.retailer,
+                similarityScore: 1.0,
+              ),
+            ));
+          }
+        } catch (_) {
+          results.add(MapEntry(ingredient.ingredientId!, null));
+        }
+      }
+      final basket = RetailerBasket(
+        retailerName: retailerName,
+        matches: Map.fromEntries(results),
+        isLoading: false,
+      );
+      state = state.copyWith(
+        baskets: {...state.baskets, retailerName: basket},
+      );
+    }
+
+    await Future.wait(Retailers.all.keys.map(fetchRetailer));
+    state = state.copyWith(isLoading: false);
+  }
+
+  /// Replace one ingredient's match in a retailer basket (product swap, 10c).
+  void swapProduct({
+    required String retailerName,
+    required String ingredientId,
+    required IngredientProductMatch newMatch,
+  }) {
+    final basket = state.baskets[retailerName];
+    if (basket == null) return;
+    final updatedMatches = Map<String, IngredientProductMatch?>.from(
+      basket.matches,
+    )..[ingredientId] = newMatch;
+    state = state.copyWith(
+      baskets: {
+        ...state.baskets,
+        retailerName: basket.copyWith(matches: updatedMatches),
+      },
+    );
+  }
+
+  void selectRetailer(String retailerName) {
+    state = state.copyWith(selectedRetailer: retailerName);
+  }
+
+  void reset() => state = const RetailerComparisonState();
+}
+
+final retailerComparisonProvider = StateNotifierProvider.autoDispose<
+    RetailerComparisonNotifier, RetailerComparisonState>((ref) {
+  return RetailerComparisonNotifier(ref);
+});

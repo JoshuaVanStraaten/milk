@@ -471,3 +471,89 @@ class IngredientProductMatch {
 
 // NOTE: RecipeSuggestion is ONLY defined in gemini_service.dart
 // Do NOT add it here to avoid duplicate class conflicts
+
+/// One retailer's matched products for a set of selected ingredients.
+/// Used by the retailer cost comparison feature (Sprint 10b).
+class RetailerBasket {
+  final String retailerName;
+
+  /// ingredientId → best matched product (null = not found / not available)
+  final Map<String, IngredientProductMatch?> matches;
+
+  final bool isLoading;
+  final String? error;
+
+  const RetailerBasket({
+    required this.retailerName,
+    required this.matches,
+    this.isLoading = false,
+    this.error,
+  });
+
+  RetailerBasket copyWith({
+    String? retailerName,
+    Map<String, IngredientProductMatch?>? matches,
+    bool? isLoading,
+    String? error,
+  }) {
+    return RetailerBasket(
+      retailerName: retailerName ?? this.retailerName,
+      matches: matches ?? this.matches,
+      isLoading: isLoading ?? this.isLoading,
+      error: error ?? this.error,
+    );
+  }
+
+  double get total => matches.values
+      .whereType<IngredientProductMatch>()
+      .fold(0.0, (sum, m) => sum + (m.numericPrice ?? 0.0));
+
+  int get matchedCount =>
+      matches.values.whereType<IngredientProductMatch>().length;
+
+  String get formattedTotal => 'R${total.toStringAsFixed(2)}';
+}
+
+/// Full multi-retailer comparison state for the recipe export flow.
+class RetailerComparisonState {
+  final bool isLoading;
+
+  /// retailerName → RetailerBasket
+  final Map<String, RetailerBasket> baskets;
+
+  final String? selectedRetailer;
+  final String? error;
+
+  const RetailerComparisonState({
+    this.isLoading = false,
+    this.baskets = const {},
+    this.selectedRetailer,
+    this.error,
+  });
+
+  RetailerComparisonState copyWith({
+    bool? isLoading,
+    Map<String, RetailerBasket>? baskets,
+    String? selectedRetailer,
+    String? error,
+  }) {
+    return RetailerComparisonState(
+      isLoading: isLoading ?? this.isLoading,
+      baskets: baskets ?? this.baskets,
+      selectedRetailer: selectedRetailer ?? this.selectedRetailer,
+      error: error ?? this.error,
+    );
+  }
+
+  /// Returns the retailer name with the lowest total cost (ignoring empty/unavailable baskets).
+  String? get cheapestRetailer {
+    if (baskets.isEmpty) return null;
+    final loaded = baskets.entries.where(
+      (e) => !e.value.isLoading && e.value.error == null && e.value.matchedCount > 0,
+    );
+    if (loaded.isEmpty) return null;
+    return loaded.reduce((a, b) => a.value.total < b.value.total ? a : b).key;
+  }
+
+  bool get hasData => baskets.values.any((b) => !b.isLoading && b.matchedCount > 0);
+}

@@ -568,48 +568,34 @@ class RecipeResultCard extends StatelessWidget {
 
     switch (currentStep) {
       case RecipeGenerationStep.review:
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+        // Review step is only shown when autoMatch=false (edge case).
+        // In normal flow generation lands directly on matching.
+        // Still show Save/New Recipe so the user has options.
+        return Row(
           children: [
-            FilledButton.icon(
-              onPressed: onStartMatching,
-              icon: const Icon(Icons.shopping_cart),
-              label: const Text('Match Ingredients to Products'),
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: onSaveRecipe,
+                icon: const Icon(Icons.bookmark_add),
+                label: const Text('Save Recipe'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
             ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: onSaveRecipe,
-                    icon: const Icon(Icons.bookmark_add),
-                    label: const Text('Save Recipe'),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: TextButton.icon(
+                onPressed: onReset,
+                icon: const Icon(Icons.refresh),
+                label: const Text('New Recipe'),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextButton.icon(
-                    onPressed: onReset,
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('New Recipe'),
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
           ],
         );
