@@ -9,6 +9,8 @@ class ShoppingList {
   final double totalPrice;
   final String? listColour;
   final String? chatId;
+  final String? ownerEmail; // Populated for shared-with-me lists
+  final int? sharedCount; // Populated for owned lists (number of collaborators)
 
   ShoppingList({
     required this.shoppingListId,
@@ -20,6 +22,8 @@ class ShoppingList {
     required this.totalPrice,
     this.listColour,
     this.chatId,
+    this.ownerEmail,
+    this.sharedCount,
   });
 
   /// Create from JSON (Supabase response)
@@ -66,6 +70,8 @@ class ShoppingList {
     double? totalPrice,
     String? listColour,
     String? chatId,
+    String? ownerEmail,
+    int? sharedCount,
   }) {
     return ShoppingList(
       shoppingListId: shoppingListId ?? this.shoppingListId,
@@ -77,6 +83,8 @@ class ShoppingList {
       totalPrice: totalPrice ?? this.totalPrice,
       listColour: listColour ?? this.listColour,
       chatId: chatId ?? this.chatId,
+      ownerEmail: ownerEmail ?? this.ownerEmail,
+      sharedCount: sharedCount ?? this.sharedCount,
     );
   }
 

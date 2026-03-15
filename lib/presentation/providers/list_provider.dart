@@ -69,6 +69,15 @@ final userListsProvider = FutureProvider<List<ShoppingList>>((ref) async {
   }
 });
 
+/// Provider for shared users of a specific list (returns email addresses)
+final sharedUsersProvider = FutureProvider.family<List<String>, String>((
+  ref,
+  listId,
+) async {
+  final repository = ref.watch(listRepositoryProvider);
+  return repository.getSharedUsers(listId);
+});
+
 /// Provider for a specific list by ID (with caching)
 final listByIdProvider = FutureProvider.family<ShoppingList, String>((
   ref,
@@ -814,7 +823,8 @@ class ListNotifier extends StateNotifier<AsyncValue<void>> {
   }
 
   /// Share list with another user (requires online)
-  Future<bool> shareList({
+  /// Throws with specific error messages on failure.
+  Future<void> shareList({
     required String listId,
     required String shareWithEmail,
   }) async {
@@ -827,11 +837,9 @@ class ListNotifier extends StateNotifier<AsyncValue<void>> {
       );
 
       state = const AsyncValue.data(null);
-
-      return true;
     } catch (e, stackTrace) {
       state = AsyncValue.error(e, stackTrace);
-      return false;
+      rethrow;
     }
   }
 }

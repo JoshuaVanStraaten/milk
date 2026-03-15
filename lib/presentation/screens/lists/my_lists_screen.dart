@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/config/supabase_config.dart';
 import '../../providers/list_provider.dart';
 import '../../widgets/skeleton_loaders.dart';
 import '../../widgets/animations.dart';
@@ -234,6 +235,19 @@ class _ListCard extends ConsumerWidget {
         AppConstants.listColors['Green']!;
     final listColor = Color(colorValue);
 
+    final currentUserId = SupabaseConfig.currentUser?.id;
+    final isSharedWithMe =
+        currentUserId != null && list.userId != currentUserId;
+    final sharedCount = list.sharedCount ?? 0;
+
+    String? sharingLabel;
+    if (isSharedWithMe && list.ownerEmail != null) {
+      sharingLabel = 'Shared by ${list.ownerEmail}';
+    } else if (!isSharedWithMe && sharedCount > 0) {
+      sharingLabel =
+          'Shared with $sharedCount ${sharedCount == 1 ? 'person' : 'people'}';
+    }
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       color: isSelected
@@ -291,6 +305,34 @@ class _ListCard extends ConsumerWidget {
                             : AppColors.textSecondary,
                       ),
                     ),
+                    // Sharing indicator
+                    if (sharingLabel != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Row(
+                          children: [
+                            Icon(
+                              isSharedWithMe
+                                  ? Icons.person_outline
+                                  : Icons.people_outline,
+                              size: 14,
+                              color: isDark
+                                  ? AppColors.textSecondaryDark
+                                  : AppColors.textSecondary,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              sharingLabel,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isDark
+                                    ? AppColors.textSecondaryDark
+                                    : AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     const SizedBox(height: 8),
                     Text(
                       'Total: R${list.totalPrice.toStringAsFixed(2)}',

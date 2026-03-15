@@ -77,29 +77,76 @@ class ListRepository {
           .map((json) => ShoppingList.fromJson(json))
           .toList();
 
+      // Get share counts for owned lists
+      final ownedIds = ownedLists.map((l) => l.shoppingListId).toList();
+      List<ShoppingList> ownedWithCounts = ownedLists;
+      if (ownedIds.isNotEmpty) {
+        try {
+          final shareCountResponse = await _supabase
+              .from('Shared_lists')
+              .select('ShoppingList_ID')
+              .inFilter('ShoppingList_ID', ownedIds);
+
+          final countMap = <String, int>{};
+          for (final row in (shareCountResponse as List)) {
+            final id = row['ShoppingList_ID'] as String;
+            countMap[id] = (countMap[id] ?? 0) + 1;
+          }
+
+          ownedWithCounts = ownedLists
+              .map((l) => l.copyWith(sharedCount: countMap[l.shoppingListId] ?? 0))
+              .toList();
+        } catch (e) {
+          _logger.w('Could not fetch share counts: $e');
+        }
+      }
+
       // Get shared lists
       final sharedResponse = await _supabase
           .from('Shared_lists')
-          .select('ShoppingList_ID')
+          .select('ShoppingList_ID, OwnerID')
           .eq('Shared_With', userId);
 
-      final sharedListIds = (sharedResponse as List)
-          .map((json) => json['ShoppingList_ID'] as String)
+      final sharedEntries = (sharedResponse as List)
+          .map((json) => {
+                'listId': json['ShoppingList_ID'] as String,
+                'ownerId': json['OwnerID'] as String,
+              })
           .toList();
+
+      // Look up owner emails for shared lists
+      final ownerIds = sharedEntries.map((e) => e['ownerId']!).toSet().toList();
+      final ownerEmailMap = <String, String>{};
+      if (ownerIds.isNotEmpty) {
+        try {
+          final profilesResponse = await _supabase
+              .from('user_profiles')
+              .select('id, email_address')
+              .inFilter('id', ownerIds);
+
+          for (final row in (profilesResponse as List)) {
+            ownerEmailMap[row['id'] as String] = row['email_address'] as String;
+          }
+        } catch (e) {
+          _logger.w('Could not fetch owner emails: $e');
+        }
+      }
 
       // Fetch full details for shared lists
       final List<ShoppingList> sharedLists = [];
-      for (final listId in sharedListIds) {
+      for (final entry in sharedEntries) {
         try {
-          final list = await getListById(listId);
-          sharedLists.add(list);
+          final list = await getListById(entry['listId']!);
+          sharedLists.add(list.copyWith(
+            ownerEmail: ownerEmailMap[entry['ownerId']!],
+          ));
         } catch (e) {
-          _logger.w('Could not fetch shared list $listId: $e');
+          _logger.w('Could not fetch shared list ${entry['listId']}: $e');
         }
       }
 
       // Combine and sort by created_at
-      final allLists = [...ownedLists, ...sharedLists];
+      final allLists = [...ownedWithCounts, ...sharedLists];
       allLists.sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
       _logger.i(

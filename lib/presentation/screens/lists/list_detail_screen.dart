@@ -15,6 +15,7 @@ import '../../widgets/animations.dart';
 import '../../widgets/common/app_snackbar.dart';
 import '../../widgets/common/empty_states.dart';
 import '../compare/compare_sheet.dart';
+import '../../widgets/lists/share_list_sheet.dart';
 
 class ListDetailScreen extends ConsumerStatefulWidget {
   final String listId;
@@ -379,7 +380,12 @@ class _ListDetailScreenState extends ConsumerState<ListDetailScreen> {
               title: const Text('Share List'),
               onTap: () {
                 Navigator.pop(context);
-                _showShareDialog(context, ref, list);
+                showShareListSheet(
+                  context,
+                  ref,
+                  listId: widget.listId,
+                  listName: list.listName,
+                );
               },
             ),
             ListTile(
@@ -477,77 +483,6 @@ class _ListDetailScreenState extends ConsumerState<ListDetailScreen> {
     );
   }
 
-  void _showShareDialog(BuildContext context, WidgetRef ref, dynamic list) {
-    final emailController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Share List'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Share "${list.listName}" with another user',
-              style: const TextStyle(fontSize: 14),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: emailController,
-              decoration: const InputDecoration(
-                labelText: 'Email address',
-                hintText: 'friend@example.com',
-                prefixIcon: Icon(Icons.email),
-              ),
-              keyboardType: TextInputType.emailAddress,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () async {
-              final email = emailController.text.trim();
-              if (email.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Please enter an email')),
-                );
-                return;
-              }
-
-              Navigator.pop(context);
-
-              final success = await ref
-                  .read(listNotifierProvider.notifier)
-                  .shareList(listId: widget.listId, shareWithEmail: email);
-
-              if (context.mounted) {
-                if (success) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('List shared with $email'),
-                      backgroundColor: AppColors.success,
-                    ),
-                  );
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Failed to share list'),
-                      backgroundColor: AppColors.error,
-                    ),
-                  );
-                }
-              }
-            },
-            child: const Text('Share'),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class _ListHeader extends StatelessWidget {
