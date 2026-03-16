@@ -190,7 +190,7 @@ Frozen | Food Cupboard | Snacks | Beverages
 
 - **File:** `lib/presentation/screens/home/home_screen.dart`
 - **Approach:** Render `dealsByRetailer` map as retailer-grouped sections with colored headers via `Retailers.fromName()`
-- **Status:** Deferred to Sprint 11 polish pass
+- **Status:** Deferred to Sprint 12 polish pass
 
 **4e. Compact browse header** ✅
 
@@ -364,10 +364,114 @@ Frozen | Food Cupboard | Snacks | Beverages
 
 ---
 
-### Sprint 11: Final UI/UX Polish Pass
+### Sprint 10.6: Recipe Ingredient Matching — Near-100% Accuracy ✅ COMPLETE
+
+**Model:** Opus 4.6
+**Goal:** Dramatically improve recipe ingredient → product matching accuracy from ~80% to near-100%.
+
+**Root cause:** Short/generic ingredient names ("Butter", "Salt", "Milk", "Rice") returned too much noise from retailer search APIs. The scoring algorithm couldn't reliably distinguish actual ingredients from products that merely contain the word (e.g. "Butter Chicken", "Milk Chocolate", "Chocolate Eggs").
+
+**Completed:**
+
+- **Ingredient lookup map** (`lib/data/services/ingredient_lookup.dart`) — static map of ~120 common SA recipe ingredients → optimized search queries + required/exclude word filters. Built from analysis of 42K products across all 4 retailers. Covers dairy, eggs, meat, seafood, produce, pantry, oils, canned goods, baking, spices (including Indian spices), and condiments.
+- **Hint-based pre-filtering** (`lib/data/services/smart_matching_service.dart`) — `matchIngredient()` gains optional `IngredientSearchHint` parameter. Pre-filters candidates using required/exclude words before scoring. Graceful degradation: if filtering removes all candidates, falls back to unfiltered. `hintApplied` flag relaxes extra-word rejection for hint-validated candidates.
+- **Gemini prompt improvements** (`lib/data/services/gemini_service.dart`) — "NEVER output single-word ingredient names" rule (e.g. "Sunflower Oil" not "Oil", "Large Eggs" not "Eggs"). SA-specific terms section (Maize Meal, Beef Mince, Tinned Tomatoes, Vanilla Essence, Cornflour, Spring Onions, Crushed Garlic/Ginger instead of paste).
+- **Pipeline integration** (`lib/presentation/providers/recipe_provider.dart`) — Both `_autoMatchIngredients()` and `RetailerComparisonNotifier.runComparison()` resolve lookup hints and use optimized search queries. pageSize increased 10→15 for better coverage.
+- **Expanded disqualifiers** — added personal care (bath, lotion, teeth, toothbrush, deodorant), noodle, curry to `_disqualifyingWords`
+- **95 tests** (up from 77) — 6 lookup resolution tests + 12 hint-assisted matching tests covering butter, milk, eggs, salt, sugar, rice, olive oil, cream, onion, garlic, pepper, graceful degradation
+
+**Files:**
+- `lib/data/services/ingredient_lookup.dart` (NEW)
+- `lib/data/services/smart_matching_service.dart`
+- `lib/data/services/gemini_service.dart`
+- `lib/presentation/providers/recipe_provider.dart`
+- `test/product_matching_test.dart`
+
+---
+
+### Sprint 11: Additional Retailers — SPAR, Dis-Chem, Clicks
+
+**Model:** Opus 4.6 (API reverse-engineering, architecture) → Sonnet 4.6 (implementation)
+**Goal:** Expand retailer coverage from 4 to 7 — add SPAR, Dis-Chem, and Clicks.
+
+#### 11a. API Research & Edge Functions
+
+Each retailer needs a Supabase Edge Function that proxies product search + category browse.
+
+**SPAR** (`products-spar/index.ts`)
+- Research SPAR online shopping API (myspar.co.za / spar.co.za)
+- Identify product search endpoint, pagination, category structure
+- Build Edge Function with same interface as existing retailers (query, category, page params → standardized product JSON)
+- Map SPAR categories to shared category set (Fruit & Veg, Dairy & Eggs, Meat & Poultry, Bakery, Frozen, Food Cupboard, Snacks, Beverages)
+
+**Dis-Chem** (`products-dischem/index.ts`)
+- Research Dis-Chem online API (dischem.co.za)
+- Dis-Chem is pharmacy-first but has a large grocery/health food/snacks section
+- Focus on food & beverage categories initially, expand to health supplements later
+- Build Edge Function with standardized interface
+
+**Clicks** (`products-clicks/index.ts`)
+- Research Clicks online API (clicks.co.za)
+- Clicks is pharmacy-first with limited grocery — focus on health foods, beverages, snacks, baby food
+- Build Edge Function with standardized interface
+- Note: Clicks may have fewer grocery categories than other retailers — map what's available
+
+**Common for all 3:**
+- CORS headers matching existing pattern
+- CSRF/cookie bypass if needed (document approach per retailer)
+- HTML entity decoding in product names
+- Image URL handling (direct URLs or proxy needed?)
+- Deploy with `supabase functions deploy`
+
+#### 11b. Retailer Config Registration
+
+**File:** `lib/core/constants/retailers.dart`
+- Add `SPAR`, `Dis-Chem`, `Clicks` to `Retailers.all` map
+- Brand colors, icons, slugs, edge function names
+
+**File:** `lib/core/theme/app_colors.dart`
+- Add brand colors: SPAR (green #00833E), Dis-Chem (green #00A94F), Clicks (blue #005BAA)
+
+#### 11c. Store Database
+
+- Scrape/collect store locations for SPAR, Dis-Chem, Clicks (lat/lng, name, province, city)
+- Scripts in `database/all_stores/` following existing pattern
+- Import to Supabase `stores` table with PostGIS `location` column
+- Update `stores-nearby` Edge Function to include new retailers in `find_all_nearest_stores` RPC
+
+#### 11d. Category Mapping
+
+**File:** `lib/core/constants/product_categories.dart`
+- Add SPAR/Dis-Chem/Clicks category mappings to cross-retailer category map
+- Dis-Chem/Clicks may not have all 8 categories — gracefully handle missing ones (hide category chip when browsing those retailers)
+
+#### 11e. Price Comparison Integration
+
+- `SmartMatchingService` / `ProductNameParser` should work out-of-the-box (retailer-agnostic)
+- Retailer comparison sheet (`retailer_comparison_sheet.dart`) — add 3 new tabs (7 total)
+- Consider tab scrolling or 2-row layout for 7 retailers
+- Update `RetailerComparisonNotifier` to search all 7 retailers
+
+#### 11f. Image Handling
+
+- Test if SPAR/Dis-Chem/Clicks images load directly or need proxy
+- If proxy needed, update `image-proxy/index.ts` to handle new retailer URL patterns
+- If direct URLs work, no changes needed
+
+#### 11g. Testing
+
+- Update `test/product_matching_test.dart` with cross-retailer match cases for new retailers
+- Manual test: browse, search, category filter, price compare, recipe export for each new retailer
+- Verify store-nearby returns correct nearest store for all 7 retailers
+
+**Estimated complexity:** High — each retailer is essentially a mini-project (API research + Edge Function + store data + testing). Consider splitting into 11-SPAR, 11-DisChem, 11-Clicks sub-sprints.
+
+---
+
+### Sprint 12: Final UI/UX Polish Pass
 
 **Model:** Opus 4.6 (design review & strategy) → Sonnet 4.6 (implementation)
-**Goal:** Professional, exciting look across the entire app.
+**Goal:** Professional, exciting look across the entire app — now across all 7 retailers.
 
 - Use `ui-ux-pro-max` skill for comprehensive review
 - Dark mode audit (all screens)
@@ -376,6 +480,7 @@ Frozen | Food Cupboard | Snacks | Beverages
 - Loading state improvements
 - Empty state designs
 - Error state designs
+- Verify retailer branding consistency for SPAR, Dis-Chem, Clicks
 
 ---
 
@@ -385,6 +490,7 @@ Frozen | Food Cupboard | Snacks | Beverages
 - Diet plan curation and calorie tracking
 - Store price history trends
 - **Barcode scanner** — scan products in-store, compare prices (needs barcode data in DB first)
+- **More retailers** — Game, Makro, Food Lover's Market if demand warrants
 
 ## Decisions Made
 

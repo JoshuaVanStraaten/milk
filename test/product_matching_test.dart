@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:milk/data/models/live_product.dart';
 import 'package:milk/data/services/gemini_service.dart';
+import 'package:milk/data/services/ingredient_lookup.dart';
 import 'package:milk/data/services/product_name_parser.dart';
 import 'package:milk/data/services/smart_matching_service.dart';
 
@@ -760,6 +761,238 @@ void main() {
         expect(result, isNotNull);
         expect(result!.name, contains('Tomatoes'));
       });
+    });
+  });
+
+  // ###########################################################################
+  // SECTION 3: INGREDIENT LOOKUP & HINT-ASSISTED MATCHING
+  // ###########################################################################
+
+  group('ingredient lookup resolution', () {
+    test('exact match returns hint', () {
+      final hint = IngredientLookup.resolve('butter');
+      expect(hint, isNotNull);
+      expect(hint!.searchQuery, contains('butter'));
+      expect(hint.excludeWords, contains('chicken'));
+    });
+
+    test('exact match — multi-word', () {
+      final hint = IngredientLookup.resolve('olive oil');
+      expect(hint, isNotNull);
+      expect(hint!.requiredWords, contains('olive'));
+      expect(hint.requiredWords, contains('oil'));
+    });
+
+    test('partial match — ingredient contains key', () {
+      final hint = IngredientLookup.resolve('unsalted butter');
+      expect(hint, isNotNull);
+      expect(hint!.searchQuery, contains('unsalted'));
+    });
+
+    test('case insensitive', () {
+      final hint = IngredientLookup.resolve('Olive Oil');
+      expect(hint, isNotNull);
+    });
+
+    test('unknown ingredient returns null', () {
+      final hint = IngredientLookup.resolve('dragon fruit');
+      expect(hint, isNull);
+    });
+
+    test('empty string returns null', () {
+      final hint = IngredientLookup.resolve('');
+      expect(hint, isNull);
+    });
+  });
+
+  group('hint-assisted ingredient matching', () {
+    late SmartMatchingService matcher;
+    setUp(() {
+      matcher = SmartMatchingService(gemini: GeminiService(apiKey: 'test-key'));
+    });
+
+    test('butter with hint excludes Butter Chicken', () async {
+      final hint = IngredientLookup.resolve('butter');
+      final result = await matcher.matchIngredient(
+        ingredientName: 'butter',
+        candidates: [
+          _product('Butter Chicken Curry 400g', price: 49.99),
+          _product('Act II Microwave Popcorn Butter Lovers 85g', price: 24.99),
+          _product('Clover Salted Butter 500g', price: 54.99),
+          _product('Peanut Butter Smooth 400g', price: 44.99),
+        ],
+        hint: hint,
+      );
+      expect(result, isNotNull);
+      expect(result!.name, contains('Clover'));
+    });
+
+    test('milk with hint excludes Milk Chocolate', () async {
+      final hint = IngredientLookup.resolve('milk');
+      final result = await matcher.matchIngredient(
+        ingredientName: 'milk',
+        candidates: [
+          _product('Lindt Milk Chocolate Slab 100g', price: 54.99),
+          _product('Clover Full Cream Milk 2L', price: 36.99),
+          _product('Aquafresh Milk Teeth Toothbrush', price: 29.99),
+        ],
+        hint: hint,
+      );
+      expect(result, isNotNull);
+      expect(result!.name, contains('Full Cream Milk'));
+    });
+
+    test('eggs with hint excludes chocolate eggs', () async {
+      final hint = IngredientLookup.resolve('eggs');
+      final result = await matcher.matchIngredient(
+        ingredientName: 'eggs',
+        candidates: [
+          _product('Eggs Galore Chocolate Mallow Egg 16g', price: 3.99),
+          _product('Cadbury Mini Eggs 74g', price: 34.99),
+          _product('Eggbert Large Eggs 6 Pack', price: 22.99),
+        ],
+        hint: hint,
+      );
+      expect(result, isNotNull);
+      expect(result!.name, contains('Eggbert'));
+    });
+
+    test('salt with hint excludes Dishwasher Salt', () async {
+      final hint = IngredientLookup.resolve('salt');
+      final result = await matcher.matchIngredient(
+        ingredientName: 'salt',
+        candidates: [
+          _product('Marina Dishwasher Salt 2kg', price: 49.99),
+          _product('Salt and Vinegar Crisps 125g', price: 24.99),
+          _product('Cerebos Iodated Table Salt 500g', price: 19.99),
+        ],
+        hint: hint,
+      );
+      expect(result, isNotNull);
+      expect(result!.name, contains('Cerebos'));
+    });
+
+    test('sugar with hint excludes sugar-free drinks', () async {
+      final hint = IngredientLookup.resolve('sugar');
+      final result = await matcher.matchIngredient(
+        ingredientName: 'sugar',
+        candidates: [
+          _product('7UP Sugar Free Soft Drink 500ml', price: 11.99),
+          _product('Beacon Slab Milk Chocolate 80g', price: 19.99),
+          _product('Selati White Sugar 2.5kg', price: 49.99),
+        ],
+        hint: hint,
+      );
+      expect(result, isNotNull);
+      expect(result!.name, contains('Selati'));
+    });
+
+    test('rice with hint excludes Rice Cakes', () async {
+      final hint = IngredientLookup.resolve('rice');
+      final result = await matcher.matchIngredient(
+        ingredientName: 'rice',
+        candidates: [
+          _product('Rice Cakes with Yoghurt Coating 175g', price: 72.99),
+          _product('Tastic Long Grain Parboiled Rice 2kg', price: 49.99),
+          _product('Rice Vermicelli 400g', price: 74.99),
+        ],
+        hint: hint,
+      );
+      expect(result, isNotNull);
+      expect(result!.name, contains('Tastic'));
+    });
+
+    test('olive oil with hint excludes tuna in olive oil', () async {
+      final hint = IngredientLookup.resolve('olive oil');
+      final result = await matcher.matchIngredient(
+        ingredientName: 'olive oil',
+        candidates: [
+          _product('Albacore Tuna Fillets in Olive Oil 180g', price: 84.99),
+          _product('B-well Extra Virgin Olive Oil 1L', price: 89.99),
+          _product('Olive Oil Breadsticks 100g', price: 49.99),
+        ],
+        hint: hint,
+      );
+      expect(result, isNotNull);
+      expect(result!.name, contains('B-well'));
+    });
+
+    test('cream with hint excludes Ice Cream and Cream Cheese', () async {
+      final hint = IngredientLookup.resolve('cream');
+      final result = await matcher.matchIngredient(
+        ingredientName: 'cream',
+        candidates: [
+          _product('Cream Cheese Spread 230g', price: 39.99),
+          _product('Magnum Ice Cream Bar 100ml', price: 34.99),
+          _product('Parmalat Fresh Cream 250ml', price: 24.99),
+        ],
+        hint: hint,
+      );
+      expect(result, isNotNull);
+      expect(result!.name, contains('Fresh Cream'));
+    });
+
+    test('onion with hint excludes Onion Soup and Onion Rings', () async {
+      final hint = IngredientLookup.resolve('onion');
+      final result = await matcher.matchIngredient(
+        ingredientName: 'onion',
+        candidates: [
+          _product('Knorr Brown Onion Soup 50g', price: 14.99),
+          _product('Onion Rings Frozen 500g', price: 39.99),
+          _product('Onions 1kg', price: 19.99),
+        ],
+        hint: hint,
+      );
+      expect(result, isNotNull);
+      expect(result!.name, equals('Onions 1kg'));
+    });
+
+    test('garlic with hint excludes Garlic Bread and Garlic Sauce', () async {
+      final hint = IngredientLookup.resolve('garlic');
+      final result = await matcher.matchIngredient(
+        ingredientName: 'garlic',
+        candidates: [
+          _product('Garlic Bread Baguette 300g', price: 29.99),
+          _product('Garlic and Herb Sauce 250ml', price: 34.99),
+          _product('Garlic 150g', price: 29.99),
+        ],
+        hint: hint,
+      );
+      expect(result, isNotNull);
+      expect(result!.name, equals('Garlic 150g'));
+    });
+
+    test('hint graceful degradation — all filtered out falls back', () async {
+      // If hint filtering removes everything, should fall back to unfiltered
+      final hint = IngredientSearchHint(
+        searchQuery: 'butter',
+        requiredWords: {'impossible_word_xyz'},
+      );
+      final result = await matcher.matchIngredient(
+        ingredientName: 'butter',
+        candidates: [
+          _product('Clover Butter 500g', price: 54.99),
+        ],
+        hint: hint,
+      );
+      // Should still match via fallback
+      expect(result, isNotNull);
+      expect(result!.name, contains('Butter'));
+    });
+
+    test('pepper with hint excludes Peppermint and Pepper Steak', () async {
+      final hint = IngredientLookup.resolve('pepper');
+      final result = await matcher.matchIngredient(
+        ingredientName: 'pepper',
+        candidates: [
+          _product('Peppermint Caramel Dessert 420g', price: 129.99),
+          _product('Pepper Crusted Beef Fillet 800g', price: 399.99),
+          _product('Cape Herb Black Pepper Grinder 50g', price: 58.99),
+        ],
+        hint: hint,
+      );
+      expect(result, isNotNull);
+      expect(result!.name, contains('Black Pepper'));
     });
   });
 }

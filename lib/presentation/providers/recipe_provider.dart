@@ -12,6 +12,7 @@ import '../../data/models/recipe.dart';
 import '../../data/models/live_product.dart';
 import '../../data/repositories/recipe_repository.dart';
 import '../../data/services/gemini_service.dart';
+import '../../data/services/ingredient_lookup.dart';
 import '../../core/constants/retailers.dart';
 import 'store_provider.dart'; // includes smartMatchingServiceProvider
 
@@ -211,6 +212,10 @@ class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
       // Clean the search query — strip quantities, units, prep instructions
       final searchQuery = _cleanIngredientForSearch(ingredient.ingredientName);
 
+      // Resolve ingredient lookup hint for optimized search & filtering
+      final hint = IngredientLookup.resolve(searchQuery);
+      final apiQuery = hint?.searchQuery ?? searchQuery;
+
       // Update progress
       state = state.copyWith(
         matchingCurrent: i + 1,
@@ -225,10 +230,10 @@ class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
           if (store == null) continue;
 
           final response = await api.searchProducts(
-            query: searchQuery,
+            query: apiQuery,
             store: store,
             retailer: preferredRetailer,
-            pageSize: 10, // Fetch more to find better matches
+            pageSize: 15, // Fetch more to find better matches with hint filtering
           );
           matches = response.products;
         } else {
@@ -236,10 +241,10 @@ class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
           final store = storeSelection.stores[firstRetailer]!;
 
           final response = await api.searchProducts(
-            query: searchQuery,
+            query: apiQuery,
             store: store,
             retailer: firstRetailer,
-            pageSize: 10,
+            pageSize: 15,
           );
           matches = response.products;
         }
@@ -251,6 +256,7 @@ class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
           candidates: matches,
           ingredientQuantity: ingredient.quantity,
           ingredientUnit: ingredient.unit,
+          hint: hint,
         );
 
         if (best != null) {
@@ -921,9 +927,11 @@ class RetailerComparisonNotifier
           final query = RecipeGenerationNotifier._cleanIngredientForSearch(
             ingredient.ingredientName,
           );
+          final hint = IngredientLookup.resolve(query);
+          final apiQuery = hint?.searchQuery ?? query;
           final response = await api
               .searchProducts(
-                query: query,
+                query: apiQuery,
                 store: store,
                 retailer: retailerName,
                 pageSize: 10,
@@ -935,6 +943,7 @@ class RetailerComparisonNotifier
           final best = await smartMatcher.matchIngredient(
             ingredientName: query,
             candidates: products,
+            hint: hint,
           );
 
           if (best == null) {

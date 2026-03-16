@@ -73,6 +73,34 @@ Use common SA product names, not cooking terms. Examples:
 - "Baking Powder" (unit: "g", not "ml" — it's a powder)
 - "Caster Sugar" or "White Sugar" (unit: "g")
 - "Ground Cinnamon" (unit: "g", not "ml")
+
+CRITICAL: NEVER output single-word ingredient names. Always qualify:
+- "Sunflower Oil" or "Olive Oil" not "Oil"
+- "Large Eggs" not "Eggs"
+- "White Sugar" or "Caster Sugar" not "Sugar"
+- "Table Salt" not "Salt"
+- "Long Grain Rice" or "Basmati Rice" not "Rice"
+- "Unsalted Butter" or "Salted Butter" not "Butter"
+- "Full Cream Milk" not "Milk"
+- "Black Pepper" not "Pepper"
+- "Fresh Cream" not "Cream"
+- "Cake Flour" not "Flour"
+
+SA-specific terms (use these, not international equivalents):
+- "Maize Meal" not "Cornmeal" or "Polenta"
+- "Beef Mince" not "Ground Beef"
+- "Chicken Stock" not "Chicken Broth"
+- "Tinned Tomatoes" or "Chopped Tomatoes" not "Canned Tomatoes"
+- "Tomato Paste" not "Tomato Puree"
+- "Mixed Herbs" not "Italian Seasoning"
+- "Spaghetti" or "Penne" not just "Pasta" (specify the shape)
+- "Vanilla Essence" not "Vanilla Extract"
+- "Cornflour" or "Maizena Cornflour" not "Corn Starch"
+- "Spring Onions" not "Scallions" or "Green Onions"
+- "Crushed Garlic" or "Garlic" not "Garlic Paste" (SA stores sell crushed, not paste)
+- "Crushed Ginger" or "Ginger" not "Ginger Paste" (SA stores sell crushed, not paste)
+- "Cardamom" or "Green Cardamom" not "Cardamom Pods"
+
 Valid units: "g", "kg", "ml", "l", "units" (for countable items like eggs).
 Do NOT include quantities or sizes in the name field — put quantity in "quantity" and unit in "unit".
 Do NOT include preparation (diced, melted, beaten, sifted, skinned, deboned) in the name — put it in "preparation".

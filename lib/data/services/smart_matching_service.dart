@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 
 import '../models/live_product.dart';
 import 'gemini_service.dart';
+import 'ingredient_lookup.dart';
 import 'product_name_parser.dart';
 
 /// Result of smart matching across retailers.
@@ -261,26 +262,43 @@ class SmartMatchingService {
   /// Match a recipe ingredient to the best product from candidates.
   ///
   /// Uses algorithm scoring with optional AI fallback for low confidence.
+  /// If [hint] is provided, pre-filters candidates using required/exclude words
+  /// before scoring, dramatically improving accuracy for generic ingredients.
   Future<LiveProduct?> matchIngredient({
     required String ingredientName,
     required List<LiveProduct> candidates,
     double geminiThreshold = 0.5,
     double? ingredientQuantity,
     String? ingredientUnit,
+    IngredientSearchHint? hint,
   }) async {
     if (candidates.isEmpty) return null;
+
+    // Pre-filter candidates using hint if available
+    var filtered = candidates;
+    if (hint != null) {
+      filtered = _applyHintFilter(candidates, hint);
+      // Graceful degradation: if filtering removed everything, use unfiltered
+      if (filtered.isEmpty) filtered = candidates;
+    }
 
     // Score candidates using the enhanced algorithm
     final sourceParsed = ProductNameParser.parse(ingredientName);
     final scored = <(LiveProduct, double)>[];
 
-    for (final candidate in candidates) {
+    for (final candidate in filtered) {
       final candidateParsed = ProductNameParser.parse(candidate.name);
       final confidence =
           ProductNameParser.computeConfidence(sourceParsed, candidateParsed);
 
-      // For ingredients, also factor in containment (ingredient words in product)
-      final nameScore = _ingredientNameScore(ingredientName, candidate.name);
+      // For ingredients, also factor in containment (ingredient words in product).
+      // When hint pre-filtering was applied, relax extra-word rejection since
+      // the candidate already passed required/exclude word checks.
+      final nameScore = _ingredientNameScore(
+        ingredientName,
+        candidate.name,
+        hintApplied: hint != null,
+      );
       // If ingredient name scoring disqualified this candidate, skip it entirely
       // (don't let computeConfidence rescue a disqualified product)
       if (nameScore == 0) {
@@ -318,6 +336,33 @@ class SmartMatchingService {
     }
 
     return viable.first.$1;
+  }
+
+  /// Pre-filter candidates using hint's required/exclude word lists.
+  List<LiveProduct> _applyHintFilter(
+    List<LiveProduct> candidates,
+    IngredientSearchHint hint,
+  ) {
+    return candidates.where((product) {
+      final lower = product.name.toLowerCase();
+
+      // Exclude products containing any exclude word
+      if (hint.excludeWords.isNotEmpty) {
+        for (final word in hint.excludeWords) {
+          if (lower.contains(word)) return false;
+        }
+      }
+
+      // Require at least one required word (if specified)
+      if (hint.requiredWords.isNotEmpty) {
+        final hasRequired = hint.requiredWords.any(
+          (word) => lower.contains(word),
+        );
+        if (!hasRequired) return false;
+      }
+
+      return true;
+    }).toList();
   }
 
   /// Pick the best-sized product from viable candidates.
@@ -397,9 +442,11 @@ class SmartMatchingService {
     'crouton', 'crumb', 'pie', 'tart',
     // Drinks
     'juice', 'drink', 'cooldrink', 'cordial', 'squash', 'soda',
-    // Cleaning / non-food
+    // Cleaning / non-food / personal care
     'dishwasher', 'detergent', 'cleaner', 'soap', 'shampoo', 'bleach',
     'laundry', 'fabric', 'softener', 'sanitizer', 'disinfectant',
+    'bath', 'lotion', 'moistur', 'teeth', 'toothbrush', 'toothpaste',
+    'deodorant', 'nappy', 'diaper', 'wipe',
     // Seafood (disqualifies when ingredient isn't seafood)
     'mussel', 'oyster', 'prawn', 'anchovy', 'sardine',
     // Condiments/sauces/processed (when matching fresh/basic ingredients)
@@ -408,6 +455,7 @@ class SmartMatchingService {
     'gripe', 'medicine', 'supplement',
     // Processed food indicators
     'flavoured', 'flavored', 'condensed', 'seasoning', 'soup',
+    'noodle', 'curry',
     // Snacks
     'chip', 'crisp', 'popcorn', 'cracker', 'pretzel', 'nacho',
   };
@@ -455,7 +503,11 @@ class SmartMatchingService {
   /// "beef mince" should score high against "Lean Beef Mince 500g".
   /// Uses stemming so "lemon" matches "lemons".
   /// Penalizes products with many extra irrelevant words.
-  double _ingredientNameScore(String ingredient, String productName) {
+  double _ingredientNameScore(
+    String ingredient,
+    String productName, {
+    bool hintApplied = false,
+  }) {
     final sizePattern = RegExp(r'^\d+\.?\d*(g|kg|ml|l|pack|pk)$');
     // Normalize hyphens to spaces so "stir-fry" matches "stir fry"
     final normalizedIngredient = ingredient.toLowerCase().replaceAll('-', ' ');
@@ -510,12 +562,16 @@ class SmartMatchingService {
 
     // For very short ingredients, reject if product has too many extra words.
     // Products always have brand + descriptors, so allow some extra words.
-    // 1-word: max 3 extra ("Cerebos Iodated Table Salt" OK, "Royco Onion Instant Gravy Pack" not)
-    // 2-word: max 4 extra ("PnP Hake Fillets 800g" OK, "Royco Brown Onion Instant Gravy Pack" not)
-    if (ingredientWords.length == 1 && extraWords > 3) {
+    // When hintApplied, the candidate already passed required/exclude word
+    // checks, so we relax the threshold significantly.
+    // 1-word: max 3 extra (or 6 with hint)
+    // 2-word: max 4 extra (or 7 with hint)
+    final extraWordLimit1 = hintApplied ? 6 : 3;
+    final extraWordLimit2 = hintApplied ? 7 : 4;
+    if (ingredientWords.length == 1 && extraWords > extraWordLimit1) {
       return 0;
     }
-    if (ingredientWords.length == 2 && extraWords > 4) {
+    if (ingredientWords.length == 2 && extraWords > extraWordLimit2) {
       return 0;
     }
 
