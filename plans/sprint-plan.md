@@ -168,6 +168,7 @@ All 4 edge functions updated and deployed with full subcategory chaining:
 - **Woolworths**: Already supported — 17 ATG nav codes in `CATEGORIES` map
 
 Categories supported across all retailers:
+
 ```
 Fruit & Veg | Dairy & Eggs | Meat & Poultry | Bakery
 Frozen | Food Cupboard | Snacks | Beverages
@@ -312,14 +313,14 @@ Frozen | Food Cupboard | Snacks | Beverages
 
 **Scripts created** (`database/all_stores/`):
 
-| Script | Purpose |
-|--------|---------|
-| `scrape_checkers_stores.py` | Scrape Checkers via Hybris findStores (112 query points) |
-| `scrape_shoprite_stores.py` | Scrape Shoprite via Hybris findStores (71 query points) |
-| `scrape_woolworths_stores.py` | Scrape Woolworths via getPrediction + validatePlace |
-| `normalize_pnp_stores.py` | Convert pnp_stores_v2.json to standard format |
-| `merge_all_stores.py` | Merge all retailers + Nominatim enrichment |
-| `import_to_supabase.mjs` | Upsert all_stores_combined.json to Supabase |
+| Script                        | Purpose                                                  |
+| ----------------------------- | -------------------------------------------------------- |
+| `scrape_checkers_stores.py`   | Scrape Checkers via Hybris findStores (112 query points) |
+| `scrape_shoprite_stores.py`   | Scrape Shoprite via Hybris findStores (71 query points)  |
+| `scrape_woolworths_stores.py` | Scrape Woolworths via getPrediction + validatePlace      |
+| `normalize_pnp_stores.py`     | Convert pnp_stores_v2.json to standard format            |
+| `merge_all_stores.py`         | Merge all retailers + Nominatim enrichment               |
+| `import_to_supabase.mjs`      | Upsert all_stores_combined.json to Supabase              |
 
 ---
 
@@ -358,6 +359,7 @@ Frozen | Food Cupboard | Snacks | Beverages
 - **Deployed** with `--no-verify-jwt` (image widgets can't send auth headers), `IMAGE_STORAGE_SERVICE_KEY` secret set for Storage uploads
 
 **User experience:**
+
 - Cached images (most products over time): instant from Supabase Storage CDN
 - First-time images: ~500ms (proxy fetch + auto-cache)
 - APK size: ~5MB smaller
@@ -381,6 +383,7 @@ Frozen | Food Cupboard | Snacks | Beverages
 - **95 tests** (up from 77) — 6 lookup resolution tests + 12 hint-assisted matching tests covering butter, milk, eggs, salt, sugar, rice, olive oil, cream, onion, garlic, pepper, graceful degradation
 
 **Files:**
+
 - `lib/data/services/ingredient_lookup.dart` (NEW)
 - `lib/data/services/smart_matching_service.dart`
 - `lib/data/services/gemini_service.dart`
@@ -399,24 +402,28 @@ Frozen | Food Cupboard | Snacks | Beverages
 Each retailer needs a Supabase Edge Function that proxies product search + category browse.
 
 **SPAR** (`products-spar/index.ts`)
+
 - Research SPAR online shopping API (myspar.co.za / spar.co.za)
 - Identify product search endpoint, pagination, category structure
 - Build Edge Function with same interface as existing retailers (query, category, page params → standardized product JSON)
 - Map SPAR categories to shared category set (Fruit & Veg, Dairy & Eggs, Meat & Poultry, Bakery, Frozen, Food Cupboard, Snacks, Beverages)
 
 **Dis-Chem** (`products-dischem/index.ts`)
+
 - Research Dis-Chem online API (dischem.co.za)
 - Dis-Chem is pharmacy-first but has a large grocery/health food/snacks section
 - Focus on food & beverage categories initially, expand to health supplements later
 - Build Edge Function with standardized interface
 
 **Clicks** (`products-clicks/index.ts`)
+
 - Research Clicks online API (clicks.co.za)
 - Clicks is pharmacy-first with limited grocery — focus on health foods, beverages, snacks, baby food
 - Build Edge Function with standardized interface
 - Note: Clicks may have fewer grocery categories than other retailers — map what's available
 
 **Common for all 3:**
+
 - CORS headers matching existing pattern
 - CSRF/cookie bypass if needed (document approach per retailer)
 - HTML entity decoding in product names
@@ -426,10 +433,12 @@ Each retailer needs a Supabase Edge Function that proxies product search + categ
 #### 11b. Retailer Config Registration
 
 **File:** `lib/core/constants/retailers.dart`
+
 - Add `SPAR`, `Dis-Chem`, `Clicks` to `Retailers.all` map
 - Brand colors, icons, slugs, edge function names
 
 **File:** `lib/core/theme/app_colors.dart`
+
 - Add brand colors: SPAR (green #00833E), Dis-Chem (green #00A94F), Clicks (blue #005BAA)
 
 #### 11c. Store Database
@@ -442,6 +451,7 @@ Each retailer needs a Supabase Edge Function that proxies product search + categ
 #### 11d. Category Mapping
 
 **File:** `lib/core/constants/product_categories.dart`
+
 - Add SPAR/Dis-Chem/Clicks category mappings to cross-retailer category map
 - Dis-Chem/Clicks may not have all 8 categories — gracefully handle missing ones (hide category chip when browsing those retailers)
 
@@ -473,13 +483,18 @@ Each retailer needs a Supabase Edge Function that proxies product search + categ
 **Model:** Opus 4.6 (design review & strategy) → Sonnet 4.6 (implementation)
 **Goal:** Professional, exciting look across the entire app — now across all 7 retailers.
 
-- Use `ui-ux-pro-max` skill for comprehensive review
+#### Completed ✅
+
+- **Lottie loading animations** — replaced `CircularProgressIndicator` with `LottieLoadingIndicator` in compare sheet, browse-inside-list search, and other loading states
+- **Error/empty state Lottie animations** — all 7 `EmptyState` types now have Lottie animations (error.json, lost_connection.json, empty.json, shopping_bag_empty.json, shopping_cart.json)
+- **Typography consistency** — eliminated all off-theme font sizes (13/15/17/18/22px → snapped to theme scale: 11/12/14/16/20/24), standardized font weights (w800→w700, bold→w700), normalized notation across 7 files (~30 fixes)
+- **New reusable widgets** — `LottieLoadingIndicator`, `ShimmerText`, `GlassContainer`, `ProductDetailCard`
+- **Deals loading animation** — SA-themed Lottie grocery bag with rotating messages + animated dots
+
+#### Remaining
+
 - Dark mode audit (all screens)
-- Animation polish
-- Typography consistency
-- Loading state improvements
-- Empty state designs
-- Error state designs
+- Use `ui-ux-pro-max` skill for comprehensive review
 - Verify retailer branding consistency for SPAR, Dis-Chem, Clicks
 
 ---
@@ -491,6 +506,7 @@ Each retailer needs a Supabase Edge Function that proxies product search + categ
 - Store price history trends
 - **Barcode scanner** — scan products in-store, compare prices (needs barcode data in DB first)
 - **More retailers** — Game, Makro, Food Lover's Market if demand warrants
+- **Lottie animation for AI error messages** — animated error state when Gemini recipe generation fails or AI matching encounters errors (currently shows plain text/icon)
 
 ## Decisions Made
 
