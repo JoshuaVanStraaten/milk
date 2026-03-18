@@ -534,6 +534,10 @@ class RealtimeListItemsNotifier extends StateNotifier<RealtimeListItemsState> {
     if (_connectivity.isOnline) {
       try {
         await _repository.deleteItem(itemId, resolvedListId);
+        // Invalidate list providers to refresh total
+        _ref.invalidate(listByIdProvider(listId));
+        _ref.invalidate(listByIdProvider(resolvedListId));
+        _ref.invalidate(userListsProvider);
         return true;
       } catch (e) {
         // Revert on error

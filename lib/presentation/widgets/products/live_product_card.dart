@@ -195,7 +195,7 @@ class LiveProductCard extends StatelessWidget {
         Text(
           product.price,
           style: TextStyle(
-            fontSize: 13,
+            fontSize: 14,
             fontWeight: FontWeight.w600,
             color: product.hasPromo
                 ? (isDark
@@ -215,7 +215,7 @@ class LiveProductCard extends StatelessWidget {
             product.promotionPrice,
             style: const TextStyle(
               fontSize: 12,
-              fontWeight: FontWeight.bold,
+              fontWeight: FontWeight.w700,
               color: AppColors.error,
             ),
             maxLines: 1,

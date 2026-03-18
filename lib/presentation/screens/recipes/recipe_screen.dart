@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:lottie/lottie.dart';
 import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../providers/recipe_provider.dart';
 import '../../providers/list_provider.dart';
 import '../../providers/tutorial_provider.dart';
 import '../../../data/models/recipe.dart';
+import '../../widgets/common/glass_container.dart';
+import '../../widgets/common/shimmer_text.dart';
 import '../../widgets/recipes/recipe_input_card.dart';
 import '../../widgets/recipes/recipe_result_card.dart';
 import '../../widgets/recipes/ingredient_matching_sheet.dart';
@@ -341,80 +344,37 @@ class _GenerateRecipeTabState extends ConsumerState<_GenerateRecipeTab> {
     final progressText = state.matchingProgressText;
     final percent = state.matchingPercent;
 
-    return Container(
+    return GlassContainer(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.surfaceDarkMode : AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
-      ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           // Icon / animated indicator
           if (isMatching) ...[
-            // Progress ring — large, clean
-            SizedBox(
-              width: 80,
-              height: 80,
-              child: TweenAnimationBuilder<double>(
-                tween: Tween(begin: 0, end: percent),
-                duration: const Duration(milliseconds: 400),
-                curve: Curves.easeOut,
-                builder: (context, value, _) {
-                  return Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      // Track
-                      SizedBox(
-                        width: 80,
-                        height: 80,
-                        child: CircularProgressIndicator(
-                          value: 1.0,
-                          strokeWidth: 5,
-                          color:
-                              (isDark
-                                      ? AppColors.textDisabledDark
-                                      : AppColors.textDisabled)
-                                  .withValues(alpha: 0.3),
-                        ),
-                      ),
-                      // Progress
-                      SizedBox(
-                        width: 80,
-                        height: 80,
-                        child: CircularProgressIndicator(
-                          value: value,
-                          strokeWidth: 5,
-                          strokeCap: StrokeCap.round,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                      // Percentage text
-                      Text(
-                        '${(value * 100).round()}%',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          color: isDark
-                              ? AppColors.textPrimaryDark
-                              : AppColors.textPrimary,
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              ),
+            // Glow-pulsing progress ring
+            _GlowProgressRing(
+              percent: percent,
+              isDark: isDark,
             ),
           ] else ...[
-            // Indeterminate spinner for recipe generation
-            SizedBox(
-              width: 56,
-              height: 56,
-              child: CircularProgressIndicator(
-                strokeWidth: 4,
-                strokeCap: StrokeCap.round,
-                color: AppColors.primary,
-              ),
+            // Lottie cooking animation for recipe generation
+            Lottie.asset(
+              'assets/animations/cooking.json',
+              width: 220,
+              height: 130,
+              fit: BoxFit.contain,
+              repeat: true,
+              errorBuilder: (context, error, stackTrace) {
+                return SizedBox(
+                  width: 56,
+                  height: 56,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 4,
+                    strokeCap: StrokeCap.round,
+                    color: AppColors.primary,
+                  ),
+                );
+              },
             ),
           ],
 
@@ -452,31 +412,47 @@ class _GenerateRecipeTabState extends ConsumerState<_GenerateRecipeTab> {
             const SizedBox(height: 16),
           ],
 
-          // Progress text — ingredient being searched
+          // Progress text — ingredient being searched (with slide animation)
           if (progressText != null) ...[
-            Text(
-              progressText,
-              style: TextStyle(
-                fontSize: 13,
-                color: isDark
-                    ? AppColors.textSecondaryDark
-                    : AppColors.textSecondary,
-                height: 1.4,
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 300),
+              transitionBuilder: (child, animation) {
+                return FadeTransition(
+                  opacity: animation,
+                  child: SlideTransition(
+                    position: Tween<Offset>(
+                      begin: const Offset(0.15, 0),
+                      end: Offset.zero,
+                    ).animate(animation),
+                    child: child,
+                  ),
+                );
+              },
+              child: Text(
+                progressText,
+                key: ValueKey<String>(progressText),
+                style: TextStyle(
+                  fontSize: 13,
+                  color: isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondary,
+                  height: 1.4,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
             ),
           ] else ...[
-            Text(
-              'This may take a moment...',
+            ShimmerText(
+              text: 'This may take a moment...',
+              textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 13,
                 color: isDark
                     ? AppColors.textSecondaryDark
                     : AppColors.textSecondary,
               ),
-              textAlign: TextAlign.center,
             ),
           ],
         ],
@@ -1151,6 +1127,117 @@ class _SavedRecipeCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Glow-pulsing progress ring for ingredient matching
+// -----------------------------------------------------------------------------
+
+class _GlowProgressRing extends StatefulWidget {
+  final double percent;
+  final bool isDark;
+
+  const _GlowProgressRing({
+    required this.percent,
+    required this.isDark,
+  });
+
+  @override
+  State<_GlowProgressRing> createState() => _GlowProgressRingState();
+}
+
+class _GlowProgressRingState extends State<_GlowProgressRing>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _glowController;
+
+  @override
+  void initState() {
+    super.initState();
+    _glowController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _glowController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: widget.percent),
+      duration: const Duration(milliseconds: 400),
+      curve: Curves.easeOut,
+      builder: (context, value, _) {
+        return AnimatedBuilder(
+          animation: _glowController,
+          builder: (context, child) {
+            final glowAlpha =
+                0.1 + (_glowController.value * 0.3);
+            return Container(
+              width: 88,
+              height: 88,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primary
+                        .withValues(alpha: glowAlpha),
+                    blurRadius: 20 + (_glowController.value * 10),
+                    spreadRadius: 2,
+                  ),
+                ],
+              ),
+              child: child,
+            );
+          },
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // Track
+              SizedBox(
+                width: 80,
+                height: 80,
+                child: CircularProgressIndicator(
+                  value: 1.0,
+                  strokeWidth: 5,
+                  color: (widget.isDark
+                          ? AppColors.textDisabledDark
+                          : AppColors.textDisabled)
+                      .withValues(alpha: 0.3),
+                ),
+              ),
+              // Progress
+              SizedBox(
+                width: 80,
+                height: 80,
+                child: CircularProgressIndicator(
+                  value: value,
+                  strokeWidth: 5,
+                  strokeCap: StrokeCap.round,
+                  color: AppColors.primary,
+                ),
+              ),
+              // Percentage text
+              Text(
+                '${(value * 100).round()}%',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: widget.isDark
+                      ? AppColors.textPrimaryDark
+                      : AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

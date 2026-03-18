@@ -10,6 +10,8 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/constants/retailers.dart';
 import '../../../data/models/recipe.dart';
 import '../../providers/recipe_provider.dart';
+import '../common/lottie_loading_indicator.dart';
+import '../common/shimmer_text.dart';
 import 'ingredient_matching_sheet.dart';
 
 /// Opens the retailer comparison sheet. Returns the [RetailerBasket] the user
@@ -362,7 +364,39 @@ class _RetailerTabContent extends ConsumerWidget {
     final color = config?.color ?? AppColors.primary;
 
     if (basket == null || basket.isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              LottieLoadingIndicator(
+                width: 140,
+                height: 140,
+                message: 'Searching $retailerName...',
+                messageStyle: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: isDark
+                      ? AppColors.textPrimaryDark
+                      : AppColors.textPrimary,
+                ),
+                subtitle: ShimmerText(
+                  text:
+                      'Finding the best prices for ${selectedIngredients.length} ingredients',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
     }
 
     if (basket.error != null) {

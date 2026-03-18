@@ -183,7 +183,7 @@ class _MyListsScreenState extends ConsumerState<MyListsScreen> {
             Text(
               'Error loading lists',
               style: TextStyle(
-                fontSize: 18,
+                fontSize: 20,
                 color: isDark
                     ? AppColors.textPrimaryDark
                     : AppColors.textPrimary,
@@ -288,7 +288,7 @@ class _ListCard extends ConsumerWidget {
                     Text(
                       list.listName,
                       style: TextStyle(
-                        fontSize: 18,
+                        fontSize: 16,
                         fontWeight: FontWeight.w600,
                         color: isDark
                             ? AppColors.textPrimaryDark
@@ -338,7 +338,7 @@ class _ListCard extends ConsumerWidget {
                       'Total: R${list.totalPrice.toStringAsFixed(2)}',
                       style: TextStyle(
                         fontSize: 16,
-                        fontWeight: FontWeight.bold,
+                        fontWeight: FontWeight.w700,
                         color: listColor,
                       ),
                     ),

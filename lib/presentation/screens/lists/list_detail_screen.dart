@@ -14,6 +14,7 @@ import '../../widgets/skeleton_loaders.dart';
 import '../../widgets/animations.dart';
 import '../../widgets/common/app_snackbar.dart';
 import '../../widgets/common/empty_states.dart';
+import '../../widgets/common/lottie_loading_indicator.dart';
 import '../compare/compare_sheet.dart';
 import '../../widgets/lists/share_list_sheet.dart';
 
@@ -1610,7 +1611,7 @@ class _BrowseAddTabState extends ConsumerState<_BrowseAddTab> {
 
   Widget _buildResults(bool isDark) {
     if (_searching) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(child: LottieLoadingIndicator(message: 'Searching products...'));
     }
 
     if (_error != null) {

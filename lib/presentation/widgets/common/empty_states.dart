@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lottie/lottie.dart';
 import '../../../core/theme/app_colors.dart';
 
 /// Reusable empty state widget with consistent styling
@@ -27,21 +28,21 @@ class EmptyState extends StatelessWidget {
 
     return Center(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(32.0),
+        padding: const EdgeInsets.fromLTRB(32, 16, 32, 80),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             // Illustration
             customIcon ?? _buildIllustration(config, isDark),
 
-            const SizedBox(height: 24),
+            SizedBox(height: config.lottieAsset != null ? 4 : 24),
 
             // Title
             Text(
               customTitle ?? config.title,
               style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
+                fontSize: 24,
+                fontWeight: FontWeight.w700,
                 color: isDark
                     ? AppColors.textPrimaryDark
                     : AppColors.textPrimary,
@@ -56,7 +57,7 @@ class EmptyState extends StatelessWidget {
               customMessage ?? config.message,
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: 15,
+                fontSize: 16,
                 height: 1.5,
                 color: isDark
                     ? AppColors.textSecondaryDark
@@ -82,6 +83,22 @@ class EmptyState extends StatelessWidget {
   }
 
   Widget _buildIllustration(_EmptyStateConfig config, bool isDark) {
+    if (config.lottieAsset != null) {
+      return Lottie.asset(
+        config.lottieAsset!,
+        width: 200,
+        height: 200,
+        fit: BoxFit.contain,
+        repeat: true,
+        errorBuilder: (context, error, stackTrace) {
+          return _buildIconIllustration(config, isDark);
+        },
+      );
+    }
+    return _buildIconIllustration(config, isDark);
+  }
+
+  Widget _buildIconIllustration(_EmptyStateConfig config, bool isDark) {
     return Container(
       width: 140,
       height: 140,
@@ -192,7 +209,7 @@ class EmptyState extends StatelessWidget {
                     child: Text(
                       tip,
                       style: TextStyle(
-                        fontSize: 13,
+                        fontSize: 14,
                         color: isDark
                             ? AppColors.textSecondaryDark
                             : AppColors.textSecondary,
@@ -219,6 +236,7 @@ class EmptyState extends StatelessWidget {
           title: 'No Shopping Lists Yet',
           message:
               'Create your first list to start tracking prices and saving money on groceries.',
+          lottieAsset: 'assets/animations/empty.json',
           tips: [
             'Add items from any store to a single list',
             'Items are automatically grouped by store',
@@ -235,6 +253,7 @@ class EmptyState extends StatelessWidget {
           title: 'Your List is Empty',
           message:
               'Start adding items from any store - they\'ll be grouped automatically.',
+          lottieAsset: 'assets/animations/shopping_bag_empty.json',
           tips: [
             'Add items from different stores to one list',
             'Long-press products to quickly add them',
@@ -250,6 +269,7 @@ class EmptyState extends StatelessWidget {
           title: 'No Products Found',
           message:
               'We couldn\'t find any products matching your criteria. Try adjusting your search or filters.',
+          lottieAsset: 'assets/animations/shopping_bag_empty.json',
         );
 
       case EmptyStateType.noSearchResults:
@@ -260,6 +280,7 @@ class EmptyState extends StatelessWidget {
           title: 'No Results Found',
           message:
               'Try different keywords or check the spelling of your search term.',
+          lottieAsset: 'assets/animations/empty.json',
           tips: [
             'Use simpler search terms',
             'Check for typos',
@@ -286,6 +307,7 @@ class EmptyState extends StatelessWidget {
           title: 'You\'re Offline',
           message:
               'Check your internet connection and try again. Some features may be limited.',
+          lottieAsset: 'assets/animations/lost_connection.json',
         );
 
       case EmptyStateType.error:
@@ -296,6 +318,7 @@ class EmptyState extends StatelessWidget {
           title: 'Something Went Wrong',
           message:
               'We encountered an error loading this content. Please try again.',
+          lottieAsset: 'assets/animations/error.json',
         );
     }
   }
@@ -321,6 +344,7 @@ class _EmptyStateConfig {
   final String title;
   final String message;
   final List<String>? tips;
+  final String? lottieAsset;
 
   const _EmptyStateConfig({
     required this.icon,
@@ -330,5 +354,6 @@ class _EmptyStateConfig {
     required this.title,
     required this.message,
     this.tips,
+    this.lottieAsset,
   });
 }

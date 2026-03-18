@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/theme/app_colors.dart';
+import '../common/lottie_loading_indicator.dart';
 import '../../../core/constants/retailers.dart';
 import '../../../data/models/recipe.dart';
 import '../../providers/recipe_provider.dart';
@@ -235,7 +236,13 @@ class _IngredientMatchingSheetState
     bool isDark,
   ) {
     if (state.isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(
+        child: LottieLoadingIndicator(
+          width: 140,
+          height: 140,
+          message: 'Searching products...',
+        ),
+      );
     }
 
     if (state.error != null) {

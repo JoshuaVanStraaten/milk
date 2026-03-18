@@ -22,7 +22,7 @@ import '../../widgets/animations.dart';
 import '../../widgets/products/add_to_list_sheet.dart';
 import '../../widgets/products/store_picker_sheet.dart';
 import '../../widgets/tutorial/tutorial_targets.dart';
-import 'live_product_detail_screen.dart';
+import '../../widgets/products/product_detail_card.dart';
 import '../compare/compare_sheet.dart';
 
 // ─────────────────────────────────────────────
@@ -517,10 +517,10 @@ class _LiveBrowseScreenState extends ConsumerState<LiveBrowseScreen> {
           child: LiveProductCard(
             product: product,
             onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => LiveProductDetailScreen(product: product),
-                ),
+              showProductDetailCard(
+                context: context,
+                ref: ref,
+                product: product,
               );
             },
             onCompare: () => showCompareSheet(context, ref, product),
@@ -971,8 +971,8 @@ class _FilterSortSheetState extends State<_FilterSortSheet> {
                 Text(
                   'Sort & Filter',
                   style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
                     color: textPrimary,
                   ),
                 ),
@@ -1005,7 +1005,7 @@ class _FilterSortSheetState extends State<_FilterSortSheet> {
                   Text(
                     'Filter',
                     style: TextStyle(
-                      fontSize: 13,
+                      fontSize: 14,
                       fontWeight: FontWeight.w600,
                       color: textSecondary,
                       letterSpacing: 0.5,
@@ -1070,7 +1070,7 @@ class _FilterSortSheetState extends State<_FilterSortSheet> {
                   Text(
                     'Sort by',
                     style: TextStyle(
-                      fontSize: 13,
+                      fontSize: 14,
                       fontWeight: FontWeight.w600,
                       color: textSecondary,
                       letterSpacing: 0.5,
@@ -1153,8 +1153,8 @@ class _FilterSortSheetState extends State<_FilterSortSheet> {
                   child: const Text(
                     'Apply',
                     style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 16,
                     ),
                   ),
                 ),

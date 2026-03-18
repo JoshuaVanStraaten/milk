@@ -15,6 +15,7 @@ import '../../../data/models/nearby_store.dart';
 import '../../../data/services/product_name_parser.dart';
 import '../../providers/list_provider.dart';
 import '../../providers/store_provider.dart';
+import '../../widgets/common/lottie_loading_indicator.dart';
 import '../../widgets/products/add_to_list_sheet.dart';
 
 /// Show the comparison sheet as a modal bottom sheet.
@@ -237,17 +238,11 @@ class _CompareSheetState extends ConsumerState<CompareSheet> {
 
   Widget _buildLoading() {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 48),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const CircularProgressIndicator(strokeWidth: 2.5),
-          const SizedBox(height: 16),
-          Text(
-            'Searching all retailers...',
-            style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
-          ),
-        ],
+      padding: const EdgeInsets.symmetric(vertical: 32),
+      child: LottieLoadingIndicator(
+        width: 140,
+        height: 140,
+        message: 'Searching all retailers...',
       ),
     );
   }

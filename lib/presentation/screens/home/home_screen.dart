@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:lottie/lottie.dart';
 import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 import '../../../core/constants/retailers.dart';
 import '../../../core/theme/app_colors.dart';
@@ -16,9 +17,10 @@ import '../../../data/models/live_product.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/store_provider.dart';
 import '../../providers/tutorial_provider.dart';
+import '../../widgets/common/shimmer_text.dart';
 import '../../widgets/products/add_to_list_sheet.dart';
 import '../../widgets/tutorial/tutorial_targets.dart';
-import '../products/live_product_detail_screen.dart';
+import '../../widgets/products/product_detail_card.dart';
 import '../compare/compare_sheet.dart';
 
 // =============================================================================
@@ -278,6 +280,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       vsync: this,
       duration: const Duration(milliseconds: 600),
     );
+    // If deals are already cached, skip the fade-in animation
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final state = ref.read(homeDealsProvider);
+      if (state.hotDeals.isNotEmpty) {
+        _fadeController.value = 1.0;
+      }
+    });
   }
 
   @override
@@ -366,6 +375,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   void _loadDealsOnce() {
+    final state = ref.read(homeDealsProvider);
+    // Skip if already loaded or currently loading
+    if (state.hotDeals.isNotEmpty || state.isLoading) {
+      _dealsLoaded = true;
+      return;
+    }
     if (!_dealsLoaded) {
       _dealsLoaded = true;
       Future.microtask(() {
@@ -419,7 +434,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
             // ─── HOT DEALS CAROUSEL ───
             if (dealsState.isLoading)
-              SliverToBoxAdapter(child: _DealsLoadingAnimation())
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(child: _DealsLoadingAnimation()),
+              )
             else if (dealsState.hotDeals.isNotEmpty)
               SliverToBoxAdapter(
                 child: FadeTransition(
@@ -491,7 +509,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 Text(
                   greeting,
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: 12,
                     fontWeight: FontWeight.w500,
                     color: AppColors.primary,
                   ),
@@ -500,7 +518,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   name != null ? 'Hi, $name 👋' : 'Hi there 👋',
                   style: TextStyle(
                     fontSize: 20,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                     color: isDark
                         ? AppColors.textPrimaryDark
                         : AppColors.textPrimary,
@@ -528,7 +546,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 // SAVINGS BANNER — "You could save R134 this week" (Loss aversion + anchoring)
 // =============================================================================
 
-class _SavingsBanner extends StatelessWidget {
+class _SavingsBanner extends StatefulWidget {
   final int totalDeals;
   final double totalSavings;
   final bool isDark;
@@ -540,7 +558,72 @@ class _SavingsBanner extends StatelessWidget {
   });
 
   @override
+  State<_SavingsBanner> createState() => _SavingsBannerState();
+}
+
+class _SavingsBannerState extends State<_SavingsBanner>
+    with TickerProviderStateMixin {
+  late final AnimationController _bounceController;
+  late final AnimationController _countController;
+  late Animation<double> _bounceAnimation;
+  late Animation<double> _countAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Piggy spring-in — single bounce entrance with delay
+    _bounceController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    );
+    _bounceAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _bounceController, curve: Curves.elasticOut),
+    );
+    // Small delay so the banner is visible before the piggy pops in
+    Future.delayed(const Duration(milliseconds: 200), () {
+      if (mounted) _bounceController.forward();
+    });
+
+    // Count-up animation for savings value
+    _countController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    );
+    _countAnimation = Tween<double>(begin: 0, end: widget.totalSavings)
+        .animate(CurvedAnimation(
+      parent: _countController,
+      curve: Curves.easeOutCubic,
+    ));
+    _countController.forward();
+  }
+
+  @override
+  void didUpdateWidget(covariant _SavingsBanner oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.totalSavings != widget.totalSavings) {
+      _countAnimation = Tween<double>(
+        begin: oldWidget.totalSavings,
+        end: widget.totalSavings,
+      ).animate(CurvedAnimation(
+        parent: _countController,
+        curve: Curves.easeOutCubic,
+      ));
+      _countController.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _bounceController.dispose();
+    _countController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final isDark = widget.isDark;
+
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -565,18 +648,28 @@ class _SavingsBanner extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // Savings icon with pulse effect
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: isDark ? 0.3 : 0.15),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(
-              Icons.savings_outlined,
-              color: AppColors.primary,
-              size: 24,
+          // Scale-bouncing piggy icon
+          AnimatedBuilder(
+            animation: _bounceAnimation,
+            builder: (context, child) {
+              return Transform.scale(
+                scale: _bounceAnimation.value,
+                child: child,
+              );
+            },
+            child: Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color:
+                    AppColors.primary.withValues(alpha: isDark ? 0.3 : 0.15),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.savings_outlined,
+                color: AppColors.primary,
+                size: 24,
+              ),
             ),
           ),
           const SizedBox(width: 16),
@@ -584,23 +677,28 @@ class _SavingsBanner extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (totalSavings > 0) ...[
-                  Text(
-                    'Save up to R${totalSavings.toStringAsFixed(0)} this week',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: isDark
-                          ? AppColors.textPrimaryDark
-                          : AppColors.textPrimary,
-                    ),
+                if (widget.totalSavings > 0) ...[
+                  AnimatedBuilder(
+                    animation: _countAnimation,
+                    builder: (context, _) {
+                      return Text(
+                        'Save up to R${_countAnimation.value.toStringAsFixed(0)} this week',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: isDark
+                              ? AppColors.textPrimaryDark
+                              : AppColors.textPrimary,
+                        ),
+                      );
+                    },
                   ),
                   const SizedBox(height: 2),
                 ],
                 Text(
-                  '$totalDeals specials near you right now',
+                  '${widget.totalDeals} specials near you right now',
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: 12,
                     fontWeight: FontWeight.w500,
                     color: AppColors.primary,
                   ),
@@ -644,7 +742,7 @@ class _HotDealsSection extends StatelessWidget {
                 'Hot Deals',
                 style: TextStyle(
                   fontSize: 20,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                   color: isDark
                       ? AppColors.textPrimaryDark
                       : AppColors.textPrimary,
@@ -654,7 +752,7 @@ class _HotDealsSection extends StatelessWidget {
               Text(
                 'Near you',
                 style: TextStyle(
-                  fontSize: 13,
+                  fontSize: 12,
                   fontWeight: FontWeight.w500,
                   color: isDark
                       ? AppColors.textSecondaryDark
@@ -696,7 +794,7 @@ class _HotDealCard extends ConsumerWidget {
     final retailerColor = config?.color ?? AppColors.primary;
 
     return GestureDetector(
-      onTap: () => _openDetail(context),
+      onTap: () => _openDetail(context, ref),
       child: Container(
         width: 160,
         decoration: BoxDecoration(
@@ -763,8 +861,8 @@ class _HotDealCard extends ConsumerWidget {
                           '-${deal.savingsPercent}%',
                           style: const TextStyle(
                             color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       ),
@@ -854,8 +952,8 @@ class _HotDealCard extends ConsumerWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w800,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
                       color: AppColors.primary,
                     ),
                   ),
@@ -883,11 +981,11 @@ class _HotDealCard extends ConsumerWidget {
     );
   }
 
-  void _openDetail(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => LiveProductDetailScreen(product: deal.toLiveProduct()),
-      ),
+  void _openDetail(BuildContext context, WidgetRef ref) {
+    showProductDetailCard(
+      context: context,
+      ref: ref,
+      product: deal.toLiveProduct(),
     );
   }
 
@@ -966,8 +1064,8 @@ class _RetailerDealsSection extends StatelessWidget {
               Text(
                 '$retailerName Specials',
                 style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
                   color: isDark
                       ? AppColors.textPrimaryDark
                       : AppColors.textPrimary,
@@ -979,7 +1077,7 @@ class _RetailerDealsSection extends StatelessWidget {
                 child: Text(
                   'View all products',
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: 14,
                     fontWeight: FontWeight.w600,
                     color: AppColors.primary,
                   ),
@@ -1223,9 +1321,7 @@ class _DealsLoadingAnimation extends StatefulWidget {
 }
 
 class _DealsLoadingAnimationState extends State<_DealsLoadingAnimation>
-    with TickerProviderStateMixin {
-  late AnimationController _trolleyController;
-  late AnimationController _bounceController;
+    with SingleTickerProviderStateMixin {
   late AnimationController _dotsController;
   int _messageIndex = 0;
   Timer? _messageTimer;
@@ -1233,37 +1329,23 @@ class _DealsLoadingAnimationState extends State<_DealsLoadingAnimation>
   // SA-flavoured loading messages
   static const _messages = [
     'Checking the specials for you...',
-    'Eish, so many deals today! 🔥',
+    'Eish, so many deals today!',
     'Finding the lekker prices...',
     'Comparing across all the stores...',
     'Almost there, just a sec...',
     'Hunting for the best bargains...',
     'Loading fresh deals nearby...',
-    'Saving you money, one item at a time 💰',
+    'Saving you money, one item at a time',
   ];
 
   @override
   void initState() {
     super.initState();
-    // Trolley slides left-right
-    _trolleyController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2000),
-    )..repeat(reverse: true);
-
-    // Items bounce
-    _bounceController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    )..repeat(reverse: true);
-
-    // Dot animation
     _dotsController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1500),
     )..repeat();
 
-    // Rotate messages every 2.5 seconds
     _messageTimer = Timer.periodic(const Duration(milliseconds: 2500), (_) {
       if (mounted) {
         setState(() {
@@ -1275,8 +1357,6 @@ class _DealsLoadingAnimationState extends State<_DealsLoadingAnimation>
 
   @override
   void dispose() {
-    _trolleyController.dispose();
-    _bounceController.dispose();
     _dotsController.dispose();
     _messageTimer?.cancel();
     super.dispose();
@@ -1286,161 +1366,109 @@ class _DealsLoadingAnimationState extends State<_DealsLoadingAnimation>
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 24),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 32),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Animated trolley scene
-          SizedBox(
-            height: 100,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                // Moving trolley
-                AnimatedBuilder(
-                  animation: _trolleyController,
-                  builder: (context, child) {
-                    final dx = (_trolleyController.value - 0.5) * 60;
-                    return Transform.translate(
-                      offset: Offset(dx, 0),
-                      child: child,
-                    );
-                  },
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Bouncing items above trolley
-                      AnimatedBuilder(
-                        animation: _bounceController,
-                        builder: (context, _) {
-                          final dy = _bounceController.value * -8;
-                          return Transform.translate(
-                            offset: Offset(0, dy),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text('🥦', style: TextStyle(fontSize: 18)),
-                                const SizedBox(width: 4),
-                                Text('🍞', style: TextStyle(fontSize: 16)),
-                                const SizedBox(width: 4),
-                                Text('🥛', style: TextStyle(fontSize: 18)),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 4),
-                      // Trolley icon
-                      Icon(
-                        Icons.shopping_cart_rounded,
-                        size: 44,
-                        color: AppColors.primary,
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Track/line
-                Positioned(
-                  bottom: 8,
-                  left: 40,
-                  right: 40,
-                  child: Container(
-                    height: 2,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          Colors.transparent,
-                          AppColors.primary.withValues(alpha: 0.3),
-                          AppColors.primary.withValues(alpha: 0.3),
-                          Colors.transparent,
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 16),
-
-          // Animated loading message
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 400),
-            transitionBuilder: (child, animation) {
-              return FadeTransition(
-                opacity: animation,
-                child: SlideTransition(
-                  position: Tween<Offset>(
-                    begin: const Offset(0, 0.3),
-                    end: Offset.zero,
-                  ).animate(animation),
-                  child: child,
-                ),
+          // Lottie grocery bag animation
+          Lottie.asset(
+            'assets/animations/grocery_shopping_bag_pickup_and_delivery.json',
+            width: 200,
+            height: 200,
+            fit: BoxFit.contain,
+            repeat: true,
+            errorBuilder: (context, error, stackTrace) {
+              return Icon(
+                Icons.shopping_cart_rounded,
+                size: 64,
+                color: AppColors.primary,
               );
             },
-            child: Text(
-              _messages[_messageIndex],
-              key: ValueKey<int>(_messageIndex),
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: isDark
-                    ? AppColors.textPrimaryDark
-                    : AppColors.textPrimary,
+          ),
+
+            const SizedBox(height: 20),
+
+            // Shimmer text with animated message rotation
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 400),
+              transitionBuilder: (child, animation) {
+                return FadeTransition(
+                  opacity: animation,
+                  child: SlideTransition(
+                    position: Tween<Offset>(
+                      begin: const Offset(0, 0.3),
+                      end: Offset.zero,
+                    ).animate(animation),
+                    child: child,
+                  ),
+                );
+              },
+              child: ShimmerText(
+                key: ValueKey<int>(_messageIndex),
+                text: _messages[_messageIndex],
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: isDark
+                      ? AppColors.textPrimaryDark
+                      : AppColors.textPrimary,
+                ),
               ),
             ),
-          ),
 
-          const SizedBox(height: 16),
+            const SizedBox(height: 16),
 
-          // Animated dots progress
-          AnimatedBuilder(
-            animation: _dotsController,
-            builder: (context, _) {
-              return Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(4, (i) {
-                  final delay = i * 0.2;
-                  final t = (_dotsController.value - delay).clamp(0.0, 1.0);
-                  final scale =
-                      0.4 +
-                      0.6 * (t < 0.5 ? t * 2 : (1 - t) * 2).clamp(0.0, 1.0);
-                  final opacity = 0.3 + 0.7 * scale;
-                  return Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 4),
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: opacity),
-                      shape: BoxShape.circle,
-                    ),
-                    transform: Matrix4.diagonal3Values(scale, scale, 1.0),
-                    transformAlignment: Alignment.center,
-                  );
-                }),
-              );
-            },
-          ),
-
-          const SizedBox(height: 12),
-
-          // Subtle hint
-          Text(
-            'Checking 4 retailers near you',
-            style: TextStyle(
-              fontSize: 12,
-              color: isDark
-                  ? AppColors.textSecondaryDark
-                  : AppColors.textSecondary,
+            // Animated dots
+            AnimatedBuilder(
+              animation: _dotsController,
+              builder: (context, _) {
+                return Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(4, (i) {
+                    final delay = i * 0.2;
+                    final t =
+                        (_dotsController.value - delay).clamp(0.0, 1.0);
+                    final scale =
+                        0.4 +
+                        0.6 *
+                            (t < 0.5 ? t * 2 : (1 - t) * 2)
+                                .clamp(0.0, 1.0);
+                    final opacity = 0.3 + 0.7 * scale;
+                    return Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 4),
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color:
+                            AppColors.primary.withValues(alpha: opacity),
+                        shape: BoxShape.circle,
+                      ),
+                      transform:
+                          Matrix4.diagonal3Values(scale, scale, 1.0),
+                      transformAlignment: Alignment.center,
+                    );
+                  }),
+                );
+              },
             ),
-          ),
-        ],
-      ),
-    );
+
+            const SizedBox(height: 12),
+
+            // Subtle hint
+            Text(
+              'Checking 4 retailers near you',
+              style: TextStyle(
+                fontSize: 12,
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      );
   }
 }
 
@@ -1481,8 +1509,8 @@ class _WelcomeDialog extends StatelessWidget {
             const Text(
               'Welcome to Milk!',
               style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w800,
+                fontSize: 24,
+                fontWeight: FontWeight.w700,
                 color: AppColors.textPrimary,
               ),
             ),
@@ -1505,7 +1533,7 @@ class _WelcomeDialog extends StatelessWidget {
                   child: Text(
                     'Skip',
                     style: TextStyle(
-                      fontSize: 13,
+                      fontSize: 14,
                       fontWeight: FontWeight.w500,
                       color: AppColors.textSecondary,
                     ),
@@ -1516,7 +1544,7 @@ class _WelcomeDialog extends StatelessWidget {
                   child: const Text(
                     'Start tour',
                     style: TextStyle(
-                      fontSize: 13,
+                      fontSize: 14,
                       fontWeight: FontWeight.w600,
                       color: AppColors.primary,
                     ),

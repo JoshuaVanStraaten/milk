@@ -15,6 +15,7 @@ import '../../../data/models/live_product.dart';
 import '../../../data/services/product_name_parser.dart';
 import '../../../data/services/smart_matching_service.dart';
 import '../../providers/store_provider.dart';
+import '../../widgets/common/lottie_loading_indicator.dart';
 import '../../widgets/products/add_to_list_sheet.dart';
 
 class LiveProductDetailScreen extends ConsumerStatefulWidget {
@@ -87,8 +88,8 @@ class _LiveProductDetailScreenState
                   Text(
                     widget.product.name,
                     style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
                       color: textColor,
                       height: 1.3,
                     ),
@@ -192,7 +193,7 @@ class _LiveProductDetailScreenState
                 product.price,
                 style: TextStyle(
                   fontSize: 28,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                   color: textColor,
                 ),
               ),
@@ -224,7 +225,7 @@ class _LiveProductDetailScreenState
             Text(
               product.promotionPrice,
               style: TextStyle(
-                fontSize: 15,
+                fontSize: 16,
                 fontWeight: FontWeight.w600,
                 color: AppColors.error,
               ),
@@ -235,7 +236,7 @@ class _LiveProductDetailScreenState
             const SizedBox(height: 4),
             Text(
               product.promotionValid,
-              style: TextStyle(fontSize: 13, color: subtitleColor),
+              style: TextStyle(fontSize: 12, color: subtitleColor),
             ),
           ],
         ],
@@ -441,17 +442,15 @@ class _LiveProductDetailScreenState
     Color subtitleColor,
   ) {
     if (_comparingPrices) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 32),
-        child: Column(
-          children: [
-            const CircularProgressIndicator(strokeWidth: 2.5),
-            const SizedBox(height: 16),
-            Text(
-              'Comparing prices across all retailers...',
-              style: TextStyle(fontSize: 14, color: subtitleColor),
-            ),
-          ],
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 32),
+          child: LottieLoadingIndicator(
+            width: 140,
+            height: 140,
+            message: 'Comparing prices across all retailers...',
+            messageStyle: TextStyle(fontSize: 14, color: subtitleColor),
+          ),
         ),
       );
     }
@@ -530,8 +529,8 @@ class _LiveProductDetailScreenState
             Text(
               'Price Comparison',
               style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
                 color: textColor,
               ),
             ),
@@ -540,7 +539,7 @@ class _LiveProductDetailScreenState
         const SizedBox(height: 4),
         Text(
           '${results.length} result${results.length == 1 ? '' : 's'} found',
-          style: TextStyle(fontSize: 13, color: subtitleColor),
+          style: TextStyle(fontSize: 12, color: subtitleColor),
         ),
         if (_verifyingWithAi)
           Padding(
@@ -595,7 +594,7 @@ class _LiveProductDetailScreenState
                 Expanded(
                   child: Text(
                     'No exact matches found at other stores',
-                    style: TextStyle(fontSize: 13, color: subtitleColor),
+                    style: TextStyle(fontSize: 12, color: subtitleColor),
                   ),
                 ),
               ],
@@ -837,7 +836,7 @@ class _LiveProductDetailScreenState
                   Text(
                     match.name,
                     style: TextStyle(
-                      fontSize: 13,
+                      fontSize: 14,
                       fontWeight: FontWeight.w500,
                       color: textColor,
                     ),
