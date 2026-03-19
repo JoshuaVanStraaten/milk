@@ -9,6 +9,7 @@ class RecipeResultCard extends StatelessWidget {
   final Recipe recipe;
   final RecipeGenerationStep currentStep;
   final bool isLoading;
+  final String? matchedRetailer;
   final VoidCallback onStartMatching;
   final Function(int index) onMatchIngredient;
   final VoidCallback onExportToList;
@@ -21,6 +22,7 @@ class RecipeResultCard extends StatelessWidget {
     required this.recipe,
     required this.currentStep,
     required this.isLoading,
+    this.matchedRetailer,
     required this.onStartMatching,
     required this.onMatchIngredient,
     required this.onExportToList,
@@ -330,6 +332,10 @@ class RecipeResultCard extends StatelessWidget {
   }
 
   Widget _buildStoreChip(String label, String? retailer, bool isDark) {
+    // "All Stores" has retailer=null, matchedRetailer='' or null means All Stores
+    final isSelected = (retailer == null && (matchedRetailer == null || matchedRetailer!.isEmpty)) ||
+        (retailer != null && matchedRetailer == retailer);
+
     return GestureDetector(
       onTap: () {
         if (onReMatchForStore != null) {
@@ -339,15 +345,17 @@ class RecipeResultCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
-          color: AppColors.primary.withValues(alpha: 0.1),
+          color: isSelected
+              ? AppColors.primary
+              : AppColors.primary.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w600,
-            color: AppColors.primary,
+            color: isSelected ? Colors.white : AppColors.primary,
           ),
         ),
       ),
@@ -570,32 +578,52 @@ class RecipeResultCard extends StatelessWidget {
       case RecipeGenerationStep.review:
         // Review step is only shown when autoMatch=false (edge case).
         // In normal flow generation lands directly on matching.
-        // Still show Save/New Recipe so the user has options.
-        return Row(
+        // Show Export button if any ingredients are matched (robustness guard).
+        final hasMatches = recipe.ingredients.any((i) => i.isMatched);
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: onSaveRecipe,
-                icon: const Icon(Icons.bookmark_add),
-                label: const Text('Save Recipe'),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
+            if (hasMatches) ...[
+              FilledButton.icon(
+                onPressed: onExportToList,
+                icon: const Icon(Icons.add_shopping_cart),
+                label: const Text('Export to Shopping List'),
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: TextButton.icon(
-                onPressed: onReset,
-                icon: const Icon(Icons.refresh),
-                label: const Text('New Recipe'),
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
+              const SizedBox(height: 12),
+            ],
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: onSaveRecipe,
+                    icon: const Icon(Icons.bookmark_add),
+                    label: const Text('Save Recipe'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
                 ),
-              ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextButton.icon(
+                    onPressed: onReset,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('New Recipe'),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         );

@@ -321,7 +321,8 @@ class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
 
     state = state.copyWith(
       isLoading: false,
-      currentStep: RecipeGenerationStep.review,
+      currentStep: RecipeGenerationStep.matching,
+      matchedRetailer: retailer.isEmpty ? '' : retailer,
       clearProgress: true,
     );
   }

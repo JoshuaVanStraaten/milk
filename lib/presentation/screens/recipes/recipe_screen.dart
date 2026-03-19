@@ -6,6 +6,7 @@ import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../providers/recipe_provider.dart';
 import '../../providers/list_provider.dart';
+import '../../providers/store_provider.dart';
 import '../../providers/tutorial_provider.dart';
 import '../../../data/models/recipe.dart';
 import '../../widgets/common/glass_container.dart';
@@ -76,6 +77,7 @@ class _GenerateRecipeTabState extends ConsumerState<_GenerateRecipeTab> {
   bool _useIngredientsMode = false;
   TutorialCoachMark? _tutorialCoachMark;
   bool _tutorialTriggered = false;
+  bool _recipeResultTutorialShown = false;
   final _modeSelectorKey = GlobalKey();
 
   @override
@@ -101,12 +103,7 @@ class _GenerateRecipeTabState extends ConsumerState<_GenerateRecipeTab> {
         ),
         colorShadow: Colors.black,
         opacityShadow: 0.8,
-        textSkip: 'SKIP',
-        textStyleSkip: const TextStyle(
-          color: AppColors.primary,
-          fontWeight: FontWeight.w600,
-          fontSize: 14,
-        ),
+        hideSkip: true,
         paddingFocus: 10,
         focusAnimationDuration: const Duration(milliseconds: 300),
         unFocusAnimationDuration: const Duration(milliseconds: 300),
@@ -118,6 +115,87 @@ class _GenerateRecipeTabState extends ConsumerState<_GenerateRecipeTab> {
           return true;
         },
       )..show(context: context);
+    });
+  }
+
+  void _maybeShowRecipeResultTutorial() {
+    final tutorialService = ref.read(tutorialServiceProvider);
+    if (tutorialService.isRecipeResultTutorialCompleted) return;
+
+    Future.delayed(const Duration(milliseconds: 800), () {
+      if (!mounted) return;
+
+      // Use a dialog instead of TutorialCoachMark — the coach mark overlay
+      // can't reliably target widgets inside a ScrollView (off-screen targets
+      // cause the overlay to get stuck with no way to dismiss).
+      ref.read(tutorialServiceProvider).completeRecipeResultTutorial();
+
+      showDialog(
+        context: context,
+        barrierDismissible: true,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Row(
+            children: [
+              Icon(Icons.auto_awesome, color: AppColors.primary, size: 24),
+              const SizedBox(width: 8),
+              const Text('Recipe Ready!'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.check_circle, color: AppColors.primary, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(child: Text(
+                    'Each ingredient is matched to a real product. '
+                    'Tap "Change" to swap it.',
+                    style: TextStyle(fontSize: 13, height: 1.4),
+                  )),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.store, color: AppColors.primary, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(child: Text(
+                    'Use the store chips to re-match all ingredients '
+                    'to a specific retailer.',
+                    style: TextStyle(fontSize: 13, height: 1.4),
+                  )),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.add_shopping_cart, color: AppColors.primary, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(child: Text(
+                    'Tap "Export to Shopping List" to add ingredients '
+                    'to a list.',
+                    style: TextStyle(fontSize: 13, height: 1.4),
+                  )),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Got it'),
+            ),
+          ],
+        ),
+      );
     });
   }
 
@@ -235,9 +313,14 @@ class _GenerateRecipeTabState extends ConsumerState<_GenerateRecipeTab> {
         onSelectRecipe: (recipeName) {
           // Clear everything and generate full recipe
           ref.read(recipeSuggestionsProvider.notifier).clear();
+          final retailer = ref.read(selectedRetailerProvider);
           ref
               .read(recipeGenerationProvider.notifier)
-              .generateRecipe(recipeRequest: recipeName, servings: 4);
+              .generateRecipe(
+                recipeRequest: recipeName,
+                servings: 4,
+                preferredRetailer: retailer,
+              );
         },
         onBack: () {
           // Only clear suggestions, keep ingredients for editing
@@ -258,24 +341,28 @@ class _GenerateRecipeTabState extends ConsumerState<_GenerateRecipeTab> {
                   .getSuggestions(ingredients: ingredients, mealType: mealType);
             },
             onGenerateRecipe: (request, servings, dietary) {
+              final retailer = ref.read(selectedRetailerProvider);
               ref
                   .read(recipeGenerationProvider.notifier)
                   .generateRecipe(
                     recipeRequest: request,
                     servings: servings,
                     dietaryRestrictions: dietary,
+                    preferredRetailer: retailer,
                   );
             },
           );
         }
         return RecipeInputCard(
           onGenerate: (request, servings, dietary) {
+            final retailer = ref.read(selectedRetailerProvider);
             ref
                 .read(recipeGenerationProvider.notifier)
                 .generateRecipe(
                   recipeRequest: request,
                   servings: servings,
                   dietaryRestrictions: dietary,
+                  preferredRetailer: retailer,
                 );
           },
         );
@@ -287,10 +374,18 @@ class _GenerateRecipeTabState extends ConsumerState<_GenerateRecipeTab> {
       case RecipeGenerationStep.matching:
       case RecipeGenerationStep.export:
         if (state.generatedRecipe != null) {
+          // Trigger recipe result tutorial on first generation
+          if (!_recipeResultTutorialShown &&
+              state.currentStep == RecipeGenerationStep.matching) {
+            _recipeResultTutorialShown = true;
+            _maybeShowRecipeResultTutorial();
+          }
+
           return RecipeResultCard(
             recipe: state.generatedRecipe!,
             currentStep: state.currentStep,
             isLoading: state.isLoading,
+            matchedRetailer: state.matchedRetailer,
             onStartMatching: () {
               ref
                   .read(recipeGenerationProvider.notifier)
@@ -302,6 +397,9 @@ class _GenerateRecipeTabState extends ConsumerState<_GenerateRecipeTab> {
                 ref,
                 state.generatedRecipe!.ingredients[index],
                 index,
+                initialRetailer: (state.matchedRetailer?.isNotEmpty ?? false)
+                    ? state.matchedRetailer
+                    : null,
               );
             },
             onExportToList: () {
@@ -529,14 +627,16 @@ class _GenerateRecipeTabState extends ConsumerState<_GenerateRecipeTab> {
     BuildContext context,
     WidgetRef ref,
     RecipeIngredient ingredient,
-    int index,
-  ) {
+    int index, {
+    String? initialRetailer,
+  }) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => IngredientMatchingSheet(
         ingredient: ingredient,
+        initialRetailer: initialRetailer,
         onSelectMatch: (match) {
           ref
               .read(recipeGenerationProvider.notifier)

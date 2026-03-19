@@ -162,12 +162,7 @@ class _LiveBrowseScreenState extends ConsumerState<LiveBrowseScreen> {
         targets: targets,
         colorShadow: Colors.black,
         opacityShadow: 0.8,
-        textSkip: 'SKIP',
-        textStyleSkip: const TextStyle(
-          color: AppColors.primary,
-          fontWeight: FontWeight.w600,
-          fontSize: 14,
-        ),
+        hideSkip: true,
         paddingFocus: 10,
         focusAnimationDuration: const Duration(milliseconds: 300),
         unFocusAnimationDuration: const Duration(milliseconds: 300),

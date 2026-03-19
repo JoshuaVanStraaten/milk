@@ -355,12 +355,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       targets: targets,
       colorShadow: Colors.black,
       opacityShadow: 0.8,
-      textSkip: 'SKIP',
-      textStyleSkip: const TextStyle(
-        color: AppColors.primary,
-        fontWeight: FontWeight.w600,
-        fontSize: 14,
-      ),
+      hideSkip: true,
       paddingFocus: 10,
       focusAnimationDuration: const Duration(milliseconds: 300),
       unFocusAnimationDuration: const Duration(milliseconds: 300),
@@ -588,12 +583,12 @@ class _SavingsBannerState extends State<_SavingsBanner>
     // Count-up animation for savings value
     _countController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1500),
+      duration: const Duration(milliseconds: 2500),
     );
     _countAnimation = Tween<double>(begin: 0, end: widget.totalSavings)
         .animate(CurvedAnimation(
       parent: _countController,
-      curve: Curves.easeOutCubic,
+      curve: Curves.easeOutQuart,
     ));
     _countController.forward();
   }
@@ -607,7 +602,7 @@ class _SavingsBannerState extends State<_SavingsBanner>
         end: widget.totalSavings,
       ).animate(CurvedAnimation(
         parent: _countController,
-        curve: Curves.easeOutCubic,
+        curve: Curves.easeOutQuart,
       ));
       _countController.forward(from: 0);
     }

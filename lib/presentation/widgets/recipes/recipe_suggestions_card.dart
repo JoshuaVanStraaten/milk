@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/services/gemini_service.dart';
+import '../common/lottie_loading_indicator.dart';
 
 /// Card widget for displaying recipe suggestions based on ingredients
 class RecipeSuggestionsCard extends StatelessWidget {
@@ -103,30 +104,8 @@ class RecipeSuggestionsCard extends StatelessWidget {
         color: isDark ? AppColors.surfaceDarkMode : AppColors.surface,
         borderRadius: BorderRadius.circular(16),
       ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const CircularProgressIndicator(),
-          const SizedBox(height: 24),
-          Text(
-            'Finding recipes...',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Looking for dishes you can make',
-            style: TextStyle(
-              fontSize: 14,
-              color: isDark
-                  ? AppColors.textSecondaryDark
-                  : AppColors.textSecondary,
-            ),
-          ),
-        ],
+      child: const LottieLoadingIndicator(
+        message: 'Finding recipes...',
       ),
     );
   }

@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/config/supabase_config.dart';
 import '../../providers/list_provider.dart';
+import '../../providers/tutorial_provider.dart';
 import '../../widgets/skeleton_loaders.dart';
 import '../../widgets/animations.dart';
 import '../../widgets/common/app_snackbar.dart';
 import '../../widgets/common/empty_states.dart';
+import '../../widgets/tutorial/tutorial_targets.dart';
 
 class MyListsScreen extends ConsumerStatefulWidget {
   const MyListsScreen({super.key});
@@ -20,6 +23,52 @@ class MyListsScreen extends ConsumerStatefulWidget {
 class _MyListsScreenState extends ConsumerState<MyListsScreen> {
   final Set<String> _selectedIds = {};
   bool get _isSelectionMode => _selectedIds.isNotEmpty;
+
+  TutorialCoachMark? _tutorialCoachMark;
+  bool _tutorialTriggered = false;
+  final _createListFabKey = GlobalKey();
+  final _firstListCardKey = GlobalKey();
+
+  @override
+  void dispose() {
+    _tutorialCoachMark?.finish();
+    super.dispose();
+  }
+
+  void _maybeShowListsTutorial({bool hasLists = false}) {
+    if (_tutorialTriggered) return;
+    final tutorialService = ref.read(tutorialServiceProvider);
+    if (tutorialService.isListsTutorialCompleted) return;
+    _tutorialTriggered = true;
+
+    Future.delayed(const Duration(milliseconds: 600), () {
+      if (!mounted) return;
+      if (_createListFabKey.currentContext == null) return;
+
+      _tutorialCoachMark = TutorialCoachMark(
+        targets: buildListsTutorialTargets(
+          createListFabKey: _createListFabKey,
+          firstListCardKey:
+              hasLists && _firstListCardKey.currentContext != null
+                  ? _firstListCardKey
+                  : null,
+        ),
+        colorShadow: Colors.black,
+        opacityShadow: 0.8,
+        hideSkip: true,
+        paddingFocus: 10,
+        focusAnimationDuration: const Duration(milliseconds: 300),
+        unFocusAnimationDuration: const Duration(milliseconds: 300),
+        onFinish: () {
+          ref.read(tutorialServiceProvider).completeListsTutorial();
+        },
+        onSkip: () {
+          ref.read(tutorialServiceProvider).completeListsTutorial();
+          return true;
+        },
+      )..show(context: context);
+    });
+  }
 
   void _exitSelectionMode() {
     setState(() => _selectedIds.clear());
@@ -119,8 +168,11 @@ class _MyListsScreenState extends ConsumerState<MyListsScreen> {
       body: listsAsync.when(
         data: (lists) {
           if (lists.isEmpty) {
+            _maybeShowListsTutorial(hasLists: false);
             return _buildEmptyState(context, isDark);
           }
+
+          _maybeShowListsTutorial(hasLists: true);
 
           return RefreshIndicator(
             onRefresh: () async {
@@ -134,6 +186,7 @@ class _MyListsScreenState extends ConsumerState<MyListsScreen> {
                 return AnimatedListItem(
                   index: index,
                   child: _ListCard(
+                    key: index == 0 ? _firstListCardKey : null,
                     list: list,
                     isSelected: _selectedIds.contains(list.shoppingListId),
                     isSelectionMode: _isSelectionMode,
@@ -152,6 +205,7 @@ class _MyListsScreenState extends ConsumerState<MyListsScreen> {
       floatingActionButton: _isSelectionMode
           ? null
           : FloatingActionButton(
+              key: _createListFabKey,
               onPressed: () => context.push('/lists/create'),
               child: const Icon(Icons.add),
             ),
@@ -220,6 +274,7 @@ class _ListCard extends ConsumerWidget {
   final VoidCallback onToggleSelect;
 
   const _ListCard({
+    super.key,
     required this.list,
     required this.isSelected,
     required this.isSelectionMode,

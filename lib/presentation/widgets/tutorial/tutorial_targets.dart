@@ -12,6 +12,7 @@ class TutorialTooltip extends StatelessWidget {
   final int stepIndex;
   final int totalSteps;
   final VoidCallback? onTap;
+  final VoidCallback? onSkip;
 
   const TutorialTooltip({
     super.key,
@@ -20,6 +21,7 @@ class TutorialTooltip extends StatelessWidget {
     required this.stepIndex,
     required this.totalSteps,
     this.onTap,
+    this.onSkip,
   });
 
   @override
@@ -92,14 +94,31 @@ class TutorialTooltip extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 10),
-          // Tap to continue hint
-          Text(
-            'Tap anywhere to continue',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-              color: AppColors.primary,
-            ),
+          // Bottom row: tap hint + skip button
+          Row(
+            children: [
+              Text(
+                'Tap anywhere to continue',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.primary,
+                ),
+              ),
+              const Spacer(),
+              if (onSkip != null)
+                GestureDetector(
+                  onTap: onSkip,
+                  child: Text(
+                    'SKIP',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+            ],
           ),
         ],
       ),
@@ -140,6 +159,7 @@ List<TargetFocus> buildHomeTutorialTargets({
               stepIndex: 0,
               totalSteps: total,
               onTap: controller.next,
+              onSkip: controller.skip,
             );
           },
         ),
@@ -165,6 +185,7 @@ List<TargetFocus> buildHomeTutorialTargets({
               stepIndex: 1,
               totalSteps: total,
               onTap: controller.next,
+              onSkip: controller.skip,
             );
           },
         ),
@@ -195,6 +216,7 @@ List<TargetFocus> buildHomeTutorialTargets({
               stepIndex: 2,
               totalSteps: total,
               onTap: controller.next,
+              onSkip: controller.skip,
             );
           },
         ),
@@ -245,6 +267,7 @@ List<TargetFocus> buildBrowseTutorialTargets({
               stepIndex: 0,
               totalSteps: total,
               onTap: controller.next,
+              onSkip: controller.skip,
             );
           },
         ),
@@ -270,6 +293,7 @@ List<TargetFocus> buildBrowseTutorialTargets({
               stepIndex: 1,
               totalSteps: total,
               onTap: controller.next,
+              onSkip: controller.skip,
             );
           },
         ),
@@ -295,6 +319,7 @@ List<TargetFocus> buildBrowseTutorialTargets({
               stepIndex: 2,
               totalSteps: total,
               onTap: controller.next,
+              onSkip: controller.skip,
             );
           },
         ),
@@ -319,6 +344,7 @@ List<TargetFocus> buildBrowseTutorialTargets({
               stepIndex: 3,
               totalSteps: total,
               onTap: controller.next,
+              onSkip: controller.skip,
             );
           },
         ),
@@ -353,6 +379,214 @@ List<TargetFocus> buildRecipesTutorialTargets({
               stepIndex: 0,
               totalSteps: 1,
               onTap: controller.next,
+              onSkip: controller.skip,
+            );
+          },
+        ),
+      ],
+    ),
+  ];
+}
+
+// =============================================================================
+// RECIPE RESULT TUTORIAL TARGETS (shown after first recipe generation)
+// =============================================================================
+
+List<TargetFocus> buildRecipeResultTutorialTargets({
+  GlobalKey? storeSelectorKey,
+  GlobalKey? exportButtonKey,
+}) {
+  final targets = <TargetFocus>[];
+  final hasStoreSelector = storeSelectorKey != null;
+  final hasExportButton = exportButtonKey != null;
+  final total = (hasStoreSelector ? 1 : 0) + (hasExportButton ? 1 : 0);
+  var step = 0;
+
+  // Step 1: Re-match store chips (if visible)
+  if (hasStoreSelector) {
+    targets.add(TargetFocus(
+      identify: 'store_selector',
+      keyTarget: storeSelectorKey,
+      shape: ShapeLightFocus.RRect,
+      radius: 12,
+      paddingFocus: 6,
+      contents: [
+        TargetContent(
+          align: ContentAlign.bottom,
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          builder: (context, controller) {
+            return TutorialTooltip(
+              title: 'Switch Retailers',
+              description:
+                  'Each ingredient is matched to a real product. Tap "Change" to swap it.\n\nUse these chips to re-match all ingredients to a specific store.',
+              stepIndex: step,
+              totalSteps: total,
+              onTap: controller.next,
+              onSkip: controller.skip,
+            );
+          },
+        ),
+      ],
+    ));
+    step++;
+  }
+
+  // Step 2: Export button (if visible)
+  if (hasExportButton) {
+    targets.add(TargetFocus(
+      identify: 'export_button',
+      keyTarget: exportButtonKey,
+      shape: ShapeLightFocus.RRect,
+      radius: 12,
+      paddingFocus: 6,
+      contents: [
+        TargetContent(
+          align: ContentAlign.top,
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          builder: (context, controller) {
+            return TutorialTooltip(
+              title: 'Export to Shopping List',
+              description:
+                  'Add matched ingredients to a shopping list. You can deselect items you already have.',
+              stepIndex: step,
+              totalSteps: total,
+              onTap: controller.next,
+              onSkip: controller.skip,
+            );
+          },
+        ),
+      ],
+    ));
+  }
+
+  return targets;
+}
+
+// =============================================================================
+// LISTS TUTORIAL TARGETS
+// =============================================================================
+
+List<TargetFocus> buildListsTutorialTargets({
+  required GlobalKey createListFabKey,
+  GlobalKey? firstListCardKey,
+}) {
+  final hasListCard = firstListCardKey != null;
+  final total = hasListCard ? 2 : 1;
+
+  return [
+    // Step 1: Create list FAB
+    TargetFocus(
+      identify: 'create_list_fab',
+      keyTarget: createListFabKey,
+      shape: ShapeLightFocus.RRect,
+      radius: 16,
+      paddingFocus: 8,
+      contents: [
+        TargetContent(
+          align: ContentAlign.top,
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          builder: (context, controller) {
+            return TutorialTooltip(
+              title: 'Create a List',
+              description:
+                  'Tap here to create a new shopping list. Pick a store, choose a colour, and start adding items.',
+              stepIndex: 0,
+              totalSteps: total,
+              onTap: controller.next,
+              onSkip: controller.skip,
+            );
+          },
+        ),
+      ],
+    ),
+
+    // Step 2: List card interactions (only if lists exist)
+    if (hasListCard)
+      TargetFocus(
+        identify: 'first_list_card',
+        keyTarget: firstListCardKey,
+        shape: ShapeLightFocus.RRect,
+        radius: 16,
+        paddingFocus: 6,
+        contents: [
+          TargetContent(
+            align: ContentAlign.bottom,
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            builder: (context, controller) {
+              return TutorialTooltip(
+                title: 'Manage Your Lists',
+                description:
+                    'Tap to open a list. Long-press to select multiple for bulk deletion. Swipe left to quickly delete one.',
+                stepIndex: 1,
+                totalSteps: total,
+                onTap: controller.next,
+                onSkip: controller.skip,
+              );
+            },
+          ),
+        ],
+      ),
+  ];
+}
+
+// =============================================================================
+// LIST DETAIL TUTORIAL TARGETS (shown on first list detail visit)
+// =============================================================================
+
+List<TargetFocus> buildListDetailTutorialTargets({
+  required GlobalKey addItemButtonKey,
+}) {
+  const total = 2;
+
+  return [
+    // Step 1: Add items
+    TargetFocus(
+      identify: 'add_item_button',
+      keyTarget: addItemButtonKey,
+      shape: ShapeLightFocus.RRect,
+      radius: 16,
+      paddingFocus: 8,
+      contents: [
+        TargetContent(
+          align: ContentAlign.top,
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          builder: (context, controller) {
+            return TutorialTooltip(
+              title: 'Add Items',
+              description:
+                  'Add items manually or browse products from any store. You can also compare prices before adding.',
+              stepIndex: 0,
+              totalSteps: total,
+              onTap: controller.next,
+              onSkip: controller.skip,
+            );
+          },
+        ),
+      ],
+    ),
+
+    // Step 2: Item management hint (positioned at center of screen)
+    TargetFocus(
+      identify: 'item_management',
+      targetPosition: TargetPosition(
+        const Size(300, 100),
+        const Offset(50, 300),
+      ),
+      shape: ShapeLightFocus.RRect,
+      radius: 16,
+      contents: [
+        TargetContent(
+          align: ContentAlign.bottom,
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          builder: (context, controller) {
+            return TutorialTooltip(
+              title: 'Managing Items',
+              description:
+                  'Tap an item to edit it. Swipe left to quickly delete. Long-press to select multiple items for bulk deletion.',
+              stepIndex: 1,
+              totalSteps: total,
+              onTap: controller.next,
+              onSkip: controller.skip,
             );
           },
         ),

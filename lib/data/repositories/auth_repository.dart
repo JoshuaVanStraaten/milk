@@ -225,29 +225,53 @@ class AuthRepository {
     }
   }
 
-  /// Get user profile from database by user ID
+  /// Get user profile from database by user ID.
+  /// Retries with exponential backoff on transient network errors.
   Future<UserProfile> getUserProfile(String userId) async {
-    try {
-      _logger.d('Fetching user profile for: $userId');
+    const maxAttempts = 3;
 
-      final response = await _supabase
-          .from('user_profiles')
-          .select()
-          .eq('id', userId)
-          .single();
+    for (var attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        _logger.d('Fetching user profile for: $userId (attempt $attempt)');
 
-      final profile = UserProfile.fromJson(response);
-      _logger.d('✅ User profile fetched');
+        final response = await _supabase
+            .from('user_profiles')
+            .select()
+            .eq('id', userId)
+            .single();
 
-      return profile;
-    } catch (e, stackTrace) {
-      _logger.e(
-        'Error fetching user profile',
-        error: e,
-        stackTrace: stackTrace,
-      );
-      throw Exception('Failed to fetch user profile: $e');
+        final profile = UserProfile.fromJson(response);
+        _logger.d('✅ User profile fetched');
+
+        return profile;
+      } catch (e, stackTrace) {
+        final isTransient = e.toString().contains('SocketException') ||
+            e.toString().contains('Failed host lookup') ||
+            e.toString().contains('Connection refused') ||
+            e.toString().contains('Connection reset') ||
+            e.toString().contains('TimeoutException');
+
+        if (isTransient && attempt < maxAttempts) {
+          final delay = Duration(seconds: attempt * 2);
+          _logger.w(
+            'Transient error fetching profile (attempt $attempt/$maxAttempts), '
+            'retrying in ${delay.inSeconds}s...',
+          );
+          await Future.delayed(delay);
+          continue;
+        }
+
+        _logger.e(
+          'Error fetching user profile',
+          error: e,
+          stackTrace: stackTrace,
+        );
+        throw Exception('Failed to fetch user profile: $e');
+      }
     }
+
+    // Unreachable, but satisfies the analyzer
+    throw Exception('Failed to fetch user profile after $maxAttempts attempts');
   }
 
   /// Update user profile

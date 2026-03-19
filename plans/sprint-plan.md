@@ -499,6 +499,116 @@ Each retailer needs a Supabase Edge Function that proxies product search + categ
 
 ---
 
+### Sprint 12.5: Post-Release Bug Fixes & UX Improvements ✅ COMPLETE
+
+**Model:** Opus 4.6
+**Goal:** Fix bugs reported after v1.1.0+3 Play Store release, improve discoverability.
+
+**Completed:**
+
+- **Recipe re-match bug fix** — `reMatchWithRetailer()` was setting `currentStep: review` instead of `matching`, which hid the "Change"/"Match" buttons and "Export to Shopping List" button after switching retailers. One-line fix in `recipe_provider.dart`. Added robustness guard: export button now also shows in `review` step when ingredients are matched.
+- **List sync bug fix** — Items added from browse screen didn't appear in list detail until app restart. Root cause: `ListItemNotifier.addItem()` didn't invalidate `realtimeListItemsProvider(listId)`, which `list_detail_screen.dart` watches. Added the missing invalidation.
+- **Default recipe matching uses browse retailer** — Initial auto-match now uses the currently selected retailer from the browse screen (via `selectedRetailerProvider`) instead of "All Stores". Active store chip is visually highlighted with filled background. `matchedRetailer` tracked in `RecipeGenerationState`.
+- **Lottie loading for "Use Ingredients"** — Replaced `CircularProgressIndicator` in `recipe_suggestions_card.dart` with `LottieLoadingIndicator`.
+- **Savings count-up animation slowed** — Duration increased from 1500ms to 2500ms, curve changed to `easeOutQuart` for more dramatic deceleration on fast devices.
+- **Long-press multi-select for list items** — Added long-press selection mode to `list_detail_screen.dart` (reused pattern from `my_lists_screen.dart`). All 3 deletion methods available: swipe-left (quick), tap-edit-bin (deliberate), long-press multi-select (bulk). Selection mode shows count + delete button in AppBar, selection indicators replace checkboxes.
+- **Expanded tutorials** — Recipe result tutorial (3 steps: matched ingredients, store chips, export button) triggers on first recipe generation. Lists tutorial (2 steps: create FAB, list card management) triggers on first Lists tab visit. List detail tutorial (2 steps: add items, item management hints). Added `recipeResult` and `lists` tutorial completion tracking to `TutorialService`.
+
+**Deferred:**
+
+- **Missing stores** (Woolworths Irene Village Mall, Woolworths Southdowns, Checkers/Woolworths Lorraine PE) — requires store code validation against retailer APIs, deferred to separate data task.
+
+**Files modified:**
+
+- `lib/presentation/providers/recipe_provider.dart` — re-match step fix, matchedRetailer tracking
+- `lib/presentation/providers/list_provider.dart` — realtimeListItemsProvider invalidation
+- `lib/presentation/widgets/recipes/recipe_result_card.dart` — export button robustness, matchedRetailer prop, store chip highlighting, tutorial GlobalKeys
+- `lib/presentation/widgets/recipes/recipe_suggestions_card.dart` — Lottie loading
+- `lib/presentation/screens/recipes/recipe_screen.dart` — browse retailer passthrough, recipe result tutorial trigger
+- `lib/presentation/screens/home/home_screen.dart` — animation duration + curve
+- `lib/presentation/screens/lists/list_detail_screen.dart` — long-press multi-select
+- `lib/presentation/screens/lists/my_lists_screen.dart` — lists tutorial
+- `lib/data/services/tutorial_service.dart` — new tutorial keys
+- `lib/presentation/widgets/tutorial/tutorial_targets.dart` — recipe result, lists, list detail tutorial targets
+
+---
+
+### Sprint 12.6: Tutorial & Auth Hardening ✅ COMPLETE
+
+**Model:** Opus 4.6
+**Goal:** Fix tutorial overlay bugs, improve auth resilience, pass retailer context through recipe flow.
+
+**Completed:**
+
+- **Tutorial overlay black screen fix** — Recipe result tutorial replaced TutorialCoachMark (which caused stuck black overlays when tooltips rendered off-screen) with AlertDialog showing 3 tip rows. Root cause: library's `_buildContents` Stack fills entire overlay, blocking taps when tooltip is off-viewport.
+- **SKIP button moved into tutorial cards** — All `TutorialTooltip` widgets now have inline SKIP button (bottom-right of card) instead of library's bottom-of-screen skip text. Removed `textSkip`/`textStyleSkip` from all TutorialCoachMark instances, replaced with `hideSkip: true`.
+- **Auth profile retry with backoff** — `getUserProfile()` now retries up to 3 times with exponential backoff (2s, 4s) on transient network errors (SocketException, DNS lookup, connection refused/reset, timeout). Prevents sign-in failures on flaky networks.
+- **Recipe matching respects selected retailer** — "Use Ingredients" suggestions now pass `preferredRetailer` from `selectedRetailerProvider`. Ingredient matching sheet opens pre-filtered to the active matched retailer (with empty-string-to-null normalization for "All Stores").
+- **Tutorial GlobalKey cleanup** — Removed `ingredientsSectionKey`, `storeSelectorKey`, `exportButtonKey` from `recipe_result_card.dart` (no longer needed after dialog replacement).
+
+**Files modified:**
+
+- `lib/presentation/widgets/tutorial/tutorial_targets.dart` — SKIP in card, recipe result targets refactored
+- `lib/presentation/screens/recipes/recipe_screen.dart` — AlertDialog tutorial, retailer passthrough, matching sheet initialRetailer
+- `lib/presentation/widgets/recipes/recipe_result_card.dart` — removed tutorial GlobalKeys
+- `lib/presentation/screens/home/home_screen.dart` — hideSkip: true
+- `lib/presentation/screens/products/live_browse_screen.dart` — hideSkip: true
+- `lib/presentation/screens/lists/my_lists_screen.dart` — hideSkip: true
+- `lib/data/repositories/auth_repository.dart` — retry with exponential backoff
+
+---
+
+### Sprint 13: Admin Dashboard
+
+**Model:** Opus 4.6
+**Goal:** Build an admin dashboard to monitor users, track app health, and identify backend issues.
+
+**Scope:**
+
+- User activity monitoring (signups, active users, retention)
+- Error/issue tracking (failed API calls, auth errors, crash reports)
+- Store data health checks (missing stores, stale data, broken images)
+- Recipe generation metrics (success rate, matching accuracy, popular recipes)
+- Shopping list usage stats (lists created, items added, sharing activity)
+- Real-time alerts for backend issues (Edge Function failures, Supabase downtime)
+
+**Tech options:** Supabase Dashboard views, custom web dashboard (Next.js + Supabase), or Flutter web admin panel.
+
+---
+
+### Sprint 14: Onboarding Flow Redesign
+
+**Model:** Opus 4.6
+**Goal:** Design and build a compelling onboarding flow that converts new users and explains the app's value proposition.
+
+**Scope:**
+
+- Multi-step onboarding screens (value props, feature highlights, social proof)
+- Location permission request with clear benefit explanation
+- Store preference selection (favorite retailers)
+- Optional account creation (allow browsing without signup)
+- Animated illustrations / Lottie animations per step
+- Skip option with re-access from profile
+- A/B test-ready structure for optimizing conversion
+
+---
+
+### Sprint 15: Security Audit (Saturday 2026-03-22)
+
+**Model:** Opus 4.6
+**Goal:** Full security audit of Flutter app → Supabase backend. Identify and fix vulnerabilities before wider public rollout.
+
+**Scope:**
+
+- **Flutter client:** Secure storage audit, API key exposure, certificate pinning, reverse engineering resistance, input validation
+- **Supabase backend:** RLS policy review (all tables), Edge Function auth/CORS, SQL injection vectors, auth flow security
+- **API security:** Rate limiting, request validation, CSRF protection, token management
+- **Data privacy:** PII handling, GDPR-like compliance, data encryption at rest/transit
+- **Dependency audit:** Known CVEs in Flutter/Dart packages, Supabase client versions
+- **Penetration testing:** Auth bypass attempts, privilege escalation, API fuzzing
+
+---
+
 ## Future (Add to CLAUDE.md)
 
 - **FatSecret API** for nutritional information (fat, protein, carbs)

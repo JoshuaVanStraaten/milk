@@ -903,8 +903,9 @@ class ListItemNotifier extends StateNotifier<AsyncValue<void>> {
         // Cache the item
         await _cache.saveItem(item);
 
-        // Refresh items and list
+        // Refresh items and list (including realtime provider used by list detail screen)
         _ref.invalidate(listItemsProvider(listId));
+        _ref.invalidate(realtimeListItemsProvider(listId));
         _ref.invalidate(listByIdProvider(listId));
         _ref.invalidate(userListsProvider);
 

@@ -28,6 +28,67 @@ class ListDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _ListDetailScreenState extends ConsumerState<ListDetailScreen> {
+  final Set<String> _selectedIds = {};
+  bool get _isSelectionMode => _selectedIds.isNotEmpty;
+
+  void _exitSelectionMode() {
+    setState(() => _selectedIds.clear());
+  }
+
+  void _toggleSelection(String itemId) {
+    setState(() {
+      if (_selectedIds.contains(itemId)) {
+        _selectedIds.remove(itemId);
+      } else {
+        _selectedIds.add(itemId);
+      }
+    });
+    AppHaptics.lightTap();
+  }
+
+  void _enterSelectionMode(String itemId) {
+    setState(() => _selectedIds.add(itemId));
+    AppHaptics.lightTap();
+  }
+
+  Future<void> _confirmBulkDelete() async {
+    final count = _selectedIds.length;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Delete $count item${count > 1 ? 's' : ''}?'),
+        content: Text(
+          'This will permanently remove $count item${count > 1 ? 's' : ''} from this list.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true && mounted) {
+      final notifier = ref.read(
+        realtimeListItemsProvider(widget.listId).notifier,
+      );
+      for (final id in _selectedIds) {
+        notifier.deleteItem(id);
+      }
+      AppSnackbar.success(
+        context,
+        message: '$count item${count > 1 ? 's' : ''} removed',
+      );
+      _exitSelectionMode();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final listAsync = ref.watch(listByIdProvider(widget.listId));
@@ -36,34 +97,53 @@ class _ListDetailScreenState extends ConsumerState<ListDetailScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: listAsync.when(
-          data: (list) => Text(list.listName),
-          loading: () => const Text('Loading...'),
-          error: (_, __) => const Text('Error'),
-        ),
-        actions: [
-          // Real-time indicator
-          if (itemsState.isRealtime)
-            Padding(
-              padding: const EdgeInsets.only(right: 8.0),
-              child: Tooltip(
-                message: 'Real-time sync active',
-                child: Icon(Icons.sync, color: AppColors.success, size: 20),
+        leading: _isSelectionMode
+            ? IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: _exitSelectionMode,
+              )
+            : null,
+        title: _isSelectionMode
+            ? Text('${_selectedIds.length} selected')
+            : listAsync.when(
+                data: (list) => Text(list.listName),
+                loading: () => const Text('Loading...'),
+                error: (_, __) => const Text('Error'),
               ),
-            ),
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () {
-              _showAddItemDialog(context);
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.more_vert),
-            onPressed: () {
-              _showListOptions(context, ref, listAsync.value);
-            },
-          ),
-        ],
+        backgroundColor: _isSelectionMode
+            ? AppColors.primary.withValues(alpha: 0.1)
+            : null,
+        actions: _isSelectionMode
+            ? [
+                IconButton(
+                  icon: const Icon(Icons.delete, color: AppColors.error),
+                  onPressed: _confirmBulkDelete,
+                ),
+              ]
+            : [
+                // Real-time indicator
+                if (itemsState.isRealtime)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: Tooltip(
+                      message: 'Real-time sync active',
+                      child:
+                          Icon(Icons.sync, color: AppColors.success, size: 20),
+                    ),
+                  ),
+                IconButton(
+                  icon: const Icon(Icons.add),
+                  onPressed: () {
+                    _showAddItemDialog(context);
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.more_vert),
+                  onPressed: () {
+                    _showListOptions(context, ref, listAsync.value);
+                  },
+                ),
+              ],
       ),
       body: listAsync.when(
         data: (list) {
@@ -190,7 +270,14 @@ class _ListDetailScreenState extends ConsumerState<ListDetailScreen> {
           ref.read(realtimeListItemsProvider(widget.listId).notifier).refresh();
           ref.invalidate(listByIdProvider(widget.listId));
         },
-        child: _AnimatedItemList(items: sortedItems, listId: widget.listId),
+        child: _AnimatedItemList(
+          items: sortedItems,
+          listId: widget.listId,
+          selectedIds: _selectedIds,
+          isSelectionMode: _isSelectionMode,
+          onLongPress: _enterSelectionMode,
+          onToggleSelect: _toggleSelection,
+        ),
       );
     }
 
@@ -226,6 +313,10 @@ class _ListDetailScreenState extends ConsumerState<ListDetailScreen> {
         listId: widget.listId,
         isDark: isDark,
         buildHeader: _buildRetailerHeader,
+        selectedIds: _selectedIds,
+        isSelectionMode: _isSelectionMode,
+        onLongPress: _enterSelectionMode,
+        onToggleSelect: _toggleSelection,
       ),
     );
   }
@@ -547,8 +638,19 @@ class _ListHeader extends StatelessWidget {
 class _ListItemTile extends ConsumerWidget {
   final ListItem item;
   final String listId;
+  final bool isSelected;
+  final bool isSelectionMode;
+  final VoidCallback? onLongPress;
+  final VoidCallback? onToggleSelect;
 
-  const _ListItemTile({required this.item, required this.listId});
+  const _ListItemTile({
+    required this.item,
+    required this.listId,
+    this.isSelected = false,
+    this.isSelectionMode = false,
+    this.onLongPress,
+    this.onToggleSelect,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -578,6 +680,12 @@ class _ListItemTile extends ConsumerWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
+        decoration: isSelected
+            ? BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.primary, width: 2),
+              )
+            : null,
         child: Card(
           key: ValueKey(item.itemId),
           margin: const EdgeInsets.only(bottom: 8),
@@ -587,22 +695,39 @@ class _ListItemTile extends ConsumerWidget {
             opacity: item.completedItem ? 0.7 : 1.0,
             child: InkWell(
               onTap: () {
-                AppHaptics.lightTap();
-                _showEditItemDialog(context, ref);
+                if (isSelectionMode) {
+                  onToggleSelect?.call();
+                } else {
+                  AppHaptics.lightTap();
+                  _showEditItemDialog(context, ref);
+                }
               },
+              onLongPress: isSelectionMode ? null : onLongPress,
               borderRadius: BorderRadius.circular(12),
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8.0),
                 child: ListTile(
-                  leading: AnimatedCheckbox(
-                    value: item.completedItem,
-                    onChanged: (value) {
-                      // Use realtime provider for toggle with optimistic update
-                      ref
-                          .read(realtimeListItemsProvider(listId).notifier)
-                          .toggleItemCompletion(item);
-                    },
-                  ),
+                  leading: isSelectionMode
+                      ? Icon(
+                          isSelected
+                              ? Icons.check_circle
+                              : Icons.radio_button_unchecked,
+                          color: isSelected
+                              ? AppColors.primary
+                              : (isDark
+                                  ? AppColors.textSecondaryDark
+                                  : AppColors.textSecondary),
+                        )
+                      : AnimatedCheckbox(
+                          value: item.completedItem,
+                          onChanged: (value) {
+                            // Use realtime provider for toggle with optimistic update
+                            ref
+                                .read(
+                                    realtimeListItemsProvider(listId).notifier)
+                                .toggleItemCompletion(item);
+                          },
+                        ),
                   title: AnimatedDefaultTextStyle(
                     duration: const Duration(milliseconds: 200),
                     style: TextStyle(
@@ -1957,8 +2082,19 @@ class _GroupedListEntry {
 class _AnimatedItemList extends StatefulWidget {
   final List<ListItem> items;
   final String listId;
+  final Set<String> selectedIds;
+  final bool isSelectionMode;
+  final void Function(String itemId)? onLongPress;
+  final void Function(String itemId)? onToggleSelect;
 
-  const _AnimatedItemList({required this.items, required this.listId});
+  const _AnimatedItemList({
+    required this.items,
+    required this.listId,
+    this.selectedIds = const {},
+    this.isSelectionMode = false,
+    this.onLongPress,
+    this.onToggleSelect,
+  });
 
   @override
   State<_AnimatedItemList> createState() => _AnimatedItemListState();
@@ -2035,6 +2171,10 @@ class _AnimatedItemListState extends State<_AnimatedItemList>
           key: ValueKey(item.itemId),
           item: item,
           listId: widget.listId,
+          isSelected: widget.selectedIds.contains(item.itemId),
+          isSelectionMode: widget.isSelectionMode,
+          onLongPress: () => widget.onLongPress?.call(item.itemId),
+          onToggleSelect: () => widget.onToggleSelect?.call(item.itemId),
         );
       },
     );
@@ -2045,11 +2185,19 @@ class _AnimatedItemListState extends State<_AnimatedItemList>
 class _AnimatedListItem extends StatefulWidget {
   final ListItem item;
   final String listId;
+  final bool isSelected;
+  final bool isSelectionMode;
+  final VoidCallback? onLongPress;
+  final VoidCallback? onToggleSelect;
 
   const _AnimatedListItem({
     super.key,
     required this.item,
     required this.listId,
+    this.isSelected = false,
+    this.isSelectionMode = false,
+    this.onLongPress,
+    this.onToggleSelect,
   });
 
   @override
@@ -2114,7 +2262,14 @@ class _AnimatedListItemState extends State<_AnimatedListItem>
       position: _slideAnimation,
       child: FadeTransition(
         opacity: _fadeAnimation,
-        child: _ListItemTile(item: widget.item, listId: widget.listId),
+        child: _ListItemTile(
+          item: widget.item,
+          listId: widget.listId,
+          isSelected: widget.isSelected,
+          isSelectionMode: widget.isSelectionMode,
+          onLongPress: widget.onLongPress,
+          onToggleSelect: widget.onToggleSelect,
+        ),
       ),
     );
   }
@@ -2127,12 +2282,20 @@ class _AnimatedGroupedList extends StatelessWidget {
   final bool isDark;
   final Widget Function(String retailer, int itemCount, bool isDark)
   buildHeader;
+  final Set<String> selectedIds;
+  final bool isSelectionMode;
+  final void Function(String itemId)? onLongPress;
+  final void Function(String itemId)? onToggleSelect;
 
   const _AnimatedGroupedList({
     required this.entries,
     required this.listId,
     required this.isDark,
     required this.buildHeader,
+    this.selectedIds = const {},
+    this.isSelectionMode = false,
+    this.onLongPress,
+    this.onToggleSelect,
   });
 
   @override
@@ -2153,6 +2316,10 @@ class _AnimatedGroupedList extends StatelessWidget {
           key: ValueKey(entry.id),
           item: entry.item!,
           listId: listId,
+          isSelected: selectedIds.contains(entry.id),
+          isSelectionMode: isSelectionMode,
+          onLongPress: () => onLongPress?.call(entry.id),
+          onToggleSelect: () => onToggleSelect?.call(entry.id),
         );
       },
     );
