@@ -1339,15 +1339,61 @@ class _ManualAddTabState extends ConsumerState<_ManualAddTab> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _priceController = TextEditingController();
-  final _quantityController = TextEditingController(text: '1');
   final _noteController = TextEditingController();
+  final _scrollController = ScrollController();
+  final _noteFocusNode = FocusNode();
+  Timer? _longPressTimer;
+  int _quantity = 1;
+
+  @override
+  void initState() {
+    super.initState();
+    _noteFocusNode.addListener(_onNoteFocus);
+  }
+
   @override
   void dispose() {
+    _longPressTimer?.cancel();
     _nameController.dispose();
     _priceController.dispose();
-    _quantityController.dispose();
     _noteController.dispose();
+    _scrollController.dispose();
+    _noteFocusNode.dispose();
     super.dispose();
+  }
+
+  void _onNoteFocus() {
+    if (_noteFocusNode.hasFocus) {
+      Future.delayed(const Duration(milliseconds: 300), () {
+        if (_scrollController.hasClients) {
+          _scrollController.animateTo(
+            _scrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOut,
+          );
+        }
+      });
+    }
+  }
+
+  void _startIncrement(int delta) {
+    _longPressTimer?.cancel();
+    _updateQuantity(delta);
+    _longPressTimer = Timer(const Duration(milliseconds: 400), () {
+      _longPressTimer = Timer.periodic(const Duration(milliseconds: 150), (_) {
+        _updateQuantity(delta);
+      });
+    });
+  }
+
+  void _stopIncrement() {
+    _longPressTimer?.cancel();
+    _longPressTimer = null;
+  }
+
+  void _updateQuantity(int delta) {
+    FocusScope.of(context).unfocus();
+    setState(() => _quantity = (_quantity + delta).clamp(1, 99));
   }
 
   Future<void> _handleAddItem() async {
@@ -1356,7 +1402,7 @@ class _ManualAddTabState extends ConsumerState<_ManualAddTab> {
     // Optimistic — close and show snackbar immediately, add in background
     final itemName = _nameController.text.trim();
     final itemPrice = double.parse(_priceController.text);
-    final itemQty = double.parse(_quantityController.text);
+    final itemQty = _quantity.toDouble();
     final itemNote = _noteController.text.trim().isEmpty
         ? null
         : _noteController.text.trim();
@@ -1388,6 +1434,8 @@ class _ManualAddTabState extends ConsumerState<_ManualAddTab> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Padding(
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -1398,6 +1446,7 @@ class _ManualAddTabState extends ConsumerState<_ManualAddTab> {
       child: Form(
         key: _formKey,
         child: SingleChildScrollView(
+          controller: _scrollController,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1422,42 +1471,87 @@ class _ManualAddTabState extends ConsumerState<_ManualAddTab> {
 
               const SizedBox(height: 16),
 
+              TextFormField(
+                controller: _priceController,
+                decoration: const InputDecoration(
+                  labelText: 'Price',
+                  prefixText: 'R ',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                validator: (value) {
+                  if (value?.isEmpty ?? true) return 'Required';
+                  if (double.tryParse(value!) == null) return 'Invalid';
+                  return null;
+                },
+              ),
+
+              const SizedBox(height: 20),
+
+              // Quantity stepper
               Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    flex: 2,
-                    child: TextFormField(
-                      controller: _priceController,
-                      decoration: const InputDecoration(
-                        labelText: 'Price',
-                        prefixText: 'R ',
-                        border: OutlineInputBorder(),
-                      ),
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      validator: (value) {
-                        if (value?.isEmpty ?? true) return 'Required';
-                        if (double.tryParse(value!) == null) return 'Invalid';
-                        return null;
-                      },
+                  Text(
+                    'Quantity',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
                     ),
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: TextFormField(
-                      controller: _quantityController,
-                      decoration: const InputDecoration(
-                        labelText: 'Qty',
-                        border: OutlineInputBorder(),
+                  const Spacer(),
+                  GestureDetector(
+                    onTapDown: (_) => _startIncrement(-1),
+                    onTapUp: (_) => _stopIncrement(),
+                    onTapCancel: _stopIncrement,
+                    child: Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: isDark
+                            ? AppColors.surfaceDarkModeLight
+                            : AppColors.surface,
                       ),
-                      keyboardType: TextInputType.number,
-                      validator: (value) {
-                        if (value?.isEmpty ?? true) return 'Required';
-                        if (double.tryParse(value!) == null) return 'Invalid';
-                        return null;
-                      },
+                      child: Icon(
+                        Icons.remove,
+                        size: 18,
+                        color: _quantity <= 1
+                            ? (isDark ? AppColors.textDisabledDark : AppColors.textDisabled)
+                            : (isDark ? AppColors.textPrimaryDark : AppColors.textPrimary),
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 44,
+                    child: Text(
+                      '$_quantity',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                  GestureDetector(
+                    onTapDown: (_) => _startIncrement(1),
+                    onTapUp: (_) => _stopIncrement(),
+                    onTapCancel: _stopIncrement,
+                    child: Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: AppColors.primary.withValues(alpha: isDark ? 0.2 : 0.1),
+                      ),
+                      child: const Icon(
+                        Icons.add,
+                        size: 18,
+                        color: AppColors.primary,
+                      ),
                     ),
                   ),
                 ],
@@ -1465,14 +1559,27 @@ class _ManualAddTabState extends ConsumerState<_ManualAddTab> {
 
               const SizedBox(height: 16),
 
+              // Note
+              Text(
+                'Note',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 8),
               TextFormField(
                 controller: _noteController,
-                decoration: const InputDecoration(
-                  labelText: 'Note (optional)',
-                  prefixIcon: Icon(Icons.note),
-                  border: OutlineInputBorder(),
+                focusNode: _noteFocusNode,
+                decoration: InputDecoration(
+                  hintText: 'e.g. Get the low-fat version',
+                  isDense: true,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
-                maxLines: 2,
+                maxLines: 1,
               ),
 
               const SizedBox(height: 24),
@@ -1596,7 +1703,7 @@ class _BrowseAddTabState extends ConsumerState<_BrowseAddTab> {
     }
   }
 
-  Future<void> _addProductToList(LiveProduct product) async {
+  void _addProductToList(LiveProduct product) {
     double regularPrice = product.priceNumeric;
     double? specialPrice;
     Map<String, double>? multiBuyInfo;
@@ -1616,31 +1723,22 @@ class _BrowseAddTabState extends ConsumerState<_BrowseAddTab> {
       }
     }
 
-    // Optimistic — close and show snackbar immediately, add in background
-    Navigator.of(widget.outerContext).pop();
-    widget.scaffoldMessenger.showSnackBar(
-      SnackBar(
-        content: Text('${product.name} added'),
-        backgroundColor: AppColors.primary,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        margin: const EdgeInsets.all(16),
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _BrowseAddConfirmSheet(
+        product: product,
+        regularPrice: regularPrice,
+        specialPrice: specialPrice,
+        multiBuyInfo: multiBuyInfo,
+        listId: widget.listId,
+        outerContext: widget.outerContext,
+        scaffoldMessenger: widget.scaffoldMessenger,
+        ref: ref,
       ),
     );
-
-    ref
-        .read(realtimeListItemsProvider(widget.listId).notifier)
-        .addItem(
-          itemName: product.name,
-          itemPrice: regularPrice,
-          itemRetailer: product.retailer,
-          itemSpecialPrice: specialPrice,
-          multiBuyInfo: multiBuyInfo,
-        )
-        .then((_) {
-      ref.invalidate(listByIdProvider(widget.listId));
-      ref.invalidate(userListsProvider);
-    });
   }
 
   @override
@@ -2056,6 +2154,309 @@ class _BrowseProductRowState extends State<_BrowseProductRow>
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Confirmation sheet shown when adding a browsed product to a list.
+/// Lets user adjust quantity and add an optional note before confirming.
+class _BrowseAddConfirmSheet extends StatefulWidget {
+  final LiveProduct product;
+  final double regularPrice;
+  final double? specialPrice;
+  final Map<String, double>? multiBuyInfo;
+  final String listId;
+  final BuildContext outerContext;
+  final ScaffoldMessengerState scaffoldMessenger;
+  final WidgetRef ref;
+
+  const _BrowseAddConfirmSheet({
+    required this.product,
+    required this.regularPrice,
+    required this.specialPrice,
+    required this.multiBuyInfo,
+    required this.listId,
+    required this.outerContext,
+    required this.scaffoldMessenger,
+    required this.ref,
+  });
+
+  @override
+  State<_BrowseAddConfirmSheet> createState() => _BrowseAddConfirmSheetState();
+}
+
+class _BrowseAddConfirmSheetState extends State<_BrowseAddConfirmSheet> {
+  int _quantity = 1;
+  final _noteController = TextEditingController();
+  Timer? _longPressTimer;
+
+  @override
+  void dispose() {
+    _longPressTimer?.cancel();
+    _noteController.dispose();
+    super.dispose();
+  }
+
+  void _startIncrement(int delta) {
+    _longPressTimer?.cancel();
+    _updateQuantity(delta);
+    _longPressTimer = Timer(const Duration(milliseconds: 400), () {
+      _longPressTimer = Timer.periodic(const Duration(milliseconds: 150), (_) {
+        _updateQuantity(delta);
+      });
+    });
+  }
+
+  void _stopIncrement() {
+    _longPressTimer?.cancel();
+    _longPressTimer = null;
+  }
+
+  void _updateQuantity(int delta) {
+    FocusScope.of(context).unfocus();
+    setState(() => _quantity = (_quantity + delta).clamp(1, 99));
+  }
+
+  void _handleAdd() {
+    final note = _noteController.text.trim().isEmpty
+        ? null
+        : _noteController.text.trim();
+
+    // Pop this confirm sheet
+    Navigator.of(context).pop();
+    // Pop the parent tabbed sheet
+    Navigator.of(widget.outerContext).pop();
+
+    widget.scaffoldMessenger.showSnackBar(
+      SnackBar(
+        content: Text('${widget.product.name} added'),
+        backgroundColor: AppColors.primary,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
+      ),
+    );
+
+    widget.ref
+        .read(realtimeListItemsProvider(widget.listId).notifier)
+        .addItem(
+          itemName: widget.product.name,
+          itemPrice: widget.regularPrice,
+          itemQuantity: _quantity.toDouble(),
+          itemNote: note,
+          itemRetailer: widget.product.retailer,
+          itemSpecialPrice: widget.specialPrice,
+          multiBuyInfo: widget.multiBuyInfo,
+        )
+        .then((_) {
+      widget.ref.invalidate(listByIdProvider(widget.listId));
+      widget.ref.invalidate(userListsProvider);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgColor = isDark ? AppColors.surfaceDarkMode : Colors.white;
+    final textColor = isDark ? AppColors.textPrimaryDark : AppColors.textPrimary;
+    final subtitleColor = isDark ? AppColors.textSecondaryDark : AppColors.textSecondary;
+    final viewInsets = MediaQuery.of(context).viewInsets;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Handle
+          Center(
+            child: Container(
+              margin: const EdgeInsets.only(top: 12, bottom: 8),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+
+          // Product info
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    width: 48,
+                    height: 48,
+                    color: Colors.white,
+                    child: (widget.product.imageUrl?.isNotEmpty ?? false)
+                        ? Image.network(
+                            widget.product.imageUrl!,
+                            fit: BoxFit.contain,
+                            errorBuilder: (_, __, ___) =>
+                                const Icon(Icons.shopping_bag_outlined, size: 24),
+                          )
+                        : const Icon(Icons.shopping_bag_outlined, size: 24),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.product.name,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: textColor,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${widget.product.retailer} · ${widget.product.price}',
+                        style: TextStyle(fontSize: 13, color: subtitleColor),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const Divider(height: 1),
+
+          // Quantity + Note
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Quantity stepper
+                Row(
+                  children: [
+                    Text(
+                      'Quantity',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: textColor,
+                      ),
+                    ),
+                    const Spacer(),
+                    GestureDetector(
+                      onTapDown: (_) => _startIncrement(-1),
+                      onTapUp: (_) => _stopIncrement(),
+                      onTapCancel: _stopIncrement,
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: isDark
+                              ? AppColors.surfaceDarkModeLight
+                              : AppColors.surface,
+                        ),
+                        child: Icon(
+                          Icons.remove,
+                          size: 18,
+                          color: _quantity <= 1
+                              ? (isDark ? AppColors.textDisabledDark : AppColors.textDisabled)
+                              : textColor,
+                        ),
+                      ),
+                    ),
+                    SizedBox(
+                      width: 44,
+                      child: Text(
+                        '$_quantity',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          color: textColor,
+                        ),
+                      ),
+                    ),
+                    GestureDetector(
+                      onTapDown: (_) => _startIncrement(1),
+                      onTapUp: (_) => _stopIncrement(),
+                      onTapCancel: _stopIncrement,
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: AppColors.primary.withValues(alpha: isDark ? 0.2 : 0.1),
+                        ),
+                        child: const Icon(
+                          Icons.add,
+                          size: 18,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 16),
+
+                // Note
+                Text(
+                  'Note',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: textColor,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _noteController,
+                  decoration: InputDecoration(
+                    hintText: 'e.g. Get the low-fat version',
+                    isDense: true,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  maxLines: 1,
+                ),
+              ],
+            ),
+          ),
+
+          // Sticky add button
+          const Divider(height: 1),
+          Padding(
+            padding: EdgeInsets.fromLTRB(16, 12, 16, 12 + viewInsets.bottom),
+            child: SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: _handleAdd,
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text(
+                  'Add to List',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

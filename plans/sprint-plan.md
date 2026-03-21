@@ -392,35 +392,50 @@ Frozen | Food Cupboard | Snacks | Beverages
 
 ---
 
-### Sprint 11: Additional Retailers — SPAR, Dis-Chem, Clicks
+### Sprint 11: Additional Retailers — Makro, Dis-Chem, Clicks
 
 **Model:** Opus 4.6 (API reverse-engineering, architecture) → Sonnet 4.6 (implementation)
-**Goal:** Expand retailer coverage from 4 to 7 — add SPAR, Dis-Chem, and Clicks.
+**Goal:** Expand retailer coverage from 4 to 7 — add Makro, Dis-Chem, and Clicks.
+
+**Priority order:** Makro → Dis-Chem → Clicks (tackle individually as sub-sprints).
+
+> **SPAR deferred:** SPAR is a franchise model — each store is independently owned with no centralized product/price API. Research (2026-03-21) found:
+> - `spar.co.za/SPAR-Products` — own-brand catalog only, no prices, server-rendered HTML
+> - `sparsame.com` / `easyquote-dcs.co.za` — working JSON API but only 1 store (SPAR Botswana)
+> - `mobile.spar.co.za` — loyalty/rewards Rails app, no product catalog
+> - `spar2u.myshopify.com` → redirects to SPAR2U Sri Lanka, not SA
+> - SPAR2U SA app backend remains unknown (APK decompilation blocked by download site JS)
+> - **Revisit if:** SPAR launches a centralized e-commerce platform, or someone captures SPAR2U network traffic via mitmproxy/HTTP Toolkit
 
 #### 11a. API Research & Edge Functions
 
-Each retailer needs a Supabase Edge Function that proxies product search + category browse.
+Each retailer needs a Supabase Edge Function that proxies product search + category browse. Research in order — once one is cracked, build the Edge Function before moving to the next.
 
-**SPAR** (`products-spar/index.ts`)
+**Makro** (`products-makro/index.ts`) — Sprint 11.1
 
-- Research SPAR online shopping API (myspar.co.za / spar.co.za)
+- Research Makro online shopping API (makro.co.za)
+- Makro is a Massmart/Walmart subsidiary — likely has a modern e-commerce backend
+- Bulk/wholesale pricing is a differentiator — capture unit price vs pack price if available
 - Identify product search endpoint, pagination, category structure
 - Build Edge Function with same interface as existing retailers (query, category, page params → standardized product JSON)
-- Map SPAR categories to shared category set (Fruit & Veg, Dairy & Eggs, Meat & Poultry, Bakery, Frozen, Food Cupboard, Snacks, Beverages)
+- Map Makro categories to shared category set (Fruit & Veg, Dairy & Eggs, Meat & Poultry, Bakery, Frozen, Food Cupboard, Snacks, Beverages)
+- Store locations: scrape/collect Makro warehouse locations (fewer stores but high-value)
 
-**Dis-Chem** (`products-dischem/index.ts`)
+**Dis-Chem** (`products-dischem/index.ts`) — Sprint 11.2
 
 - Research Dis-Chem online API (dischem.co.za)
 - Dis-Chem is pharmacy-first but has a large grocery/health food/snacks section
 - Focus on food & beverage categories initially, expand to health supplements later
 - Build Edge Function with standardized interface
+- Store locations: scrape Dis-Chem store locator
 
-**Clicks** (`products-clicks/index.ts`)
+**Clicks** (`products-clicks/index.ts`) — Sprint 11.3
 
 - Research Clicks online API (clicks.co.za)
 - Clicks is pharmacy-first with limited grocery — focus on health foods, beverages, snacks, baby food
 - Build Edge Function with standardized interface
 - Note: Clicks may have fewer grocery categories than other retailers — map what's available
+- Store locations: scrape Clicks store locator
 
 **Common for all 3:**
 
@@ -434,16 +449,16 @@ Each retailer needs a Supabase Edge Function that proxies product search + categ
 
 **File:** `lib/core/constants/retailers.dart`
 
-- Add `SPAR`, `Dis-Chem`, `Clicks` to `Retailers.all` map
+- Add `Makro`, `Dis-Chem`, `Clicks` to `Retailers.all` map
 - Brand colors, icons, slugs, edge function names
 
 **File:** `lib/core/theme/app_colors.dart`
 
-- Add brand colors: SPAR (green #00833E), Dis-Chem (green #00A94F), Clicks (blue #005BAA)
+- Add brand colors: Makro (blue #003DA5), Dis-Chem (green #00A94F), Clicks (blue #005BAA)
 
 #### 11c. Store Database
 
-- Scrape/collect store locations for SPAR, Dis-Chem, Clicks (lat/lng, name, province, city)
+- Scrape/collect store locations for Makro, Dis-Chem, Clicks (lat/lng, name, province, city)
 - Scripts in `database/all_stores/` following existing pattern
 - Import to Supabase `stores` table with PostGIS `location` column
 - Update `stores-nearby` Edge Function to include new retailers in `find_all_nearest_stores` RPC
@@ -452,29 +467,38 @@ Each retailer needs a Supabase Edge Function that proxies product search + categ
 
 **File:** `lib/core/constants/product_categories.dart`
 
-- Add SPAR/Dis-Chem/Clicks category mappings to cross-retailer category map
+- Add Makro/Dis-Chem/Clicks category mappings to cross-retailer category map
 - Dis-Chem/Clicks may not have all 8 categories — gracefully handle missing ones (hide category chip when browsing those retailers)
+- Makro may have bulk-only categories — decide whether to include or filter
 
 #### 11e. Price Comparison Integration
 
 - `SmartMatchingService` / `ProductNameParser` should work out-of-the-box (retailer-agnostic)
+- **Open question:** Do Makro bulk sizes (e.g. 5kg flour) match against normal grocery sizes (1kg, 2.5kg)? May need size-normalization logic to show per-unit price comparisons
 - Retailer comparison sheet (`retailer_comparison_sheet.dart`) — add 3 new tabs (7 total)
 - Consider tab scrolling or 2-row layout for 7 retailers
 - Update `RetailerComparisonNotifier` to search all 7 retailers
 
-#### 11f. Image Handling
+#### 11f. Recipe Matching Impact
 
-- Test if SPAR/Dis-Chem/Clicks images load directly or need proxy
+- `SmartMatchingService.matchIngredient()` is retailer-agnostic — should work as-is
+- `ingredient_lookup.dart` search hints may need expansion if new retailers use different product naming conventions (e.g. Makro bulk names like "FLOUR CAKE 10KG" vs PnP "Sasko Cake Flour 2.5kg")
+- `RetailerComparisonNotifier.runComparison()` — add new retailers to the comparison loop
+- **Test after data is available** — run existing 95 matching tests against products from new retailers to identify gaps
+
+#### 11g. Image Handling
+
+- Test if Makro/Dis-Chem/Clicks images load directly or need proxy
 - If proxy needed, update `image-proxy/index.ts` to handle new retailer URL patterns
 - If direct URLs work, no changes needed
 
-#### 11g. Testing
+#### 11h. Testing
 
 - Update `test/product_matching_test.dart` with cross-retailer match cases for new retailers
 - Manual test: browse, search, category filter, price compare, recipe export for each new retailer
 - Verify store-nearby returns correct nearest store for all 7 retailers
 
-**Estimated complexity:** High — each retailer is essentially a mini-project (API research + Edge Function + store data + testing). Consider splitting into 11-SPAR, 11-DisChem, 11-Clicks sub-sprints.
+**Estimated complexity:** High — each retailer is essentially a mini-project (API research + Edge Function + store data + testing). Tackle as sub-sprints: 11.1-Makro, 11.2-DisChem, 11.3-Clicks.
 
 ---
 
@@ -495,7 +519,7 @@ Each retailer needs a Supabase Edge Function that proxies product search + categ
 
 - Dark mode audit (all screens)
 - Use `ui-ux-pro-max` skill for comprehensive review
-- Verify retailer branding consistency for SPAR, Dis-Chem, Clicks
+- Verify retailer branding consistency for Makro, Dis-Chem, Clicks
 
 ---
 
@@ -558,6 +582,98 @@ Each retailer needs a Supabase Edge Function that proxies product search + categ
 
 ---
 
+### Sprint 12.7: Add-to-List Bottom Sheet UX Fix ✅
+
+**Model:** Opus 4.6 (UX design) → Sonnet 4.6 (implementation)
+**Status:** COMPLETED
+**Goal:** Fix keyboard-covering-fields UX issue in the add-to-list bottom sheet. Users report they can't see what they're typing because the keyboard covers the input fields.
+
+**Completed:**
+- 12.7a: Replaced quantity TextField with +/- stepper (long-press repeat, clamped 1-99) in add-to-list sheet, manual add tab, and browse add confirmation
+- 12.7b: Fixed keyboard covering notes field — keyboard-aware maxHeight (75%→90%), ScrollController + FocusNode auto-scroll, viewInsets padding
+- 12.7c: "Add to List" button moved outside scroll area (sticky), "Note" label above field, AppColors theming for dark mode
+- Bonus: Browse tab's instant-add `+` button now opens a confirmation sheet with quantity stepper + note field instead of instant qty-1 add
+
+**User complaint:** "When I try to type a note, the keyboard appears and covers the text field so I can't see what I'm typing."
+
+**File:** `lib/presentation/widgets/products/add_to_list_sheet.dart`
+
+#### 12.7a. Quantity: Replace text input with +/- stepper
+
+**Problem:** Quantity field uses a `TextField` with number keyboard — opening the keyboard pushes content around and is overkill for incrementing a simple count.
+
+**Fix:** Replace the 80px-wide `TextField` with a horizontal stepper widget:
+- `[ - ]  2  [ + ]` layout
+- Minus button: decrement (min 1), Plus button: increment (no max, reasonable default cap at 99)
+- Display quantity as styled `Text` widget between buttons (no keyboard needed)
+- Buttons: 36x36 circular `IconButton` with `Icons.remove` / `Icons.add`
+- Long-press on +/- for fast increment/decrement (repeat every 150ms after 400ms hold)
+- Remove `_quantityController` — use simple `int _quantity = 1` state variable
+
+#### 12.7b. Notes: Fix keyboard covering the text field
+
+**Problem:** The bottom sheet uses `isScrollControlled: true` and `maxHeight: 75%` with a `SingleChildScrollView`, but when the keyboard opens, the notes field gets pushed behind the keyboard.
+
+**UX solution — sheet expands + auto-scrolls on focus:**
+
+1. **Wrap sheet content in `Padding` with `MediaQuery.of(context).viewInsets.bottom`** — this is the standard Flutter pattern to make bottom sheets keyboard-aware. The sheet will automatically resize to sit above the keyboard.
+2. **Use `Scrollable.ensureVisible()` on notes field focus** — when the notes `TextField` gains focus, auto-scroll the `SingleChildScrollView` so the field is fully visible above the keyboard.
+3. **Add a `FocusNode` to the notes field** — listen for focus changes, trigger scroll-to-visible.
+4. **Remove `maxHeight` constraint when keyboard is open** — let the sheet expand up to 90% of screen height when keyboard is active, then shrink back to 75% when dismissed.
+5. **Add bottom padding equal to keyboard height** — inside the `SingleChildScrollView`, add `SizedBox(height: viewInsets.bottom)` at the end so there's room to scroll the notes field fully into view.
+
+**Implementation pattern (Flutter-idiomatic):**
+
+```dart
+// In build():
+final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+final keyboardOpen = bottomInset > 0;
+
+// Sheet max height expands when keyboard is open
+maxHeight: keyboardOpen ? 0.9 : 0.75,
+
+// Padding at bottom of sheet body
+padding: EdgeInsets.only(bottom: bottomInset),
+```
+
+```dart
+// Auto-scroll when notes field gains focus
+final _notesFocusNode = FocusNode();
+final _scrollController = ScrollController();
+
+@override
+void initState() {
+  super.initState();
+  _notesFocusNode.addListener(() {
+    if (_notesFocusNode.hasFocus) {
+      Future.delayed(Duration(milliseconds: 300), () {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: Duration(milliseconds: 250),
+          curve: Curves.easeOut,
+        );
+      });
+    }
+  });
+}
+```
+
+#### 12.7c. Visual polish
+
+- Stepper buttons use `AppColors` theme colors (work in both light/dark mode)
+- Notes field gets a visible label above it (not just placeholder) per UX best practice
+- "Add to List" button stays anchored at the bottom (outside the scroll area) so it's always reachable
+- Smooth animation when sheet height changes (keyboard open/close)
+
+**Testing:**
+- Test on physical Android device with varying screen sizes
+- Verify quantity stepper works: tap, long-press rapid increment, min boundary (1)
+- Verify notes field: keyboard opens, field stays visible, can see text while typing
+- Verify "Add to List" button remains accessible with keyboard open
+- Test both light and dark mode
+
+---
+
 ### Sprint 13: Admin Dashboard
 
 **Model:** Opus 4.6
@@ -615,7 +731,8 @@ Each retailer needs a Supabase Edge Function that proxies product search + categ
 - Diet plan curation and calorie tracking
 - Store price history trends
 - **Barcode scanner** — scan products in-store, compare prices (needs barcode data in DB first)
-- **More retailers** — Game, Makro, Food Lover's Market if demand warrants
+- **SPAR integration** — franchise model with no centralized API; revisit if they launch e-commerce or if SPAR2U app traffic is captured via mitmproxy
+- **More retailers** — Game, Food Lover's Market if demand warrants
 - **Lottie animation for AI error messages** — animated error state when Gemini recipe generation fails or AI matching encounters errors (currently shows plain text/icon)
 
 ## Decisions Made
@@ -642,6 +759,6 @@ Each retailer needs a Supabase Edge Function that proxies product search + categ
 1. `flutter analyze` — zero warnings
 2. Manual test on emulator/physical Android
 3. Test both light and dark mode
-4. Test all 4 retailers where applicable
+4. Test all active retailers where applicable
 5. Commit with conventional commit message
 6. Push to GitHub

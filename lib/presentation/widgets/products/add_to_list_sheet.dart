@@ -4,6 +4,8 @@
 // Model-agnostic — accepts raw values so it works with both LiveProduct
 // (live API) and Product (DB-backed) models.
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -90,16 +92,61 @@ class _AddToListSheet extends ConsumerStatefulWidget {
 }
 
 class _AddToListSheetState extends ConsumerState<_AddToListSheet> {
-  final _quantityController = TextEditingController(text: '1');
+  int _quantity = 1;
   final _noteController = TextEditingController();
+  final _scrollController = ScrollController();
+  final _noteFocusNode = FocusNode();
+  Timer? _longPressTimer;
   String? _selectedListId;
   bool _isAdding = false;
 
   @override
+  void initState() {
+    super.initState();
+    _noteFocusNode.addListener(_onNoteFocus);
+  }
+
+  @override
   void dispose() {
-    _quantityController.dispose();
+    _longPressTimer?.cancel();
     _noteController.dispose();
+    _scrollController.dispose();
+    _noteFocusNode.dispose();
     super.dispose();
+  }
+
+  void _onNoteFocus() {
+    if (_noteFocusNode.hasFocus) {
+      Future.delayed(const Duration(milliseconds: 300), () {
+        if (_scrollController.hasClients) {
+          _scrollController.animateTo(
+            _scrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOut,
+          );
+        }
+      });
+    }
+  }
+
+  void _startIncrement(int delta) {
+    _longPressTimer?.cancel();
+    _updateQuantity(delta);
+    _longPressTimer = Timer(const Duration(milliseconds: 400), () {
+      _longPressTimer = Timer.periodic(const Duration(milliseconds: 150), (_) {
+        _updateQuantity(delta);
+      });
+    });
+  }
+
+  void _stopIncrement() {
+    _longPressTimer?.cancel();
+    _longPressTimer = null;
+  }
+
+  void _updateQuantity(int delta) {
+    FocusScope.of(context).unfocus();
+    setState(() => _quantity = (_quantity + delta).clamp(1, 99));
   }
 
   Future<void> _handleAdd() async {
@@ -112,7 +159,7 @@ class _AddToListSheetState extends ConsumerState<_AddToListSheet> {
 
     setState(() => _isAdding = true);
 
-    final quantity = double.tryParse(_quantityController.text) ?? 1.0;
+    final quantity = _quantity.toDouble();
 
     final notifier = ref.read(listItemNotifierProvider.notifier);
     final item = await notifier.addItem(
@@ -161,9 +208,12 @@ class _AddToListSheetState extends ConsumerState<_AddToListSheet> {
         ? AppColors.textSecondaryDark
         : AppColors.textSecondary;
 
+    final viewInsets = MediaQuery.of(context).viewInsets;
+    final keyboardOpen = viewInsets.bottom > 0;
+
     return Container(
       constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.75,
+        maxHeight: MediaQuery.of(context).size.height * (keyboardOpen ? 0.9 : 0.75),
       ),
       decoration: BoxDecoration(
         color: bgColor,
@@ -242,6 +292,7 @@ class _AddToListSheetState extends ConsumerState<_AddToListSheet> {
           // List selection
           Flexible(
             child: SingleChildScrollView(
+              controller: _scrollController,
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -261,7 +312,7 @@ class _AddToListSheetState extends ConsumerState<_AddToListSheet> {
 
                   const SizedBox(height: 20),
 
-                  // Quantity
+                  // Quantity stepper
                   Row(
                     children: [
                       Text(
@@ -272,22 +323,56 @@ class _AddToListSheetState extends ConsumerState<_AddToListSheet> {
                           color: textColor,
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      const Spacer(),
+                      GestureDetector(
+                        onTapDown: (_) => _startIncrement(-1),
+                        onTapUp: (_) => _stopIncrement(),
+                        onTapCancel: _stopIncrement,
+                        child: Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: isDark
+                                ? AppColors.surfaceDarkModeLight
+                                : AppColors.surface,
+                          ),
+                          child: Icon(
+                            Icons.remove,
+                            size: 18,
+                            color: _quantity <= 1
+                                ? (isDark ? AppColors.textDisabledDark : AppColors.textDisabled)
+                                : textColor,
+                          ),
+                        ),
+                      ),
                       SizedBox(
-                        width: 80,
-                        child: TextField(
-                          controller: _quantityController,
-                          keyboardType: TextInputType.number,
+                        width: 44,
+                        child: Text(
+                          '$_quantity',
                           textAlign: TextAlign.center,
-                          decoration: InputDecoration(
-                            isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 10,
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: textColor,
+                          ),
+                        ),
+                      ),
+                      GestureDetector(
+                        onTapDown: (_) => _startIncrement(1),
+                        onTapUp: (_) => _stopIncrement(),
+                        onTapCancel: _stopIncrement,
+                        child: Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: AppColors.primary.withValues(alpha: isDark ? 0.2 : 0.1),
+                          ),
+                          child: const Icon(
+                            Icons.add,
+                            size: 18,
+                            color: AppColors.primary,
                           ),
                         ),
                       ),
@@ -297,10 +382,19 @@ class _AddToListSheetState extends ConsumerState<_AddToListSheet> {
                   const SizedBox(height: 16),
 
                   // Note
+                  Text(
+                    'Note',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: textColor,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
                   TextField(
                     controller: _noteController,
+                    focusNode: _noteFocusNode,
                     decoration: InputDecoration(
-                      labelText: 'Note (optional)',
                       hintText: 'e.g. Get the low-fat version',
                       isDense: true,
                       border: OutlineInputBorder(
@@ -309,40 +403,42 @@ class _AddToListSheetState extends ConsumerState<_AddToListSheet> {
                     ),
                     maxLines: 1,
                   ),
+                ],
+              ),
+            ),
+          ),
 
-                  const SizedBox(height: 24),
-
-                  // Add button
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton(
-                      onPressed: _isAdding ? null : _handleAdd,
-                      style: FilledButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+          // Sticky add button
+          const Divider(height: 1),
+          Padding(
+            padding: EdgeInsets.fromLTRB(16, 12, 16, 12 + viewInsets.bottom),
+            child: SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: _isAdding ? null : _handleAdd,
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: _isAdding
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text(
+                        'Add to List',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                      child: _isAdding
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const Text(
-                              'Add to List',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                    ),
-                  ),
-                ],
               ),
             ),
           ),
