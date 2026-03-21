@@ -100,6 +100,7 @@ class ProductCategories {
         'woolworths': 'Pantry',
         'checkers': 'Food Cupboard',
         'shoprite': 'Food Cupboard',
+        'makro': 'Food Cupboard',
       },
     ),
     ProductCategory(
@@ -110,6 +111,7 @@ class ProductCategories {
         'woolworths': 'Chocolates-Sweets-Snacks',
         'checkers': 'Snacks',
         'shoprite': 'Snacks',
+        'makro': 'Snacks',
       },
     ),
     ProductCategory(
@@ -120,6 +122,65 @@ class ProductCategories {
         'woolworths': 'Beverages-Juices',
         'checkers': 'Beverages',
         'shoprite': 'Beverages',
+        'makro': 'Beverages',
+      },
+    ),
+
+    // ── Pharmacy / Health categories (Dis-Chem & Clicks only) ──
+    ProductCategory(
+      displayName: 'Vitamins',
+      icon: Icons.medication_rounded,
+      retailerKeys: {
+        'dischem': 'Vitamins',
+        'clicks': 'Vitamins',
+      },
+    ),
+    ProductCategory(
+      displayName: 'Supplements',
+      icon: Icons.fitness_center_rounded,
+      retailerKeys: {
+        'dischem': 'Supplements',
+        'clicks': 'Supplements',
+      },
+    ),
+    ProductCategory(
+      displayName: 'Baby',
+      icon: Icons.child_care_rounded,
+      retailerKeys: {
+        'dischem': 'Baby',
+        'clicks': 'Baby',
+      },
+    ),
+    ProductCategory(
+      displayName: 'Skincare',
+      icon: Icons.spa_rounded,
+      retailerKeys: {
+        'dischem': 'Skincare',
+        'clicks': 'Skincare',
+      },
+    ),
+    ProductCategory(
+      displayName: 'Haircare',
+      icon: Icons.face_rounded,
+      retailerKeys: {
+        'dischem': 'Haircare',
+        'clicks': 'Haircare',
+      },
+    ),
+    ProductCategory(
+      displayName: 'Medicine',
+      icon: Icons.local_pharmacy_rounded,
+      retailerKeys: {
+        'dischem': 'Medicine',
+        'clicks': 'Medicine',
+      },
+    ),
+    ProductCategory(
+      displayName: 'Protein',
+      icon: Icons.sports_gymnastics_rounded,
+      retailerKeys: {
+        'dischem': 'Protein',
+        'clicks': 'Protein',
       },
     ),
   ];

@@ -8,6 +8,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:lottie/lottie.dart';
 import '../../../core/constants/retailers.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/live_product.dart';
@@ -87,9 +88,15 @@ class _CompareSheetState extends ConsumerState<CompareSheet> {
 
     try {
       final api = ref.read(liveApiServiceProvider);
+      // Compare against peer retailers only:
+      // Grocery → other grocery stores, Pharmacy → other pharmacy stores.
+      final peers = Retailers.comparisonPeers(widget.product.retailer);
+      final peerStores = Map.fromEntries(
+        widget.stores.stores.entries.where((e) => peers.contains(e.key)),
+      );
       final results = await api.compareProduct(
         productName: _buildSearchQuery(),
-        stores: widget.stores.stores,
+        stores: peerStores,
       );
 
       if (mounted) {
@@ -237,12 +244,15 @@ class _CompareSheetState extends ConsumerState<CompareSheet> {
   }
 
   Widget _buildLoading() {
+    final isPharmacy = Retailers.isPharmacy(widget.product.retailer);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 32),
       child: LottieLoadingIndicator(
         width: 140,
         height: 140,
-        message: 'Searching all retailers...',
+        message: isPharmacy
+            ? 'Comparing pharmacies...'
+            : 'Comparing grocery retailers...',
       ),
     );
   }
@@ -293,7 +303,9 @@ class _CompareSheetState extends ConsumerState<CompareSheet> {
             Icon(Icons.store, size: 48, color: subtitleColor),
             const SizedBox(height: 12),
             Text(
-              'No other retailers available to compare',
+              Retailers.isPharmacy(widget.product.retailer)
+                  ? 'No other pharmacies available to compare'
+                  : 'No other retailers available to compare',
               style: TextStyle(color: subtitleColor),
               textAlign: TextAlign.center,
             ),
@@ -347,11 +359,30 @@ class _CompareSheetState extends ConsumerState<CompareSheet> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.search_off, size: 48, color: subtitleColor),
-            const SizedBox(height: 12),
+            Lottie.asset(
+              'assets/animations/empty.json',
+              width: 120,
+              height: 120,
+              repeat: false,
+            ),
+            const SizedBox(height: 8),
             Text(
-              'No matching products found at other retailers',
-              style: TextStyle(color: subtitleColor),
+              'No matching products found',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: isDark
+                    ? AppColors.textPrimaryDark
+                    : AppColors.textPrimary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              Retailers.isPharmacy(widget.product.retailer)
+                  ? 'This product wasn\'t found at other pharmacies'
+                  : 'This product wasn\'t found at other grocery stores',
+              style: TextStyle(fontSize: 13, color: subtitleColor),
               textAlign: TextAlign.center,
             ),
           ],
@@ -394,18 +425,32 @@ class _CompareSheetState extends ConsumerState<CompareSheet> {
             ),
           ),
 
-        // No exact matches — show message
+        // No exact matches — highlighted container so users notice
         if (!hasExact) ...[
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12),
+          Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppColors.secondary.withValues(alpha: isDark ? 0.12 : 0.08),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: AppColors.secondary.withValues(alpha: 0.2),
+              ),
+            ),
             child: Row(
               children: [
-                Icon(Icons.info_outline, size: 16, color: subtitleColor),
-                const SizedBox(width: 8),
+                Icon(Icons.info_outline, size: 18, color: AppColors.secondary),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'No exact matches found at other stores',
-                    style: TextStyle(fontSize: 13, color: subtitleColor),
+                    'No exact matches found — showing similar products',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: isDark
+                          ? AppColors.textPrimaryDark
+                          : AppColors.textPrimary,
+                    ),
                   ),
                 ),
               ],

@@ -52,7 +52,9 @@ class _RetailerComparisonSheetState
     extends ConsumerState<_RetailerComparisonSheet>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
-  final List<String> _retailerNames = Retailers.all.keys.toList();
+  final List<String> _retailerNames = Retailers.all.keys
+      .where(Retailers.isGrocery)
+      .toList();
   bool _hasJumpedToCheapest = false;
 
   @override
@@ -168,8 +170,8 @@ class _RetailerComparisonSheetState
               // Tab bar
               TabBar(
                 controller: _tabController,
-                isScrollable: false,
-                tabAlignment: TabAlignment.fill,
+                isScrollable: _retailerNames.length > 4,
+                tabAlignment: _retailerNames.length > 4 ? TabAlignment.start : TabAlignment.fill,
                 tabs: _retailerNames.map((name) {
                   final basket = compState.baskets[name];
                   final isCheapest = compState.cheapestRetailer == name;
@@ -253,9 +255,12 @@ class _RetailerComparisonSheetState
   String _shortName(String name) {
     const shorts = {
       'Pick n Pay': 'PnP',
-      'Woolworths': 'Woolworths',
+      'Woolworths': 'Woolies',
       'Checkers': 'Checkers',
       'Shoprite': 'Shoprite',
+      'Makro': 'Makro',
+      'Dis-Chem': 'Dis-Chem',
+      'Clicks': 'Clicks',
     };
     return shorts[name] ?? name;
   }

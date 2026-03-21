@@ -88,6 +88,30 @@ class Retailers {
       edgeFunctionName: 'products-shoprite',
       slug: 'shoprite',
     ),
+    'Makro': RetailerConfig(
+      name: 'Makro',
+      color: AppColors.makro,
+      colorLight: Color(0xFFE6EDF8), // Light blue tint
+      icon: Icons.warehouse,
+      edgeFunctionName: 'products-makro',
+      slug: 'makro',
+    ),
+    'Dis-Chem': RetailerConfig(
+      name: 'Dis-Chem',
+      color: AppColors.disChem,
+      colorLight: Color(0xFFE6F7ED), // Light green tint
+      icon: Icons.local_pharmacy,
+      edgeFunctionName: 'products-dischem',
+      slug: 'dischem',
+    ),
+    'Clicks': RetailerConfig(
+      name: 'Clicks',
+      color: AppColors.clicks,
+      colorLight: Color(0xFFE6EFF8), // Light blue tint
+      icon: Icons.medication,
+      edgeFunctionName: 'products-clicks',
+      slug: 'clicks',
+    ),
   };
 
   /// Look up a [RetailerConfig] by its API slug (e.g. "pnp", "checkers").
@@ -107,6 +131,42 @@ class Retailers {
 
   /// Ordered list of retailer display names.
   static List<String> get names => all.keys.toList();
+
+  /// Grocery-focused retailers used for recipe auto-matching.
+  /// Makro, Dis-Chem, and Clicks are excluded because they are not
+  /// full grocery stores — their limited product ranges produce poor
+  /// recipe ingredient matches.
+  static const Set<String> groceryRetailers = {
+    'Pick n Pay',
+    'Woolworths',
+    'Checkers',
+    'Shoprite',
+  };
+
+  /// Whether [retailerName] is a grocery retailer (used for recipe matching).
+  static bool isGrocery(String retailerName) =>
+      groceryRetailers.contains(retailerName);
+
+  /// Pharmacy retailers — compare against each other, not grocery stores.
+  static const Set<String> pharmacyRetailers = {
+    'Dis-Chem',
+    'Clicks',
+  };
+
+  /// Whether [retailerName] is a pharmacy retailer.
+  static bool isPharmacy(String retailerName) =>
+      pharmacyRetailers.contains(retailerName);
+
+  /// Returns the set of retailer names to compare against for a given source.
+  /// - Grocery products compare against other grocery retailers.
+  /// - Pharmacy products (Dis-Chem/Clicks) compare against each other.
+  /// - Makro compares against grocery retailers (bulk vs standard).
+  static Set<String> comparisonPeers(String sourceRetailer) {
+    if (pharmacyRetailers.contains(sourceRetailer)) {
+      return pharmacyRetailers;
+    }
+    return groceryRetailers;
+  }
 
   // Private constructor to prevent instantiation
   Retailers._();

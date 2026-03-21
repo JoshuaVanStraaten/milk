@@ -263,7 +263,7 @@ List<TargetFocus> buildBrowseTutorialTargets({
             return TutorialTooltip(
               title: 'Switch Stores',
               description:
-                  'Tap here to switch between Pick n Pay, Woolworths, Checkers, and Shoprite.',
+                  'Tap here to switch between retailers like Pick n Pay, Woolworths, Checkers, and more.',
               stepIndex: 0,
               totalSteps: total,
               onTap: controller.next,

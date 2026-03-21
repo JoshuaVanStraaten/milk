@@ -159,7 +159,9 @@ class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
         currentStep: autoMatch
             ? RecipeGenerationStep.matching
             : RecipeGenerationStep.review,
-        matchedRetailer: preferredRetailer,
+        // Don't override matchedRetailer here — _autoMatchIngredients already
+        // set it to the actual grocery retailer used (which may differ from
+        // preferredRetailer if it was null or non-grocery).
       );
     } on GeminiException catch (e) {
       debugPrint('Gemini error: $e');
@@ -197,7 +199,15 @@ class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
       state.generatedRecipe!.ingredients,
     );
 
-    final retailerName = preferredRetailer ?? storeSelection.stores.keys.first;
+    // Only match against grocery retailers (PnP, Woolworths, Checkers, Shoprite).
+    // If the preferred retailer is non-grocery, fall back to first grocery retailer.
+    String retailerName;
+    if (preferredRetailer != null && Retailers.isGrocery(preferredRetailer)) {
+      retailerName = preferredRetailer;
+    } else {
+      retailerName = storeSelection.stores.keys
+          .firstWhere(Retailers.isGrocery, orElse: () => storeSelection.stores.keys.first);
+    }
 
     // Set total for progress tracking
     state = state.copyWith(
@@ -225,29 +235,17 @@ class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
       try {
         List<LiveProduct> matches;
 
-        if (preferredRetailer != null && preferredRetailer.isNotEmpty) {
-          final store = storeSelection.stores[preferredRetailer];
-          if (store == null) continue;
+        // Always use the grocery-validated retailerName for searching
+        final store = storeSelection.stores[retailerName];
+        if (store == null) continue;
 
-          final response = await api.searchProducts(
-            query: apiQuery,
-            store: store,
-            retailer: preferredRetailer,
-            pageSize: 15, // Fetch more to find better matches with hint filtering
-          );
-          matches = response.products;
-        } else {
-          final firstRetailer = storeSelection.stores.keys.first;
-          final store = storeSelection.stores[firstRetailer]!;
-
-          final response = await api.searchProducts(
-            query: apiQuery,
-            store: store,
-            retailer: firstRetailer,
-            pageSize: 15,
-          );
-          matches = response.products;
-        }
+        final response = await api.searchProducts(
+          query: apiQuery,
+          store: store,
+          retailer: retailerName,
+          pageSize: 15,
+        );
+        matches = response.products;
 
         // Smart match — use enhanced scoring from SmartMatchingService
         final smartMatcher = _ref.read(smartMatchingServiceProvider);
@@ -291,7 +289,7 @@ class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
       generatedRecipe: state.generatedRecipe!.copyWith(
         ingredients: ingredients,
       ),
-      matchedRetailer: preferredRetailer,
+      matchedRetailer: retailerName,
       clearProgress: true,
     );
   }
@@ -676,10 +674,14 @@ class IngredientMatchingNotifier
         );
         products = response.products;
       } else {
-        // Search all retailers in parallel
+        // Search grocery retailers only (exclude Makro, Dis-Chem, Clicks)
+        final groceryStores = Map.fromEntries(
+          storeSelection.stores.entries
+              .where((e) => Retailers.isGrocery(e.key)),
+        );
         final results = await api.compareProduct(
           productName: ingredientName,
-          stores: storeSelection.stores,
+          stores: groceryStores,
         );
 
         products = [];
@@ -885,9 +887,15 @@ class RetailerComparisonNotifier
     final storeSelection = _ref.read(storeSelectionProvider).value;
     if (storeSelection == null) return;
 
+    // Only compare grocery retailers — Makro/Dis-Chem/Clicks are excluded
+    // because their limited product ranges produce poor ingredient matches.
+    final groceryNames = Retailers.all.keys
+        .where(Retailers.isGrocery)
+        .toList();
+
     // Initialise all baskets as loading
     final initialBaskets = Map.fromEntries(
-      Retailers.all.keys.map(
+      groceryNames.map(
         (name) => MapEntry(
           name,
           RetailerBasket(
@@ -976,7 +984,7 @@ class RetailerComparisonNotifier
       );
     }
 
-    await Future.wait(Retailers.all.keys.map(fetchRetailer));
+    await Future.wait(groceryNames.map(fetchRetailer));
     state = state.copyWith(isLoading: false);
   }
 

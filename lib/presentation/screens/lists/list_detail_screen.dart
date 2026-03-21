@@ -418,20 +418,8 @@ class _ListDetailScreenState extends ConsumerState<ListDetailScreen> {
 
   /// Get color for retailer
   Color _getRetailerColor(String retailer) {
-    switch (retailer) {
-      case 'Pick n Pay':
-        return AppColors.pickNPay;
-      case 'Woolworths':
-        return AppColors.woolworths;
-      case 'Shoprite':
-        return AppColors.shoprite;
-      case 'Checkers':
-        return AppColors.checkers;
-      case 'Custom Items':
-        return AppColors.primary;
-      default:
-        return AppColors.textSecondary;
-    }
+    if (retailer == 'Custom Items') return AppColors.primary;
+    return Retailers.fromName(retailer)?.color ?? AppColors.textSecondary;
   }
 
   Widget _buildEmptyState(BuildContext context, bool isDark) {

@@ -148,16 +148,21 @@ class HomeDealsNotifier extends StateNotifier<HomeDealsState> {
       for (final entry in storeSelection.stores.entries) {
         futures.add(() async {
           try {
-            // Fetch 2 pages for more promo variety
+            // Fetch multiple pages — more for retailers with sparse promos
             final allPageProducts = <LiveProduct>[];
-            for (int page = 0; page < 2; page++) {
+            final maxPages = Retailers.isPharmacy(entry.key) ||
+                    entry.key == 'Makro'
+                ? 4  // Pharmacy/Makro have sparse promos, fetch more
+                : 2;
+
+            for (int page = 0; page < maxPages; page++) {
               final response = await api.browseProducts(
                 retailer: entry.key,
                 store: entry.value,
                 page: page,
               );
               allPageProducts.addAll(response.products);
-              // Stop if first page had few results
+              // Stop early if page had few results (small catalog)
               if (response.products.length < 20) break;
             }
 
@@ -196,6 +201,45 @@ class HomeDealsNotifier extends StateNotifier<HomeDealsState> {
                 }
               }
 
+              // Parse "X% off - Was RY.YY" or "Save RX.XX" formats
+              if (savings == null) {
+                final promoLower = p.promotionPrice.toLowerCase();
+
+                // "22% off - Was R82.95" → extract percent
+                final percentMatch = RegExp(r'(\d+)%\s*off').firstMatch(promoLower);
+                if (percentMatch != null) {
+                  savingsPercent = int.tryParse(percentMatch.group(1)!);
+                  // Extract "Was" price to calculate savings amount
+                  final wasMatch = RegExp(r'was\s*r\s*([\d,.]+)').firstMatch(promoLower);
+                  if (wasMatch != null) {
+                    final wasPrice = double.tryParse(
+                      wasMatch.group(1)!.replaceAll(',', ''),
+                    );
+                    if (wasPrice != null && wasPrice > p.priceNumeric) {
+                      savings = wasPrice - p.priceNumeric;
+                    }
+                  }
+                  // Fallback: compute from percent if no "Was" price
+                  if (savings == null && savingsPercent != null && p.priceNumeric > 0) {
+                    final originalPrice = p.priceNumeric / (1 - savingsPercent / 100);
+                    savings = originalPrice - p.priceNumeric;
+                  }
+                }
+
+                // "Save R8.00"
+                if (savings == null) {
+                  final saveMatch = RegExp(r'save\s*r\s*([\d,.]+)').firstMatch(promoLower);
+                  if (saveMatch != null) {
+                    savings = double.tryParse(
+                      saveMatch.group(1)!.replaceAll(',', ''),
+                    );
+                    if (savings != null && p.priceNumeric > 0) {
+                      savingsPercent = ((savings / (p.priceNumeric + savings)) * 100).round();
+                    }
+                  }
+                }
+              }
+
               return HomeDeal(
                 name: p.name,
                 retailer: p.retailer,
@@ -222,8 +266,12 @@ class HomeDealsNotifier extends StateNotifier<HomeDealsState> {
 
       await Future.wait(futures);
 
-      // Sort hot deals: biggest savings first, then by savings percent
+      // Sort hot deals: grocery/bulk retailers first, pharmacies last.
+      // Within each group, sort by biggest savings.
       allDeals.sort((a, b) {
+        final aIsPharmacy = Retailers.isPharmacy(a.retailer) ? 1 : 0;
+        final bIsPharmacy = Retailers.isPharmacy(b.retailer) ? 1 : 0;
+        if (aIsPharmacy != bIsPharmacy) return aIsPharmacy.compareTo(bIsPharmacy);
         final aScore = (a.savingsAmount ?? 0) + (a.savingsPercent ?? 0) * 0.5;
         final bScore = (b.savingsAmount ?? 0) + (b.savingsPercent ?? 0) * 0.5;
         return bScore.compareTo(aScore);
@@ -235,7 +283,7 @@ class HomeDealsNotifier extends StateNotifier<HomeDealsState> {
           .fold<double>(0, (sum, d) => sum + d.savingsAmount!);
 
       state = HomeDealsState(
-        hotDeals: allDeals.take(8).toList(), // Top 8 for carousel
+        hotDeals: allDeals.take(20).toList(), // Top 20 for carousel
         dealsByRetailer: byRetailer,
         totalDealsCount: allDeals.length,
         totalPotentialSavings: totalSavings,
@@ -447,9 +495,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 ),
               ),
 
-            // ─── DEALS BY RETAILER ───
+            // ─── DEALS BY RETAILER (grocery first, then pharmacies) ───
             if (!dealsState.isLoading)
-              ...dealsState.dealsByRetailer.entries.map((entry) {
+              ..._sortedRetailerEntries(dealsState.dealsByRetailer).map((entry) {
                 final config = Retailers.fromName(entry.key);
                 if (config == null)
                   return const SliverToBoxAdapter(child: SizedBox());
@@ -459,7 +507,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     child: _RetailerDealsSection(
                       retailerName: entry.key,
                       config: config,
-                      deals: entry.value.take(6).toList(),
+                      deals: entry.value,
                       isDark: isDark,
                       onViewAll: () => context.go('/stores'),
                     ),
@@ -477,6 +525,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         ),
       ),
     );
+  }
+
+  /// Orders retailer deal sections: grocery/bulk retailers first, pharmacies last.
+  List<MapEntry<String, List<HomeDeal>>> _sortedRetailerEntries(
+      Map<String, List<HomeDeal>> dealsByRetailer) {
+    final entries = dealsByRetailer.entries.toList();
+    entries.sort((a, b) {
+      final aIsPharmacy = Retailers.isPharmacy(a.key) ? 1 : 0;
+      final bIsPharmacy = Retailers.isPharmacy(b.key) ? 1 : 0;
+      return aIsPharmacy.compareTo(bIsPharmacy);
+    });
+    return entries;
   }
 
   Widget _buildSliverAppBar(

@@ -123,6 +123,7 @@ class _LiveBrowseScreenState extends ConsumerState<LiveBrowseScreen> {
   // Sort & filter state
   SortOption _sortOption = SortOption.relevance;
   bool _promosOnly = false;
+  bool _fetchingMorePromos = false;
 
   @override
   void initState() {
@@ -294,6 +295,7 @@ class _LiveBrowseScreenState extends ConsumerState<LiveBrowseScreen> {
           setState(() {
             _sortOption = sort;
             _promosOnly = promos;
+            _fetchingMorePromos = false;
           });
         },
       ),
@@ -383,7 +385,10 @@ class _LiveBrowseScreenState extends ConsumerState<LiveBrowseScreen> {
               sortOption: _sortOption,
               promosOnly: _promosOnly,
               onClearSort: () => setState(() => _sortOption = SortOption.relevance),
-              onClearPromos: () => setState(() => _promosOnly = false),
+              onClearPromos: () => setState(() {
+                _promosOnly = false;
+                _fetchingMorePromos = false;
+              }),
             ),
 
           // Products area
@@ -453,6 +458,29 @@ class _LiveBrowseScreenState extends ConsumerState<LiveBrowseScreen> {
         var products = applySort(response.products, _sortOption);
         if (_promosOnly) {
           products = products.where((p) => p.hasPromo).toList();
+
+          final canFetchMore = response.hasMorePages && response.currentPage < 5;
+
+          // Auto-fetch more pages if we have too few promo products
+          // but more pages are available. Cap at 5 pages to avoid
+          // excessive API calls for retailers with sparse promotions.
+          if (products.length < 6 && canFetchMore && !_fetchingMorePromos) {
+            _fetchingMorePromos = true;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              ref.read(liveProductsProvider.notifier).loadNextPage().then((_) {
+                if (mounted) setState(() => _fetchingMorePromos = false);
+              });
+            });
+          }
+
+          // Show skeleton while still fetching and no promos found yet
+          if (products.isEmpty && (canFetchMore || _fetchingMorePromos)) {
+            return const ProductGridSkeleton();
+          }
+
+          if (products.isEmpty) {
+            return _buildNoPromoState();
+          }
         }
 
         if (products.isEmpty) {
@@ -461,7 +489,7 @@ class _LiveBrowseScreenState extends ConsumerState<LiveBrowseScreen> {
 
         return _buildProductGrid(
           products: products,
-          hasMore: response.hasMorePages && !_promosOnly,
+          hasMore: response.hasMorePages,
         );
       },
       loading: () => const ProductGridSkeleton(),
@@ -584,7 +612,10 @@ class _LiveBrowseScreenState extends ConsumerState<LiveBrowseScreen> {
             ),
             const SizedBox(height: 16),
             TextButton(
-              onPressed: () => setState(() => _promosOnly = false),
+              onPressed: () => setState(() {
+                _promosOnly = false;
+                _fetchingMorePromos = false;
+              }),
               child: const Text('Show all products'),
             ),
           ],
@@ -707,13 +738,18 @@ class _CategoryChipBar extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final retailerConfig = Retailers.fromName(selectedRetailer);
     final accentColor = retailerConfig?.color ?? AppColors.primary;
+    final slug = retailerConfig?.slug ?? '';
+    // Filter categories to only those supported by the current retailer
+    final categories = ProductCategories.all
+        .where((c) => c.valueForRetailer(slug) != null)
+        .toList();
 
     return SizedBox(
       height: 44,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: ProductCategories.all.length + 1, // +1 for "All"
+        itemCount: categories.length + 1, // +1 for "All"
         separatorBuilder: (_, __) => const SizedBox(width: 8),
         itemBuilder: (context, index) {
           if (index == 0) {
@@ -730,7 +766,7 @@ class _CategoryChipBar extends StatelessWidget {
             );
           }
 
-          final category = ProductCategories.all[index - 1];
+          final category = categories[index - 1];
           final isSelected = selectedCategory == category;
           return _buildChip(
             context: context,

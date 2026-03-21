@@ -28,12 +28,18 @@ class AppConstants {
   static const String woolworths = 'Woolworths';
   static const String shoprite = 'Shoprite';
   static const String checkers = 'Checkers';
+  static const String makro = 'Makro';
+  static const String disChem = 'Dis-Chem';
+  static const String clicks = 'Clicks';
 
   static const List<String> retailers = [
     pickNPay,
     woolworths,
     shoprite,
     checkers,
+    makro,
+    disChem,
+    clicks,
   ];
 
   // ==========================================================================

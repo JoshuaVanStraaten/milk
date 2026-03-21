@@ -446,7 +446,28 @@ class ProductNameParser {
     final brand = _brandScore(source, candidate);
     final size = _sizeScore(source, candidate);
     final variant = _variantScore(source, candidate);
-    final name = _nameScore(source.normalizedName, candidate.normalizedName);
+
+    // When normalizedName is empty, the product's identity was fully consumed
+    // by brand/size/variant parsing. Fall back to comparing original names
+    // (minus size patterns) so products like "Strawberries 400g" vs
+    // "PnP Strawberries 250g" can still score well on name overlap.
+    final String sourceNameForScore;
+    final String candidateNameForScore;
+    if (source.normalizedName.isEmpty || candidate.normalizedName.isEmpty) {
+      final sizeRe = RegExp(
+        r'\d+\.?\d*\s*(g|kg|ml|l|litre|liter)s?\b|\d+\s*x\s*\d+',
+        caseSensitive: false,
+      );
+      sourceNameForScore = source.originalName.toLowerCase()
+          .replaceAll(sizeRe, '').replaceAll(RegExp(r'\s+'), ' ').trim();
+      candidateNameForScore = candidate.originalName.toLowerCase()
+          .replaceAll(sizeRe, '').replaceAll(RegExp(r'\s+'), ' ').trim();
+    } else {
+      sourceNameForScore = source.normalizedName;
+      candidateNameForScore = candidate.normalizedName;
+    }
+
+    final name = _nameScore(sourceNameForScore, candidateNameForScore);
 
     // Guard: if names share no meaningful words and brand isn't an exact
     // match, these are fundamentally different products — don't let
@@ -456,11 +477,36 @@ class ProductNameParser {
     final score =
         (brand * 0.30) + (size * 0.25) + (variant * 0.20) + (name * 0.25);
 
-    // Size gate: if sizes differ drastically (e.g. 6x1L vs 1L, 500g vs 1kg),
-    // cap confidence below "similar" threshold — users searching for a specific
-    // quantity don't want to see wildly different sizes as "similar".
+    // Size gate: if sizes differ drastically (e.g. 6x1L vs 1L), cap confidence
+    // below "similar" threshold. Relax for cross-retailer produce comparisons
+    // where brands differ (e.g. "Strawberries 400g" vs "PnP Strawberries 250g").
     if (size <= 0.1) {
+      // Soft gate when: brands are different AND at least one fallback brand
+      // appears in the other product's name (indicating a produce/generic product
+      // sold under different retailer labels at different sizes).
+      final srcBrand = source.brand?.toLowerCase().replaceAll('-', '') ?? '';
+      final candBrand = candidate.brand?.toLowerCase().replaceAll('-', '') ?? '';
+      final brandsAreDifferent = srcBrand != candBrand;
+      final fallbackInOtherName = (!_brandPatterns.contains(srcBrand) &&
+              candidate.originalName.toLowerCase().contains(srcBrand)) ||
+          (!_brandPatterns.contains(candBrand) &&
+              source.originalName.toLowerCase().contains(candBrand));
+
+      if (brandsAreDifferent && fallbackInOtherName && size > 0.05) {
+        // Cross-retailer produce — soft gate, allow similar matches
+        return score.clamp(0.0, 0.64);
+      }
       return score.clamp(0.0, 0.54);
+    }
+
+    // Moderate size gate: when both products have comparable size info and
+    // differ by >20% (sizeScore < 0.5), cap below "exact" threshold.
+    // 650g vs 950g is a meaningful difference — "similar" not "same product".
+    // Skip this gate when one product is missing size info entirely (e.g.
+    // "6 Pack" vs "6 x 45g") — that's incomplete data, not a real mismatch.
+    final bothHaveSize = source.sizeValue != null && candidate.sizeValue != null;
+    if (bothHaveSize && size < 0.5 && size > 0.1) {
+      return score.clamp(0.0, 0.79);
     }
 
     // Variant conflict penalty: conflicting variants (e.g. brown vs white,
@@ -490,9 +536,16 @@ class ProductNameParser {
     // Both store brands — similar tier products
     if (aIsStore && bIsStore) return 0.7;
 
-    // One known brand, one unrecognized (could be store-brand)
     final aKnown = _brandPatterns.contains(brandA);
     final bKnown = _brandPatterns.contains(brandB);
+
+    // When one brand is a fallback (first word, not a known brand) and
+    // it appears in the other product's original name, the "brand" is
+    // actually the product name (e.g. "strawberries" from "Strawberries 400g"
+    // appearing in "PnP Strawberries 250g"). Treat as compatible.
+    if (!aKnown && b.originalName.toLowerCase().contains(brandA)) return 0.7;
+    if (!bKnown && a.originalName.toLowerCase().contains(brandB)) return 0.7;
+
     if (!aKnown || !bKnown) return 0.3;
 
     // Different known brands
@@ -587,6 +640,36 @@ class ProductNameParser {
     return 0.5;
   }
 
+  // Words that signal a fundamentally different product category.
+  // When the source product doesn't contain these words but the candidate does,
+  // it's a category mismatch (e.g. "Strawberries" vs "Strawberry Drink").
+  static const _categoryMismatchWords = {
+    // Drinks
+    'drink', 'juice', 'cooldrink', 'cordial', 'squash', 'soda', 'shake',
+    'smoothie', 'water', 'tea', 'coffee',
+    // Dairy / desserts (mismatch against fresh produce)
+    'yoghurt', 'yogurt', 'custard', 'mousse', 'pudding',
+    'gelato', 'sorbet',
+    // Confectionery / snacks
+    'chocolate', 'candy', 'sweet', 'gummy', 'mallow', 'marshmallow',
+    'lollipop', 'toffee', 'fudge', 'cookie', 'biscuit', 'wafer',
+    // Baked goods
+    'cake', 'bread', 'muffin', 'scone', 'rusk', 'pie', 'tart',
+    // Cleaning / non-food
+    'detergent', 'cleaner', 'soap', 'shampoo', 'bleach', 'sanitizer',
+    'nappy', 'diaper', 'wipe',
+    // Meal replacements / supplements
+    'replace', 'replacement', 'supplement', 'vitamin', 'protein', 'formula',
+    'medicine', 'tablet', 'capsule', 'syrup',
+    // Sauces / condiments
+    'sauce', 'chutney', 'relish', 'marinade', 'dressing', 'ketchup',
+    'paste', 'pesto', 'gravy', 'soup',
+    // Jams / preserves
+    'jam', 'jelly', 'preserve', 'marmalade', 'compote', 'conserve',
+    // Processed
+    'flavoured', 'flavored', 'instant', 'powder', 'concentrate',
+  };
+
   /// Name similarity (0.0–1.0) using Jaccard + containment.
   /// Filters out generic stop words so they don't inflate scores.
   static double _nameScore(String a, String b) {
@@ -608,6 +691,14 @@ class ProductNameParser {
       return (overlap / wordsA.union(wordsB).length) * 0.3;
     }
 
+    // Category mismatch guard: if candidate has category-indicator words
+    // that the source doesn't have, these are fundamentally different products.
+    // "Strawberries" vs "Strawberry Drink" → "drink" not in source → reject.
+    final candidateCategory = meaningfulB.intersection(_categoryMismatchWords);
+    final sourceCategory = meaningfulA.intersection(_categoryMismatchWords);
+    final mismatch = candidateCategory.difference(sourceCategory);
+    if (mismatch.isNotEmpty) return 0;
+
     final overlap = meaningfulA.intersection(meaningfulB).length;
     if (overlap == 0) return 0;
 
@@ -620,6 +711,47 @@ class ProductNameParser {
     }
 
     return (jaccard * 0.4) + (containment * 0.6);
+  }
+
+  /// Multi-word phrases that indicate a different product category.
+  /// Checked as substrings on the full original name (lowercased).
+  /// "cream" alone is too common (Full Cream Milk), but "double cream"
+  /// unambiguously signals a dairy dessert, not fresh produce.
+  static const _categoryMismatchPhrases = [
+    'double cream', 'ice cream', 'cream cheese', 'sour cream',
+    'whipped cream', 'clotted cream',
+  ];
+
+  /// Check if two product names have a category mismatch based on original names.
+  /// Uses the full original name (before brand/variant stripping) so that
+  /// words like "drink", "replace", "sauce" are caught even when they'd be
+  /// stripped from normalizedName.
+  static bool _hasCategoryMismatch(String sourceOriginal, String candidateOriginal) {
+    final sourceLower = sourceOriginal.toLowerCase();
+    final candidateLower = candidateOriginal.toLowerCase();
+
+    // Check multi-word phrases first
+    for (final phrase in _categoryMismatchPhrases) {
+      if (candidateLower.contains(phrase) && !sourceLower.contains(phrase)) {
+        return true;
+      }
+    }
+
+    // Single-word check
+    final sizePattern = RegExp(r'^\d+\.?\d*(g|kg|ml|l|pack|pk)$');
+    final sourceWords = sourceLower
+        .split(RegExp(r'[\s\-]+'))
+        .where((w) => w.length > 1 && !sizePattern.hasMatch(w))
+        .toSet();
+    final candidateWords = candidateLower
+        .split(RegExp(r'[\s\-]+'))
+        .where((w) => w.length > 1 && !sizePattern.hasMatch(w))
+        .toSet();
+
+    final candidateCategory = candidateWords.intersection(_categoryMismatchWords);
+    final sourceCategory = sourceWords.intersection(_categoryMismatchWords);
+    final mismatch = candidateCategory.difference(sourceCategory);
+    return mismatch.isNotEmpty;
   }
 
   /// Map confidence score to MatchType for backward compatibility.
@@ -650,6 +782,13 @@ class ProductNameParser {
     required double sourcePrice,
     double similarityThreshold = 0.25,
   }) {
+    // Category mismatch guard on ORIGINAL names (before variant/brand stripping).
+    // Catches cases like "Strawberries 400g" vs "Replace Strawberry Drink 400g"
+    // where normalizedName stripping hides the mismatch.
+    if (_hasCategoryMismatch(source.originalName, candidate.originalName)) {
+      return null;
+    }
+
     final confidence = computeConfidence(source, candidate);
     final matchType = matchTypeFromConfidence(confidence);
 
@@ -661,8 +800,18 @@ class ProductNameParser {
       candidate.normalizedName,
     );
 
-    // Additional rejection: very low word overlap even if confidence is OK
-    if (similarity < similarityThreshold && confidence < 0.55) return null;
+    // Additional rejection: very low word overlap even if confidence is OK.
+    // Skip this check when either normalizedName is empty — that means the
+    // product name was entirely consumed by brand/size/variant parsing
+    // (e.g. "Strawberries 400g" → brand="strawberries", size=400g, normalized="").
+    // In that case, similarity=0 is misleading, not a genuine mismatch.
+    final bothNamesPresent = source.normalizedName.isNotEmpty &&
+        candidate.normalizedName.isNotEmpty;
+    if (bothNamesPresent &&
+        similarity < similarityThreshold &&
+        confidence < 0.55) {
+      return null;
+    }
 
     final priceDiff = priceNumeric - sourcePrice;
 

@@ -9,6 +9,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:lottie/lottie.dart';
 import '../../../core/constants/retailers.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/live_product.dart';
@@ -325,10 +326,15 @@ class _LiveProductDetailScreenState
       final sourceParsed = ProductNameParser.parse(widget.product.name);
       final searchQuery = sourceParsed.searchQuery;
 
-      // Search all retailers in parallel
+      // Compare against peer retailers only:
+      // Grocery → other grocery stores, Pharmacy → other pharmacy stores.
+      final peers = Retailers.comparisonPeers(widget.product.retailer);
+      final peerStores = Map.fromEntries(
+        storeSelection.stores.entries.where((e) => peers.contains(e.key)),
+      );
       final rawResults = await api.compareProduct(
         productName: searchQuery,
-        stores: storeSelection.stores,
+        stores: peerStores,
       );
 
       // Remove self from source retailer results
@@ -448,7 +454,9 @@ class _LiveProductDetailScreenState
           child: LottieLoadingIndicator(
             width: 140,
             height: 140,
-            message: 'Comparing prices across all retailers...',
+            message: Retailers.isPharmacy(widget.product.retailer)
+                ? 'Comparing prices across pharmacies...'
+                : 'Comparing prices across grocery retailers...',
             messageStyle: TextStyle(fontSize: 14, color: subtitleColor),
           ),
         ),
@@ -485,11 +493,28 @@ class _LiveProductDetailScreenState
         ),
         child: Column(
           children: [
-            Icon(Icons.search_off, size: 40, color: subtitleColor),
+            Lottie.asset(
+              'assets/animations/empty.json',
+              width: 120,
+              height: 120,
+              repeat: false,
+            ),
             const SizedBox(height: 8),
             Text(
-              'No matching products found at other retailers',
-              style: TextStyle(color: subtitleColor),
+              'No matching products found',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: textColor,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              Retailers.isPharmacy(widget.product.retailer)
+                  ? 'This product wasn\'t found at other pharmacies'
+                  : 'This product wasn\'t found at other grocery stores',
+              style: TextStyle(fontSize: 13, color: subtitleColor),
               textAlign: TextAlign.center,
             ),
           ],
@@ -583,18 +608,30 @@ class _LiveProductDetailScreenState
           const SizedBox(height: 16),
         ],
 
-        // No exact matches — show info message
+        // No exact matches — highlighted so users notice
         if (exactMatches.isEmpty) ...[
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12),
+          Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppColors.secondary.withValues(alpha: isDark ? 0.12 : 0.08),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: AppColors.secondary.withValues(alpha: 0.2),
+              ),
+            ),
             child: Row(
               children: [
-                Icon(Icons.info_outline, size: 16, color: subtitleColor),
-                const SizedBox(width: 8),
+                Icon(Icons.info_outline, size: 18, color: AppColors.secondary),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'No exact matches found at other stores',
-                    style: TextStyle(fontSize: 12, color: subtitleColor),
+                    'No exact matches found — showing similar products',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: textColor,
+                    ),
                   ),
                 ),
               ],

@@ -39,6 +39,9 @@ class AppColors {
   static const Color woolworths = Color(0xFF006341); // Green
   static const Color shoprite = Color(0xFFFF6600); // Orange
   static const Color checkers = Color(0xFF005EB8); // Blue
+  static const Color makro = Color(0xFF003DA5); // Makro blue
+  static const Color disChem = Color(0xFF00A94F); // Dis-Chem green
+  static const Color clicks = Color(0xFF005BAA); // Clicks blue
 
   // Utility Colors (Light)
   static const Color divider = Color(0xFFE5E7EB);

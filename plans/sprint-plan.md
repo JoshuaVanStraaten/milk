@@ -400,6 +400,7 @@ Frozen | Food Cupboard | Snacks | Beverages
 **Priority order:** Makro → Dis-Chem → Clicks (tackle individually as sub-sprints).
 
 > **SPAR deferred:** SPAR is a franchise model — each store is independently owned with no centralized product/price API. Research (2026-03-21) found:
+>
 > - `spar.co.za/SPAR-Products` — own-brand catalog only, no prices, server-rendered HTML
 > - `sparsame.com` / `easyquote-dcs.co.za` — working JSON API but only 1 store (SPAR Botswana)
 > - `mobile.spar.co.za` — loyalty/rewards Rails app, no product catalog
@@ -444,6 +445,7 @@ Each retailer needs a Supabase Edge Function that proxies product search + categ
 - HTML entity decoding in product names
 - Image URL handling (direct URLs or proxy needed?)
 - Deploy with `supabase functions deploy`
+- I will login with `supabase login`. When you deploy, you need to prefix the cmds with `npx ...`
 
 #### 11b. Retailer Config Registration
 
@@ -589,6 +591,7 @@ Each retailer needs a Supabase Edge Function that proxies product search + categ
 **Goal:** Fix keyboard-covering-fields UX issue in the add-to-list bottom sheet. Users report they can't see what they're typing because the keyboard covers the input fields.
 
 **Completed:**
+
 - 12.7a: Replaced quantity TextField with +/- stepper (long-press repeat, clamped 1-99) in add-to-list sheet, manual add tab, and browse add confirmation
 - 12.7b: Fixed keyboard covering notes field — keyboard-aware maxHeight (75%→90%), ScrollController + FocusNode auto-scroll, viewInsets padding
 - 12.7c: "Add to List" button moved outside scroll area (sticky), "Note" label above field, AppColors theming for dark mode
@@ -603,6 +606,7 @@ Each retailer needs a Supabase Edge Function that proxies product search + categ
 **Problem:** Quantity field uses a `TextField` with number keyboard — opening the keyboard pushes content around and is overkill for incrementing a simple count.
 
 **Fix:** Replace the 80px-wide `TextField` with a horizontal stepper widget:
+
 - `[ - ]  2  [ + ]` layout
 - Minus button: decrement (min 1), Plus button: increment (no max, reasonable default cap at 99)
 - Display quantity as styled `Text` widget between buttons (no keyboard needed)
@@ -666,6 +670,7 @@ void initState() {
 - Smooth animation when sheet height changes (keyboard open/close)
 
 **Testing:**
+
 - Test on physical Android device with varying screen sizes
 - Verify quantity stepper works: tap, long-press rapid increment, min boundary (1)
 - Verify notes field: keyboard opens, field stays visible, can see text while typing

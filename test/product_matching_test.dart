@@ -293,6 +293,144 @@ void main() {
   });
 
   // =========================================================================
+  // E2. Strawberry / single-word product matching
+  // =========================================================================
+  group('single-word product matching (strawberry bug)', () {
+    test('Strawberries 400g should parse with empty normalizedName', () {
+      final parsed = ProductNameParser.parse('Strawberries 400g');
+      // brand fallback = "strawberries" (first word), no variant match
+      // ("strawberries" does NOT contain "strawberry" as substring in Dart)
+      // normalizedName = "" after brand removal
+      expect(parsed.brand, equals('strawberries'));
+      expect(parsed.normalizedName, isEmpty);
+    });
+
+    test('PnP Strawberries 250g should match Strawberries 400g as similar', () {
+      final s = ProductNameParser.parse('Strawberries 400g');
+      final c = ProductNameParser.parse('PnP Strawberries 250g');
+      final confidence = ProductNameParser.computeConfidence(s, c);
+      expect(
+        confidence,
+        greaterThanOrEqualTo(0.55),
+        reason:
+            'Same product (fresh strawberries) different sizes — should be at least similar. Got $confidence',
+      );
+    });
+
+    test('Strawberries 400g should NOT match Replace Strawberry Drink 400g', () {
+      final s = ProductNameParser.parse('Strawberries 400g');
+      final c = ProductNameParser.parse('Replace Strawberry Drink 400g');
+      // Category mismatch should reject this via _hasCategoryMismatch
+      final match = ProductNameParser.classify(
+        source: s,
+        candidate: c,
+        retailer: 'Test',
+        name: 'Replace Strawberry Drink 400g',
+        price: 'R49.99',
+        priceNumeric: 49.99,
+        sourcePrice: 39.99,
+      );
+      expect(match, isNull,
+          reason: '"Replace Strawberry Drink" is a meal replacement, not fresh fruit');
+    });
+
+    test('Strawberries 400g should NOT match Strawberry Flavoured Yoghurt 175g', () {
+      final s = ProductNameParser.parse('Strawberries 400g');
+      final c = ProductNameParser.parse('Danone Strawberry Flavoured Yoghurt 175g');
+      final match = ProductNameParser.classify(
+        source: s,
+        candidate: c,
+        retailer: 'Test',
+        name: 'Danone Strawberry Flavoured Yoghurt 175g',
+        price: 'R12.99',
+        priceNumeric: 12.99,
+        sourcePrice: 39.99,
+      );
+      expect(match, isNull,
+          reason: 'Flavoured yoghurt is not fresh strawberries');
+    });
+
+    test('Strawberries 400g should NOT match PnP Double Cream Strawberries & Cream', () {
+      final s = ProductNameParser.parse('Strawberries 400 g');
+      final c = ProductNameParser.parse('PnP Double Cream Strawberries & Cream');
+      final match = ProductNameParser.classify(
+        source: s,
+        candidate: c,
+        retailer: 'Pick n Pay',
+        name: 'PnP Double Cream Strawberries & Cream',
+        price: 'R12.99',
+        priceNumeric: 12.99,
+        sourcePrice: 89.99,
+      );
+      expect(match, isNull,
+          reason: 'Double Cream dessert is not fresh strawberries');
+    });
+
+    test('Strawberries 400g should match Woolworths Strawberries 250g', () {
+      final s = ProductNameParser.parse('Strawberries 400g');
+      final c = ProductNameParser.parse('Woolworths Strawberries 250g');
+      final confidence = ProductNameParser.computeConfidence(s, c);
+      expect(
+        confidence,
+        greaterThanOrEqualTo(0.55),
+        reason:
+            'Same product different retailer brand — should be at least similar. Got $confidence',
+      );
+    });
+
+    test('Bananas 1kg should match PnP Bananas 750g as similar', () {
+      final s = ProductNameParser.parse('Bananas 1kg');
+      final c = ProductNameParser.parse('PnP Bananas 750g');
+      final confidence = ProductNameParser.computeConfidence(s, c);
+      expect(
+        confidence,
+        greaterThanOrEqualTo(0.30),
+        reason:
+            'Same product (bananas) — should be at least fallback. Got $confidence',
+      );
+    });
+
+    test('Bananas 650g vs Bananas 950g should be similar, NOT exact', () {
+      final s = ProductNameParser.parse('Bananas 650g');
+      final c = ProductNameParser.parse('Bananas 950g');
+      final confidence = ProductNameParser.computeConfidence(s, c);
+      expect(
+        confidence,
+        greaterThanOrEqualTo(0.55),
+        reason: 'Same product different size — should be at least similar. Got $confidence',
+      );
+      expect(
+        confidence,
+        lessThan(0.80),
+        reason: '650g vs 950g is a 46% size diff — should NOT be exact. Got $confidence',
+      );
+    });
+
+    test('Bananas 650g vs Bananas 1.2kg should be similar or fallback, NOT exact', () {
+      final s = ProductNameParser.parse('Bananas 650g');
+      final c = ProductNameParser.parse('Bananas 1.2kg');
+      final confidence = ProductNameParser.computeConfidence(s, c);
+      expect(
+        confidence,
+        lessThan(0.80),
+        reason: '650g vs 1.2kg is a huge size diff — should NOT be exact. Got $confidence',
+      );
+    });
+
+    test('Tomatoes 1kg should match PnP Tomatoes 500g as similar', () {
+      final s = ProductNameParser.parse('Tomatoes 1kg');
+      final c = ProductNameParser.parse('PnP Tomatoes 500g');
+      final confidence = ProductNameParser.computeConfidence(s, c);
+      expect(
+        confidence,
+        greaterThanOrEqualTo(0.30),
+        reason:
+            'Same product (tomatoes) — should be at least fallback. Got $confidence',
+      );
+    });
+  });
+
+  // =========================================================================
   // F. Size mismatch tests
   // =========================================================================
   group('size mismatches', () {

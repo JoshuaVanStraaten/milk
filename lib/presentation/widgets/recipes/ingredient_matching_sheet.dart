@@ -178,16 +178,19 @@ class _IngredientMatchingSheetState
                     children: [
                       _buildRetailerChip(null, 'All Stores', isDark),
                       const SizedBox(width: 8),
-                      ...Retailers.all.values.map(
-                        (config) => Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: _buildRetailerChip(
-                            config.name,
-                            config.name,
-                            isDark,
-                            chipColor: config.color,
-                          ),
-                        ),
+                      ...Retailers.groceryRetailers.map(
+                        (name) {
+                          final config = Retailers.fromName(name)!;
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: _buildRetailerChip(
+                              config.name,
+                              config.name,
+                              isDark,
+                              chipColor: config.color,
+                            ),
+                          );
+                        },
                       ),
                     ],
                   ),

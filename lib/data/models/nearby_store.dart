@@ -102,9 +102,12 @@ class StoreSelection {
   NearbyStore? get woolworths => stores['Woolworths'];
   NearbyStore? get checkers => stores['Checkers'];
   NearbyStore? get shoprite => stores['Shoprite'];
+  NearbyStore? get makro => stores['Makro'];
+  NearbyStore? get disChem => stores['Dis-Chem'];
+  NearbyStore? get clicks => stores['Clicks'];
 
-  /// Whether all 4 retailers have a nearby store
-  bool get isComplete => stores.length == 4;
+  /// Whether all registered retailers have a nearby store
+  bool get isComplete => stores.length >= Retailers.all.length;
 
   /// Look up the store for a given retailer display name
   NearbyStore? forRetailer(String name) => stores[name];

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/constants/app_constants.dart';
+import '../../../core/constants/retailers.dart';
 import '../../../data/models/recipe.dart';
 import '../../providers/recipe_provider.dart';
 
@@ -309,19 +309,10 @@ class RecipeResultCard extends StatelessWidget {
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
-                  _buildStoreChip('All Stores', null, isDark),
-                  const SizedBox(width: 6),
-                  _buildStoreChip('Pick n Pay', AppConstants.pickNPay, isDark),
-                  const SizedBox(width: 6),
-                  _buildStoreChip(
-                    'Woolworths',
-                    AppConstants.woolworths,
-                    isDark,
-                  ),
-                  const SizedBox(width: 6),
-                  _buildStoreChip('Shoprite', AppConstants.shoprite, isDark),
-                  const SizedBox(width: 6),
-                  _buildStoreChip('Checkers', AppConstants.checkers, isDark),
+                  for (final name in Retailers.groceryRetailers) ...[
+                    _buildStoreChip(name, name, isDark),
+                    const SizedBox(width: 6),
+                  ],
                 ],
               ),
             ),
@@ -331,15 +322,13 @@ class RecipeResultCard extends StatelessWidget {
     );
   }
 
-  Widget _buildStoreChip(String label, String? retailer, bool isDark) {
-    // "All Stores" has retailer=null, matchedRetailer='' or null means All Stores
-    final isSelected = (retailer == null && (matchedRetailer == null || matchedRetailer!.isEmpty)) ||
-        (retailer != null && matchedRetailer == retailer);
+  Widget _buildStoreChip(String label, String retailer, bool isDark) {
+    final isSelected = matchedRetailer == retailer;
 
     return GestureDetector(
       onTap: () {
         if (onReMatchForStore != null) {
-          onReMatchForStore!(retailer ?? '');
+          onReMatchForStore!(retailer);
         }
       },
       child: Container(
