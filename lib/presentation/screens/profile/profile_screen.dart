@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lottie/lottie.dart';
 import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/saved_location.dart';
+import '../../../data/models/vehicle_config.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/vehicle_config_provider.dart';
 import '../../widgets/common/address_search_field.dart';
+import '../../widgets/common/vehicle_config_sheet.dart';
 import '../../providers/saved_locations_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/tutorial_provider.dart';
@@ -176,6 +180,13 @@ class ProfileScreen extends ConsumerWidget {
                 _SectionHeader(title: 'My Locations', isDark: isDark),
                 const SizedBox(height: 12),
                 _LocationsCard(isDark: isDark),
+
+                const SizedBox(height: 24),
+
+                // My Vehicle Section
+                _SectionHeader(title: 'My Vehicle', isDark: isDark),
+                const SizedBox(height: 12),
+                _VehicleCard(isDark: isDark),
 
                 const SizedBox(height: 24),
 
@@ -587,6 +598,125 @@ class _LocationsCard extends ConsumerWidget {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (_) => _AddLocationSheet(isDark: isDark, ref: ref),
+    );
+  }
+}
+
+/// Card showing the user's vehicle configuration for fuel cost estimates.
+class _VehicleCard extends ConsumerWidget {
+  final bool isDark;
+  const _VehicleCard({required this.isDark});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final vehicle = ref.watch(vehicleConfigProvider);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.surfaceDarkMode : AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: vehicle == null ? _buildEmptyState(context) : _buildConfigured(context, vehicle),
+    );
+  }
+
+  Widget _buildEmptyState(BuildContext context) {
+    return Column(
+      children: [
+        SizedBox(
+          width: 80,
+          height: 80,
+          child: Lottie.asset(
+            'assets/animations/car_question.json',
+            fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) => Icon(
+              Icons.directions_car_outlined,
+              size: 40,
+              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Set up your vehicle to see trip fuel costs',
+          style: TextStyle(
+            fontSize: 14,
+            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: () => showVehicleConfigSheet(context, isDark: isDark),
+            icon: const Icon(Icons.add, size: 18),
+            label: const Text('Configure vehicle'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.primary,
+              side: BorderSide(
+                color: isDark ? AppColors.dividerDark : AppColors.divider,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildConfigured(BuildContext context, VehicleConfig vehicle) {
+    return InkWell(
+      onTap: () => showVehicleConfigSheet(context, isDark: isDark),
+      borderRadius: BorderRadius.circular(12),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(
+              Icons.directions_car,
+              color: AppColors.primary,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  vehicle.label,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: isDark
+                        ? AppColors.textPrimaryDark
+                        : AppColors.textPrimary,
+                  ),
+                ),
+                Text(
+                  '${vehicle.consumptionPer100km.toStringAsFixed(1)} L/100km · '
+                  '${vehicle.fuelTypeLabel} · ${vehicle.regionLabel}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Icon(
+            Icons.chevron_right,
+            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+          ),
+        ],
+      ),
     );
   }
 }

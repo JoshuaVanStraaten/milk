@@ -13,8 +13,11 @@ import '../../../core/constants/product_categories.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/nearby_store.dart';
 import '../../../data/models/live_product.dart';
+import '../../../data/services/fuel_cost_service.dart';
+import '../../providers/fuel_price_provider.dart';
 import '../../providers/store_provider.dart';
 import '../../providers/tutorial_provider.dart';
+import '../../providers/vehicle_config_provider.dart';
 import '../../widgets/products/live_product_card.dart';
 import '../../widgets/common/empty_states.dart';
 import '../../widgets/skeleton_loaders.dart';
@@ -638,7 +641,7 @@ class _LiveBrowseScreenState extends ConsumerState<LiveBrowseScreen> {
 // Store / retailer button for AppBar
 // ─────────────────────────────────────────────
 
-class _StoreAppBarButton extends StatelessWidget {
+class _StoreAppBarButton extends ConsumerWidget {
   final RetailerConfig? retailerConfig;
   final NearbyStore? currentStore;
   final VoidCallback onTap;
@@ -650,11 +653,30 @@ class _StoreAppBarButton extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final color = retailerConfig?.color ?? AppColors.primary;
     final name = retailerConfig?.name ?? 'Select Store';
     final branch = currentStore?.storeName ?? 'Tap to choose';
+
+    // Fuel cost hint — only if vehicle configured and store has distance
+    String? fuelHint;
+    final vehicle = ref.watch(vehicleConfigProvider);
+    if (vehicle != null && currentStore != null) {
+      final fuelPricesAsync = ref.watch(fuelPricesProvider);
+      fuelPricesAsync.whenData((fuelData) {
+        final price = fuelData.getPrice(vehicle.fuelType, vehicle.region);
+        if (price != null) {
+          final breakdown = FuelCostService().calculateTripCost(
+            distanceKm: currentStore!.distanceKm,
+            consumptionPer100km: vehicle.consumptionPer100km,
+            fuelPricePerLitre: price,
+          );
+          fuelHint =
+              '${currentStore!.distanceKm.toStringAsFixed(1)}km · ~R${breakdown.fuelCostRands.toStringAsFixed(2)} fuel';
+        }
+      });
+    }
 
     return GestureDetector(
       onTap: onTap,
@@ -677,7 +699,7 @@ class _StoreAppBarButton extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 10),
-          // Retailer name + store branch
+          // Retailer name + store branch + fuel hint
           Flexible(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -694,11 +716,13 @@ class _StoreAppBarButton extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
-                  branch,
+                  fuelHint ?? branch,
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w400,
-                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                    color: fuelHint != null
+                        ? AppColors.primary
+                        : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondary),
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,

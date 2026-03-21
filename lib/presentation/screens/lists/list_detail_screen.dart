@@ -17,6 +17,7 @@ import '../../widgets/common/empty_states.dart';
 import '../../widgets/common/lottie_loading_indicator.dart';
 import '../compare/compare_sheet.dart';
 import '../../widgets/lists/share_list_sheet.dart';
+import '../../widgets/lists/trip_cost_card.dart';
 
 class ListDetailScreen extends ConsumerStatefulWidget {
   final String listId;
@@ -153,6 +154,9 @@ class _ListDetailScreenState extends ConsumerState<ListDetailScreen> {
               _ListHeader(list: list, isDark: isDark),
 
               const Divider(height: 1),
+
+              // Trip Cost breakdown (collapsible)
+              TripCostCard(items: itemsState.items, isDark: isDark),
 
               // Items List with real-time state
               Expanded(child: _buildItemsList(itemsState, isDark)),
