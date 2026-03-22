@@ -17,6 +17,7 @@ import '../../widgets/common/empty_states.dart';
 import '../../widgets/common/lottie_loading_indicator.dart';
 import '../compare/compare_sheet.dart';
 import '../../widgets/lists/share_list_sheet.dart';
+import '../../widgets/lists/list_comparison_sheet.dart';
 import '../../widgets/lists/trip_cost_card.dart';
 
 class ListDetailScreen extends ConsumerStatefulWidget {
@@ -150,8 +151,23 @@ class _ListDetailScreenState extends ConsumerState<ListDetailScreen> {
         data: (list) {
           return Column(
             children: [
-              // List Header
-              _ListHeader(list: list, isDark: isDark),
+              // List Header with Compare button
+              _ListHeader(
+                list: list,
+                isDark: isDark,
+                onCompare: itemsState.items
+                        .where((i) => !i.completedItem)
+                        .isEmpty
+                    ? null
+                    : () => showListComparisonSheet(
+                          context: context,
+                          ref: ref,
+                          items: itemsState.items
+                              .where((i) => !i.completedItem)
+                              .toList(),
+                          listId: widget.listId,
+                        ),
+              ),
 
               const Divider(height: 1),
 
@@ -572,8 +588,13 @@ class _ListDetailScreenState extends ConsumerState<ListDetailScreen> {
 class _ListHeader extends StatelessWidget {
   final dynamic list;
   final bool isDark;
+  final VoidCallback? onCompare;
 
-  const _ListHeader({required this.list, required this.isDark});
+  const _ListHeader({
+    required this.list,
+    required this.isDark,
+    this.onCompare,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -621,6 +642,35 @@ class _ListHeader extends StatelessWidget {
               ],
             ),
           ),
+          if (onCompare != null)
+            Material(
+              color: AppColors.primary.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(12),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: onCompare,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 8),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.compare_arrows,
+                          size: 16, color: AppColors.primary),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Compare',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
