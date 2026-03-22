@@ -166,19 +166,10 @@ class _TripCostCardState extends ConsumerState<TripCostCard> {
               padding: const EdgeInsets.all(14),
               child: Row(
                 children: [
-                  SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: Lottie.asset(
-                      'assets/animations/fuel_pump.json',
-                      fit: BoxFit.contain,
-                      repeat: false,
-                      errorBuilder: (_, __, ___) => const Icon(
-                        Icons.local_gas_station,
-                        color: AppColors.primary,
-                        size: 20,
-                      ),
-                    ),
+                  const Icon(
+                    Icons.local_gas_station,
+                    color: AppColors.primary,
+                    size: 22,
                   ),
                   const SizedBox(width: 10),
                   Text(

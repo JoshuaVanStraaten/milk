@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../data/models/user_profile.dart';
 import '../../data/repositories/auth_repository.dart';
+import 'vehicle_config_provider.dart';
 
 /// Provider for the AuthRepository instance
 /// This creates a single shared instance of AuthRepository
@@ -85,6 +86,9 @@ class AuthNotifier extends StateNotifier<AsyncValue<UserProfile?>> {
       // Set success state with user profile
       state = AsyncValue.data(profile);
 
+      // Reload vehicle config for the new user
+      _ref.read(vehicleConfigProvider.notifier).reload();
+
       // Invalidate the profile provider so it refetches with the correct display name
       _ref.invalidate(currentUserProfileProvider);
     } catch (e, stackTrace) {
@@ -104,6 +108,7 @@ class AuthNotifier extends StateNotifier<AsyncValue<UserProfile?>> {
       );
 
       state = AsyncValue.data(profile);
+      _ref.read(vehicleConfigProvider.notifier).reload();
     } catch (e, stackTrace) {
       state = AsyncValue.error(e, stackTrace);
     }
@@ -134,6 +139,7 @@ class AuthNotifier extends StateNotifier<AsyncValue<UserProfile?>> {
 
       if (profile != null) {
         state = AsyncValue.data(profile);
+        _ref.read(vehicleConfigProvider.notifier).reload();
       } else {
         state = const AsyncValue.data(null);
       }
@@ -148,6 +154,7 @@ class AuthNotifier extends StateNotifier<AsyncValue<UserProfile?>> {
 
     try {
       await _authRepository.signOut();
+      _ref.read(vehicleConfigProvider.notifier).reload();
       state = const AsyncValue.data(null);
     } catch (e, stackTrace) {
       state = AsyncValue.error(e, stackTrace);

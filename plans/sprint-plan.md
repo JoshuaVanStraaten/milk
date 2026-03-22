@@ -408,99 +408,69 @@ Frozen | Food Cupboard | Snacks | Beverages
 > - SPAR2U SA app backend remains unknown (APK decompilation blocked by download site JS)
 > - **Revisit if:** SPAR launches a centralized e-commerce platform, or someone captures SPAR2U network traffic via mitmproxy/HTTP Toolkit
 
-#### 11a. API Research & Edge Functions
+#### Sprint 11.1: Makro — IN PROGRESS
 
-Each retailer needs a Supabase Edge Function that proxies product search + category browse. Research in order — once one is cracked, build the Edge Function before moving to the next.
+**Edge Function** (`supabase/functions/products-makro/index.ts`) — DEPLOYED
 
-**Makro** (`products-makro/index.ts`) — Sprint 11.1
+- Flipkart Commerce Cloud API (`POST https://www.makro.co.za/fccng/api/4/page/fetch`)
+- No auth needed — browser-like headers only (user-agent, origin, referer)
+- Search: `pageUri: "/search?q={query}&store=eat"` — 40 products/page
+- Category browse: `pageUri: "/food-products/pr?sid=eat"` with search-based mapping
+- Pagination via `pageContext.pageNumber` + `paginatedFetch: true` for page 2+
+- Product data from `RESPONSE.slots[].widget.data.products[].productInfo.value`
+- National pricing (no per-store prices — 22 warehouse stores)
+- **Promo detection fix:** priceTag filtering only uses tags with actual discount keywords (off, save, %, for r, was r, half price) — prevents false positives from "New", "Best Seller", "Bundle Deal" labels
+- **Home screen integration:** Multi-page fetch (4 pages) for Makro since promos are sparse; parses "X% off - Was RY.YY" and "Save RX.XX" promo formats
+- **Browse promo filter fix:** Shows skeleton loading while auto-fetching more pages instead of flashing "No promos" between fetches
 
-- Research Makro online shopping API (makro.co.za)
-- Makro is a Massmart/Walmart subsidiary — likely has a modern e-commerce backend
-- Bulk/wholesale pricing is a differentiator — capture unit price vs pack price if available
-- Identify product search endpoint, pagination, category structure
-- Build Edge Function with same interface as existing retailers (query, category, page params → standardized product JSON)
-- Map Makro categories to shared category set (Fruit & Veg, Dairy & Eggs, Meat & Poultry, Bakery, Frozen, Food Cupboard, Snacks, Beverages)
-- Store locations: scrape/collect Makro warehouse locations (fewer stores but high-value)
+**Flutter Registration** — DONE
 
-**Dis-Chem** (`products-dischem/index.ts`) — Sprint 11.2
+- `retailers.dart` — Makro added with brand color, icon, slug, edge function name
+- `app_colors.dart` — `makro = Color(0xFF003DA5)` (Makro blue)
+- `product_categories.dart` — Makro category mappings (search-based, not facet-based)
 
-- Research Dis-Chem online API (dischem.co.za)
-- Dis-Chem is pharmacy-first but has a large grocery/health food/snacks section
-- Focus on food & beverage categories initially, expand to health supplements later
-- Build Edge Function with standardized interface
-- Store locations: scrape Dis-Chem store locator
+**Remaining for 11.1:**
 
-**Clicks** (`products-clicks/index.ts`) — Sprint 11.3
+- Store database: compile 22 Makro warehouse locations (name, lat, lng, address, city, province) from makro.co.za/pages/store-finder
+- Import to Supabase `stores` table with PostGIS location column
+- Verify `stores-nearby` edge function returns nearest Makro
+- Image handling: Makro images load directly (FCC CDN URLs with `{@width}/{@height}/{@quality}` placeholders replaced with 312/312/70) — no proxy needed
+- On-device testing: browse, search, category filter, price compare, recipe export
 
-- Research Clicks online API (clicks.co.za)
-- Clicks is pharmacy-first with limited grocery — focus on health foods, beverages, snacks, baby food
-- Build Edge Function with standardized interface
-- Note: Clicks may have fewer grocery categories than other retailers — map what's available
-- Store locations: scrape Clicks store locator
+#### Sprint 11.2: Dis-Chem — NOT STARTED
 
-**Common for all 3:**
+- Magento 2 REST API (`GET https://www.dischem.co.za/rest/V1/products?searchCriteria[...]`)
+- No auth needed — fully open public API
+- Search via `name` field with `like` condition, pagination via `pageSize` + `currentPage`
+- Image: `https://www.dischem.co.za/media/catalog/product/{path}` from `media_gallery_entries[].file`
+- Categories API: `GET /rest/V1/categories` — full tree, no auth
+- Limited grocery range — primarily health food, supplements, baby, snacks
+- 318 stores nationwide
 
-- CORS headers matching existing pattern
-- CSRF/cookie bypass if needed (document approach per retailer)
-- HTML entity decoding in product names
-- Image URL handling (direct URLs or proxy needed?)
-- Deploy with `supabase functions deploy`
-- I will login with `supabase login`. When you deploy, you need to prefix the cmds with `npx ...`
+#### Sprint 11.3: Clicks — NOT STARTED (DEFERRED)
 
-#### 11b. Retailer Config Registration
+- SAP Hybris + Algolia search — requires Algolia key extraction from browser DevTools
+- Limited grocery — food cupboard, snacks, chocolates only
+- 600+ stores
+- **Action needed:** Open clicks.co.za, search for a product, capture `X-Algolia-Application-Id`, `X-Algolia-API-Key`, and index name from network requests
 
-**File:** `lib/core/constants/retailers.dart`
+#### Common remaining tasks (11b-11h)
 
-- Add `Makro`, `Dis-Chem`, `Clicks` to `Retailers.all` map
-- Brand colors, icons, slugs, edge function names
+**11b. Retailer Config** — Makro DONE, Dis-Chem/Clicks pending
 
-**File:** `lib/core/theme/app_colors.dart`
+**11c. Store Database** — Makro pending (22 stores), Dis-Chem/Clicks pending
 
-- Add brand colors: Makro (blue #003DA5), Dis-Chem (green #00A94F), Clicks (blue #005BAA)
+**11d. Category Mapping** — Makro DONE, Dis-Chem/Clicks pending
 
-#### 11c. Store Database
+**11e. Price Comparison** — Works out-of-the-box (retailer-agnostic matching). Tab scrolling needed for 5+ retailer tabs in comparison sheet.
 
-- Scrape/collect store locations for Makro, Dis-Chem, Clicks (lat/lng, name, province, city)
-- Scripts in `database/all_stores/` following existing pattern
-- Import to Supabase `stores` table with PostGIS `location` column
-- Update `stores-nearby` Edge Function to include new retailers in `find_all_nearest_stores` RPC
+**11f. Recipe Matching** — Retailer-agnostic, should work as-is. May need ingredient_lookup.dart expansion for Makro bulk naming conventions.
 
-#### 11d. Category Mapping
+**11g. Image Handling** — Makro: direct CDN URLs work. Dis-Chem/Clicks: TBD.
 
-**File:** `lib/core/constants/product_categories.dart`
+**11h. Testing** — 105 matching tests passing. Cross-retailer tests needed after Dis-Chem/Clicks data available.
 
-- Add Makro/Dis-Chem/Clicks category mappings to cross-retailer category map
-- Dis-Chem/Clicks may not have all 8 categories — gracefully handle missing ones (hide category chip when browsing those retailers)
-- Makro may have bulk-only categories — decide whether to include or filter
-
-#### 11e. Price Comparison Integration
-
-- `SmartMatchingService` / `ProductNameParser` should work out-of-the-box (retailer-agnostic)
-- **Open question:** Do Makro bulk sizes (e.g. 5kg flour) match against normal grocery sizes (1kg, 2.5kg)? May need size-normalization logic to show per-unit price comparisons
-- Retailer comparison sheet (`retailer_comparison_sheet.dart`) — add 3 new tabs (7 total)
-- Consider tab scrolling or 2-row layout for 7 retailers
-- Update `RetailerComparisonNotifier` to search all 7 retailers
-
-#### 11f. Recipe Matching Impact
-
-- `SmartMatchingService.matchIngredient()` is retailer-agnostic — should work as-is
-- `ingredient_lookup.dart` search hints may need expansion if new retailers use different product naming conventions (e.g. Makro bulk names like "FLOUR CAKE 10KG" vs PnP "Sasko Cake Flour 2.5kg")
-- `RetailerComparisonNotifier.runComparison()` — add new retailers to the comparison loop
-- **Test after data is available** — run existing 95 matching tests against products from new retailers to identify gaps
-
-#### 11g. Image Handling
-
-- Test if Makro/Dis-Chem/Clicks images load directly or need proxy
-- If proxy needed, update `image-proxy/index.ts` to handle new retailer URL patterns
-- If direct URLs work, no changes needed
-
-#### 11h. Testing
-
-- Update `test/product_matching_test.dart` with cross-retailer match cases for new retailers
-- Manual test: browse, search, category filter, price compare, recipe export for each new retailer
-- Verify store-nearby returns correct nearest store for all 7 retailers
-
-**Estimated complexity:** High — each retailer is essentially a mini-project (API research + Edge Function + store data + testing). Tackle as sub-sprints: 11.1-Makro, 11.2-DisChem, 11.3-Clicks.
+**Estimated complexity:** High — each retailer is a mini-project. Tackle as sub-sprints: 11.1-Makro, 11.2-DisChem, 11.3-Clicks.
 
 ---
 
@@ -522,6 +492,18 @@ Each retailer needs a Supabase Edge Function that proxies product search + categ
 - Dark mode audit (all screens)
 - Use `ui-ux-pro-max` skill for comprehensive review
 - Verify retailer branding consistency for Makro, Dis-Chem, Clicks
+
+#### Sprint 12.8: Makro Promo & Home Screen Fixes (2026-03-21)
+
+**Completed:**
+
+- **Makro promo filter fix** — Edge function priceTag filtering was falsely marking non-promo products (tagged "New", "Best Seller") as on-sale. Fixed to only use tags with discount keywords (off, save, %, for r, was r, half price).
+- **Browse promo skeleton loading** — Promo filter now shows skeleton while auto-fetching more pages for retailers with sparse promos (Makro), instead of flashing "No promos found" between page fetches.
+- **Makro deals on home screen** — Multi-page fetch (4 pages) since Makro promos are sparse. Added parsing for "X% off - Was RY.YY" and "Save RX.XX" promo formats.
+- **Hot deals expanded** — Increased from 8 to 20 deals shown. Retailer sections show all deals (removed `.take(6)` cap).
+- **Retailer ordering** — Grocery-first, pharmacy-last in home screen sections.
+- **Strawberry/cream mismatch fix** — "PnP Double Cream Strawberries & Cream" (dessert) no longer matches as "Similar" to fresh "Strawberries 400g". Added multi-word phrase detection (`_categoryMismatchPhrases`) for dairy/dessert products.
+- **105 matching tests passing** (up from 95).
 
 ---
 
@@ -676,6 +658,374 @@ void initState() {
 - Verify notes field: keyboard opens, field stays visible, can see text while typing
 - Verify "Add to List" button remains accessible with keyboard open
 - Test both light and dark mode
+
+---
+
+### Sprint 13: Fuel Cost Estimates & Trip Comparison
+
+**Status:** COMPLETED
+
+**Model:** Opus 4.6 (UX design, cost model architecture) → Sonnet 4.6 (implementation)
+**Goal:** Show users the true cost of shopping at each store — product prices + fuel cost for the round trip — and compare against delivery app fees so they can make the smartest choice.
+
+**Completed:**
+- [x] 13a. Vehicle config data model (`vehicle_config.dart`) — VehicleConfig, FuelPrice, FuelCostBreakdown, DeliveryFeeConfig
+- [x] 13b. Fuel prices backend — `fuel_prices` Supabase table + `fuel-prices` Edge Function (scrapes AA AJAX endpoint)
+- [x] 13c. Fuel price client — `FuelPriceService` with 7-day SharedPreferences cache + `fuelPriceProvider`
+- [x] 13d. Fuel cost calculation engine — `FuelCostService` with round-trip fuel + delivery comparison
+- [x] 13e. Profile UI — "My Vehicle" section with vehicle type cards, fuel type dropdown, region chips, Lottie header
+- [x] 13f. Trip Cost card on list detail screen — collapsible per-retailer breakdown with delivery comparison
+- [x] 13g. Browse screen fuel hint — distance + fuel cost subtitle on store picker
+- [x] 13h. Lottie animations — car_driving, car_question, fuel_pump (static icon used for small Trip Cost header)
+- [x] 13i. Vehicle config scoped per user (SharedPreferences keyed by user ID, reloads on login/logout)
+- [x] Bug fix: Checkers Sixty60 delivery fee corrected (not free — R35 base fee)
+
+#### Why this matters
+
+A shopping list might be R12 cheaper at Store A, but if Store A is 15km away and Store B is 2km away, the fuel cost wipes out the savings. Users currently have no visibility into this. Delivery apps (Checkers Sixty60, Woolworths Dash, PnP asap) are an alternative — sometimes cheaper than driving, sometimes not. This feature makes the hidden cost visible.
+
+#### 13a. Data Model — Vehicle & Fuel Configuration
+
+**New model:** `lib/data/models/vehicle_config.dart`
+
+```dart
+enum VehicleType { small, medium, large, suv, custom }
+
+class VehicleConfig {
+  final VehicleType type;
+  final double consumptionPer100km; // L/100km
+  final String label; // "Small Car", "Medium Car", etc.
+}
+```
+
+**Default consumption rates** (SA averages, L/100km):
+| Type | City | Highway | Blended (used) |
+|------|------|---------|-----------------|
+| Small (e.g. VW Polo, Toyota Starlet) | 6.5 | 5.0 | 5.8 |
+| Medium (e.g. Toyota Corolla, Mazda 3) | 8.5 | 6.5 | 7.5 |
+| Large / SUV (e.g. Fortuner, Rav4) | 11.0 | 8.5 | 9.8 |
+| Custom | user-entered | user-entered | user-entered |
+
+**Fuel prices** (SA DoE publishes new prices on the first Wednesday of every month):
+- 93 ULP (inland): R20.19/L (March 2026)
+- 95 ULP (coast): R19.47/L, (inland): R20.30/L
+- Diesel 50ppm (coast): R17.84/L, (inland): R19.17/L
+- Diesel 500ppm (coast): R17.47/L, (inland): R18.78/L
+
+**Storage:** `SharedPreferences` via `VehicleConfigNotifier` (Riverpod). Fields: `vehicleType`, `consumptionPer100km`, `fuelType` (petrol93/petrol95/diesel50/diesel500), `region` (coast/inland — auto-detected from GPS, overridable).
+
+**Fuel price source — live from Supabase (NOT hardcoded):**
+
+SA fuel prices change monthly. Hardcoding would require an app update every month. Instead:
+
+1. **Supabase table `fuel_prices`:**
+   ```sql
+   CREATE TABLE fuel_prices (
+     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+     fuel_type text NOT NULL,        -- 'petrol_93', 'petrol_95', 'diesel_50ppm', 'diesel_500ppm'
+     region text NOT NULL,           -- 'coast', 'inland'
+     price_per_litre numeric NOT NULL,
+     effective_date date NOT NULL,   -- first Wednesday of month
+     created_at timestamptz DEFAULT now()
+   );
+   ```
+
+2. **Edge Function `fuel-prices/index.ts`:**
+   - Scrapes latest prices from AA (`aa.co.za/fuel-pricing`) or DoE website on demand
+   - Parses the fuel price table (HTML table or PDF)
+   - Upserts into `fuel_prices` table
+   - Returns current prices as JSON
+   - **Fallback:** If scraping fails, returns most recent prices from the table (always has data)
+
+3. **Cron trigger (Supabase pg_cron or external):**
+   - Runs on the 1st and 2nd Wednesday of each month (covers announcement day + buffer)
+   - Calls the Edge Function to refresh prices
+   - Alternatively: the app calls the Edge Function on launch if cached prices are >30 days old
+
+4. **Flutter client flow:**
+   - On app launch (or first fuel cost calculation), fetch `/fuel-prices`
+   - Cache in SharedPreferences with `lastFetchedDate`
+   - Re-fetch if cache is older than 7 days
+   - Offline fallback: use cached prices (never block the user)
+
+5. **Manual override:** If scraping breaks (website changes), we can manually INSERT new rows into `fuel_prices` via Supabase dashboard — no app update needed.
+
+#### 13b. Cost Calculation Engine
+
+**New service:** `lib/data/services/fuel_cost_service.dart`
+
+```dart
+class FuelCostService {
+  /// Calculate fuel cost for a round trip to a store
+  FuelCostBreakdown calculateTripCost({
+    required double distanceKm,       // one-way, from StoreSelection
+    required VehicleConfig vehicle,
+    required FuelPrice fuelPrice,
+  });
+}
+
+class FuelCostBreakdown {
+  final double distanceKm;           // one-way
+  final double roundTripKm;          // distance * 2
+  final double fuelUsedLitres;       // roundTripKm * (consumption / 100)
+  final double fuelCostRands;        // fuelUsedLitres * pricePerLitre
+  final double wearAndTearRands;     // roundTripKm * aaRatePerKm (optional)
+  final double totalTripCost;        // fuelCost + wearAndTear
+}
+```
+
+**AA rates per km (2026)** — optional "full cost" mode:
+| Vehicle value | Rate/km | Notes |
+|---------------|---------|-------|
+| R100k–R200k | R4.62/km | Includes depreciation, fuel, maintenance, insurance |
+| R200k–R400k | R5.28/km | |
+| R400k–R600k | R6.42/km | |
+
+AA rates are the "true" cost of driving (not just fuel). Show as a toggle: "Include vehicle wear & tear (AA rates)" — defaults OFF, power users can enable.
+
+**Delivery app fees** (hardcoded, updatable):
+| App | Base fee | Free delivery threshold | Notes |
+|-----|----------|------------------------|-------|
+| Checkers Sixty60 | R36 | R500+ (free) | Most popular SA grocery delivery |
+| Woolworths Dash | R45 | R350+ (free) | Premium groceries |
+| PnP asap | R35 | R400+ (free) | Wide coverage |
+
+#### 13c. Vehicle Configuration UI
+
+**Arguments for Profile placement (winner):**
+- Set once, applies everywhere — most users don't change cars often
+- Keeps browse/list screens uncluttered
+- Natural home next to "My Locations" section
+- Matches mental model: "my car" is about me, not about a specific shopping trip
+
+**Arguments for Browse placement:**
+- Discoverability: users might not know the feature exists if buried in Profile
+- Quick switching: rental car, borrowed car, passenger scenarios
+- But: these are edge cases, and a "Change vehicle" link on the cost breakdown handles this
+
+**Decision: Primary config in Profile, with quick-change link on cost breakdowns.**
+
+**Profile screen addition:**
+
+New section "My Vehicle" between "My Locations" and "Appearance":
+- Vehicle type selector: 4 illustrated cards (Small / Medium / Large-SUV / Custom)
+  - Each card shows a simple car silhouette icon + consumption range
+  - Selected card gets emerald green border + checkmark
+- Custom mode: expands a slider or text field for L/100km (range 3.0–20.0, step 0.1)
+- Fuel type dropdown: Petrol 93 / Petrol 95 / Diesel 50ppm / Diesel 500ppm
+- Region: Coast / Inland (auto-detected, with override toggle)
+- "Not sure?" helper text: "Check your car's manual or dashboard for fuel consumption. City driving is usually 6-10 L/100km."
+
+**Lottie animations for vehicle config:**
+- Car driving animation for the vehicle type selector header
+- Fuel pump animation for fuel type section
+- Sources: LottieFiles / IconScout — search "car driving", "fuel pump", "gas station"
+- Suggested: compact 100x100px Lottie in the section header, not full-screen
+
+#### 13d. Shopping List Fuel Cost Breakdown
+
+**Where it appears:** On the `list_detail_screen.dart`, as a collapsible section below the item list.
+
+**Layout — "Trip Cost" card:**
+
+```
+┌─────────────────────────────────────────┐
+│  Trip Cost Estimate                  ▼  │
+│─────────────────────────────────────────│
+│                                         │
+│  Products           R 342.50           │
+│  ┌─ Pick n Pay       R 198.00          │
+│  ├─ Woolworths       R 144.50          │
+│  └─ (no store)       R 0.00            │
+│                                         │
+│  Fuel (2 stores)     R 24.80           │
+│  ┌─ PnP Centurion (3.2km) R 7.40      │
+│  └─ Woolworths Mall (8.1km) R 17.40   │
+│                                         │
+│  ─────────────────────────────────────  │
+│  Total               R 367.30           │
+│                                         │
+│  ┌─ vs Delivery ──────────────────────┐ │
+│  │ Checkers Sixty60    R 36.00        │ │
+│  │ PnP asap            R 35.00        │ │
+│  │ Woolworths Dash     R 45.00        │ │
+│  │                                    │ │
+│  │ Driving saves R 10.20 vs Sixty60   │ │
+│  │ (or costs R 14.80 more than Dash)  │ │
+│  └────────────────────────────────────┘ │
+│                                         │
+│  [Car icon] Medium Car · 7.5 L/100km   │
+│  Petrol 95 inland · R20.30/L  [Change] │
+└─────────────────────────────────────────┘
+```
+
+**UX details:**
+- Collapsed by default — shows just "Trip Cost: R367.30" with expand chevron
+- Expandable to full breakdown
+- "Change" link opens vehicle config (navigates to Profile or opens inline bottom sheet)
+- Color coding: green text when driving is cheaper, red when delivery is cheaper
+- If no vehicle configured: show "Set up your vehicle to see fuel costs" with a car Lottie + "Configure" button
+- Items without a retailer (manually added) are excluded from fuel calculation
+- If all items are from one store, show single-store fuel cost
+- Round trip assumed (home → store → home, for each unique store)
+- Multi-store route: currently sum of individual round trips (conservative). Future: optimize route (home → store A → store B → home)
+
+**Delivery comparison logic:**
+- Only show delivery apps for retailers that have delivery services (Checkers → Sixty60, PnP → asap, Woolworths → Dash)
+- Compare: fuel cost for that retailer's store vs delivery fee
+- If basket total exceeds free delivery threshold, show "FREE delivery" instead of fee
+- Makro/Shoprite/Dis-Chem: no delivery comparison (no mainstream delivery app)
+
+#### 13e. Browse Screen Integration (Lightweight)
+
+**NOT a full vehicle config on browse** — just a subtle fuel cost hint per store.
+
+On the store picker sheet or store info bar, show:
+- "~R7.40 fuel round trip" next to the store distance
+- Only shows if vehicle is configured
+- Tapping opens the full Trip Cost breakdown (or prompts to configure vehicle if not set)
+
+#### 13f. Lottie Animations
+
+| Location | Animation | Size | Source suggestion |
+|----------|-----------|------|-------------------|
+| Vehicle config header (Profile) | Car driving on road | 120x80px | LottieFiles "car driving flat" |
+| Trip Cost card header | Fuel gauge / pump | 48x48px | LottieFiles "fuel pump" |
+| "No vehicle configured" empty state | Car with question mark | 150x150px | LottieFiles "car confused" |
+| Delivery vs Driving verdict | Thumbs up (savings) or warning | 32x32px | Existing Lottie set |
+
+Keep animations subtle — they accent the data, not distract from it. `prefers-reduced-motion` respected (static fallback icon).
+
+#### 13g. Implementation Order
+
+1. **Fuel prices backend** — `fuel_prices` Supabase table + `fuel-prices` Edge Function (scrape AA/DoE, upsert, return JSON)
+2. **Fuel price client** — `FuelPriceService` (fetch + 7-day SharedPreferences cache) + `FuelPriceNotifier` provider
+3. **Data model + service** — `VehicleConfig`, `FuelCostService`, `VehicleConfigNotifier`
+4. **Profile UI** — "My Vehicle" section with vehicle type cards, fuel type, region
+5. **List breakdown** — Trip Cost card on `list_detail_screen.dart`
+6. **Delivery comparison** — within Trip Cost card
+7. **Browse hint** — fuel cost hint on store picker
+8. **Lottie animations** — source and integrate
+9. **Testing** — unit tests for `FuelCostService`, Edge Function curl test, manual on-device testing
+
+#### 13h. Files to Create/Modify
+
+| File | Action |
+|------|--------|
+| `supabase/functions/fuel-prices/index.ts` | **Create** — scrape AA/DoE fuel prices, upsert to Supabase |
+| `database/migrations/create_fuel_prices.sql` | **Create** — `fuel_prices` table schema |
+| `lib/data/models/vehicle_config.dart` | **Create** — VehicleConfig, FuelPrice, FuelCostBreakdown models |
+| `lib/data/services/fuel_cost_service.dart` | **Create** — calculation engine |
+| `lib/data/services/fuel_price_service.dart` | **Create** — fetch + cache fuel prices from Supabase |
+| `lib/presentation/providers/vehicle_provider.dart` | **Create** — VehicleConfigNotifier + SharedPreferences persistence |
+| `lib/presentation/providers/fuel_price_provider.dart` | **Create** — FuelPriceNotifier with 7-day cache |
+| `lib/presentation/screens/profile/profile_screen.dart` | Modify — add "My Vehicle" section |
+| `lib/presentation/screens/lists/list_detail_screen.dart` | Modify — add Trip Cost breakdown card |
+| `lib/presentation/widgets/lists/trip_cost_card.dart` | **Create** — the collapsible cost breakdown widget |
+| `lib/presentation/screens/products/live_browse_screen.dart` | Modify — fuel hint on store info |
+| `lib/core/constants/app_constants.dart` | Modify — delivery fee constants |
+| `assets/lottie/car_driving.json` | **Create** — source from LottieFiles |
+| `assets/lottie/fuel_pump.json` | **Create** — source from LottieFiles |
+| `test/fuel_cost_test.dart` | **Create** — unit tests for FuelCostService |
+
+---
+
+### Sprint 14: List Price Comparison from Browse
+
+**Model:** Opus 4.6 (UX flow design) → Sonnet 4.6 (implementation)
+**Goal:** Let users compare an entire shopping list's prices across retailers from a single browse-like view — find the cheapest store for the whole basket, not just individual items.
+
+#### Why this matters
+
+Currently, users can compare prices for individual products (tap → detail → compare). But they can't answer: "Where is my entire shopping list cheapest?" without manually comparing each item. The recipe comparison sheet does this for recipes — this extends the same concept to any shopping list.
+
+#### 14a. Entry Point — "Compare List" Button
+
+**Where:** `list_detail_screen.dart` — new action in the AppBar or as a prominent button.
+
+**Options considered:**
+
+1. **AppBar action icon** (compare_arrows) — consistent with product compare pattern, non-intrusive
+2. **FAB long-press option** — discoverable but hidden
+3. **Button below list total** — visible but takes space
+
+**Decision: AppBar action icon** — matches the existing compare paradigm. Icon: `Icons.compare_arrows`. Only enabled when list has 2+ items with retailer assignments.
+
+#### 14b. Comparison View — Full-Screen Sheet
+
+Opens a full-screen bottom sheet (like the recipe retailer comparison sheet) showing:
+
+```
+┌─────────────────────────────────────────┐
+│  Compare List Prices          X close   │
+│─────────────────────────────────────────│
+│  [PnP] [Woolworths] [Checkers] [Shoprite]│
+│  ─────────────────────────────────────  │
+│                                         │
+│  Pick n Pay — R342.50         [Cheapest]│
+│                                         │
+│  Full Cream Milk 2L        R 32.99      │
+│  Large Eggs 18s            R 54.99      │
+│  Sasko Cake Flour 2.5kg   R 34.99      │
+│  ... (all items)                        │
+│  Items not found (2)       ──────       │
+│  ┌ Vanilla Essence         No match     │
+│  └ Fresh Basil             No match     │
+│                                         │
+│  ─────────────────────────────────────  │
+│  Subtotal (8/10 items)     R 342.50     │
+│  + Fuel (PnP Centurion)   R 7.40       │
+│  ─────────────────────────────────────  │
+│  Total                     R 349.90     │
+│                                         │
+│  [  Shop at Pick n Pay  ]               │
+└─────────────────────────────────────────┘
+```
+
+**Key UX decisions:**
+
+- Reuses `RetailerComparisonNotifier` pattern — searches each item across all retailers
+- Per-retailer tab shows: matched items + prices, unmatched items, subtotal
+- Integrates fuel cost from Sprint 13 (if vehicle configured)
+- "Cheapest" badge on the tab with lowest total (products + fuel)
+- Tapping an item row opens product swap (same as recipe comparison — find alternative at that retailer)
+- "Shop at X" button could: (a) create a new list with all items re-assigned to that retailer, or (b) just close and show a summary
+
+**Difference from recipe comparison:**
+- Recipe comparison searches by ingredient name (fuzzy). List comparison searches by exact product name (already matched).
+- Recipe comparison creates a new list. List comparison re-prices an existing list.
+- List comparison includes fuel costs. Recipe comparison doesn't (yet — could add in future).
+
+#### 14c. Search Strategy
+
+For each list item, search the target retailer's API:
+- If item has a product name from a retailer (e.g. "PnP Full Cream Milk 2L"), search for it at other retailers
+- Use `ProductNameParser` to extract the generic name (strip brand, keep size) for cross-retailer search
+- Use `SmartMatchingService` for scoring matches (same as price compare)
+- Sequential per-retailer to avoid API flood (same pattern as recipe comparison)
+
+#### 14d. Implementation Order
+
+1. **"Compare List" button** — AppBar action on `list_detail_screen.dart`
+2. **ListComparisonNotifier** — Riverpod provider that searches all items across all retailers
+3. **ListComparisonSheet** — full-screen bottom sheet with retailer tabs (reuse `retailer_comparison_sheet.dart` patterns)
+4. **Fuel cost integration** — pull from Sprint 13's `FuelCostService`
+5. **Product swap** — tap item → open matching sheet for that retailer
+6. **Testing** — manual on-device
+
+#### 14e. Files to Create/Modify
+
+| File | Action |
+|------|--------|
+| `lib/presentation/providers/list_comparison_provider.dart` | **Create** — ListComparisonNotifier |
+| `lib/presentation/widgets/lists/list_comparison_sheet.dart` | **Create** — comparison UI |
+| `lib/presentation/screens/lists/list_detail_screen.dart` | Modify — add compare button |
+| `lib/presentation/providers/list_provider.dart` | Modify — expose list items for comparison |
+
+#### 14f. Dependency
+
+- Sprint 13 (Fuel Cost Estimates) should be done first so the comparison includes fuel costs
+- If Sprint 13 isn't done yet, the comparison works without fuel — just product totals per retailer
 
 ---
 
