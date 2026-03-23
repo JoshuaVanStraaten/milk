@@ -171,7 +171,26 @@ class ListRepository {
           .eq('ShoppingList_ID', listId)
           .single();
 
-      final list = ShoppingList.fromJson(response);
+      var list = ShoppingList.fromJson(response);
+
+      // If the current user is not the owner, look up the owner's email
+      final currentUserId = SupabaseConfig.currentUser?.id;
+      if (currentUserId != null && list.userId != currentUserId) {
+        try {
+          final ownerProfile = await _supabase
+              .from('user_profiles')
+              .select('email_address')
+              .eq('id', list.userId)
+              .maybeSingle();
+          if (ownerProfile != null) {
+            list = list.copyWith(
+              ownerEmail: ownerProfile['email_address'] as String,
+            );
+          }
+        } catch (e) {
+          _logger.w('Could not fetch owner email: $e');
+        }
+      }
 
       _logger.i('✅ Fetched list: ${list.listName}');
 
@@ -203,6 +222,11 @@ class ListRepository {
   Future<void> deleteList(String listId) async {
     try {
       _logger.i('Deleting list: $listId');
+
+      // Verify current user owns this list
+      if (!await isListOwner(listId)) {
+        throw Exception('You do not have permission to delete this list');
+      }
 
       // Delete all items first
       await _supabase
@@ -420,6 +444,11 @@ class ListRepository {
 
       _logger.i('Sharing list $listId with $normalizedEmail');
 
+      // Verify current user owns this list
+      if (!await isListOwner(listId)) {
+        throw Exception('You do not have permission to share this list');
+      }
+
       // Get the list details
       final list = await getListById(listId);
 
@@ -435,20 +464,9 @@ class ListRepository {
       _logger.d('User lookup response: $userResponse');
 
       if (userResponse == null) {
-        // Let's also try to see what users exist (for debugging)
-        _logger.w('User not found. Attempting debug query...');
-
-        // Try a broader search to see if any users exist
-        final allUsersResponse = await _supabase
-            .from('user_profiles')
-            .select('id, email_address')
-            .limit(5);
-
-        _logger.d('Sample users in database: $allUsersResponse');
-
         throw Exception(
-          'No user found with email: $normalizedEmail. '
-          'Make sure the user has signed up and their profile exists.',
+          'No user found with that email. '
+          'Make sure they have signed up for Milk first.',
         );
       }
 

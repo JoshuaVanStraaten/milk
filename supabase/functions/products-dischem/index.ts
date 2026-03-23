@@ -13,7 +13,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const KLEVU_ENDPOINT =
   "https://eucs7.ksearchnet.com/cloud-search/n-search/search";
-const KLEVU_TICKET = "klevu-15264750100467933";
+const KLEVU_TICKET = Deno.env.get("KLEVU_TICKET") || "";
 
 // Category → search term mapping
 // Dis-Chem is pharmacy-first — categories match their product strengths
@@ -28,7 +28,7 @@ const DISCHEM_CATEGORY_SEARCH: Record<string, string> = {
 };
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": "https://sfnavipqilqgzmtedfuh.supabase.co",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
 };

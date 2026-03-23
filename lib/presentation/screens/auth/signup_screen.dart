@@ -136,7 +136,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => context.go('/login'),
         ),
       ),
       body: SafeArea(
@@ -241,11 +241,11 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                 // Password Field
                 AppTextField(
                   label: 'Password',
-                  hint: 'At least 6 characters',
+                  hint: 'At least 8 characters (letter + number)',
                   controller: _passwordController,
                   isPassword: true,
                   prefixIcon: Icons.lock_outlined,
-                  validator: Validators.password,
+                  validator: Validators.newPassword,
                 ),
 
                 const SizedBox(height: 20),

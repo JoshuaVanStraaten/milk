@@ -1,5 +1,7 @@
 // lib/core/constants/live_api_config.dart
 
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 /// Configuration for the Live API proxy (POC Supabase project).
 ///
 /// This is a SEPARATE Supabase project from the production one.
@@ -10,15 +12,13 @@
 /// Eventually these Edge Functions will be migrated to the production
 /// Supabase project, at which point this config can be consolidated.
 class LiveApiConfig {
-  /// POC Supabase project URL
-  static const String supabaseUrl = 'https://pjqbvrluyvqvpegxumsd.supabase.co';
+  /// POC Supabase project URL (loaded from .env)
+  static String get supabaseUrl =>
+      dotenv.env['POC_SUPABASE_URL'] ?? 'https://pjqbvrluyvqvpegxumsd.supabase.co';
 
-  /// POC Supabase anon key (safe to embed — RLS enforced server-side)
-  static const String supabaseAnonKey =
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9'
-      '.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBqcWJ2cmx1eXZxdnBlZ3h1bXNkIiwi'
-      'cm9sZSI6ImFub24iLCJpYXQiOjE3Mjg1NzE0MTUsImV4cCI6MjA0NDE0NzQxNX0'
-      '.QXeQ-QEeUnOJF8l-tAJIELd08CokVqa1iKu0TLw5P_Q';
+  /// POC Supabase anon key (loaded from .env)
+  static String get supabaseAnonKey =>
+      dotenv.env['POC_SUPABASE_ANON_KEY'] ?? '';
 
   /// Build the full URL for an Edge Function.
   ///

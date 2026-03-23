@@ -16,7 +16,7 @@ const PROD_URL = `https://${PROD_PROJECT}.supabase.co`;
 const PROD_SERVICE_KEY = Deno.env.get("IMAGE_STORAGE_SERVICE_KEY") || "";
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": "https://sfnavipqilqgzmtedfuh.supabase.co",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
 };

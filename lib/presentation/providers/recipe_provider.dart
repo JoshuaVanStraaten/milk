@@ -13,6 +13,7 @@ import '../../data/models/live_product.dart';
 import '../../data/repositories/recipe_repository.dart';
 import '../../data/services/gemini_service.dart';
 import '../../data/services/ingredient_lookup.dart';
+import '../../data/services/product_name_parser.dart';
 import '../../core/constants/retailers.dart';
 import 'store_provider.dart'; // includes smartMatchingServiceProvider
 
@@ -932,6 +933,27 @@ class RetailerComparisonNotifier
       // with too many parallel requests (4 retailers × N ingredients = 4N calls).
       final results = <MapEntry<String, IngredientProductMatch?>>[];
       for (final ingredient in selectedIngredients) {
+        // If this ingredient was already matched at this retailer, reuse the
+        // existing match directly so prices stay consistent with the recipe.
+        if (ingredient.matchedRetailer == retailerName &&
+            ingredient.matchedProductPrice != null &&
+            ingredient.matchedProductPrice! > 0) {
+          results.add(MapEntry(
+            ingredient.ingredientId!,
+            IngredientProductMatch(
+              productIndex:
+                  '$retailerName:${ingredient.matchedProductName ?? ingredient.ingredientName}',
+              productName:
+                  ingredient.matchedProductName ?? ingredient.ingredientName,
+              productPrice: 'R${ingredient.matchedProductPrice!.toStringAsFixed(2)}',
+              productImageUrl: null,
+              retailer: retailerName,
+              similarityScore: 1.0,
+            ),
+          ));
+          continue;
+        }
+
         try {
           final query = RecipeGenerationNotifier._cleanIngredientForSearch(
             ingredient.ingredientName,
@@ -943,15 +965,33 @@ class RetailerComparisonNotifier
                 query: apiQuery,
                 store: store,
                 retailer: retailerName,
-                pageSize: 10,
+                pageSize: 15,
               )
               .timeout(const Duration(seconds: 12));
 
           final products = response.products;
 
+          // Use the matched product's size as target for cross-retailer
+          // comparison so all retailers match similar sizes (e.g. if PnP
+          // matched 750ml oil, Shoprite should also target ~750ml, not 5L).
+          double? targetQty = ingredient.quantity;
+          String? targetUnit = ingredient.unit;
+          if (ingredient.matchedProductName != null) {
+            final matchedParsed = ProductNameParser.parse(
+              ingredient.matchedProductName!,
+            );
+            if (matchedParsed.sizeValue != null &&
+                matchedParsed.sizeUnit != null) {
+              targetQty = matchedParsed.totalSize ?? matchedParsed.sizeValue;
+              targetUnit = matchedParsed.sizeUnit;
+            }
+          }
+
           final best = await smartMatcher.matchIngredient(
             ingredientName: query,
             candidates: products,
+            ingredientQuantity: targetQty,
+            ingredientUnit: targetUnit,
             hint: hint,
           );
 

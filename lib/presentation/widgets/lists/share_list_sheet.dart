@@ -12,6 +12,7 @@ void showShareListSheet(
   WidgetRef ref, {
   required String listId,
   required String listName,
+  String? ownerEmail,
 }) {
   showModalBottomSheet(
     context: context,
@@ -21,6 +22,7 @@ void showShareListSheet(
     builder: (_) => _ShareListSheet(
       listId: listId,
       listName: listName,
+      ownerEmail: ownerEmail,
     ),
   );
 }
@@ -28,10 +30,12 @@ void showShareListSheet(
 class _ShareListSheet extends ConsumerStatefulWidget {
   final String listId;
   final String listName;
+  final String? ownerEmail;
 
   const _ShareListSheet({
     required this.listId,
     required this.listName,
+    this.ownerEmail,
   });
 
   @override
@@ -294,7 +298,7 @@ class _ShareListSheetState extends ConsumerState<_ShareListSheet> {
               child: const Icon(Icons.person, color: AppColors.primary),
             ),
             title: Text(
-              currentEmail ?? 'You',
+              widget.ownerEmail ?? currentEmail ?? 'You',
               style: TextStyle(
                 color: isDark
                     ? AppColors.textPrimaryDark
@@ -318,9 +322,14 @@ class _ShareListSheetState extends ConsumerState<_ShareListSheet> {
             ),
           ),
 
-          // Shared users list
+          // Shared users list (exclude the owner)
           sharedUsers.when(
-            data: (users) {
+            data: (allUsers) {
+              final ownerAddr = (widget.ownerEmail ?? currentEmail ?? '')
+                  .toLowerCase();
+              final users = allUsers
+                  .where((e) => e.toLowerCase() != ownerAddr)
+                  .toList();
               if (users.isEmpty) {
                 return Padding(
                   padding: const EdgeInsets.symmetric(vertical: 16),

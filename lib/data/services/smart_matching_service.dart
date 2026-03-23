@@ -329,9 +329,21 @@ class SmartMatchingService {
     if (ingredientQuantity != null &&
         ingredientQuantity > 0 &&
         ingredientUnit != null) {
-      final neededMl = _toBaseUnit(ingredientQuantity, ingredientUnit);
-      if (neededMl != null) {
-        return _pickBestSize(viable, neededMl);
+      final neededBase = _toBaseUnit(ingredientQuantity, ingredientUnit);
+      if (neededBase != null) {
+        // Pre-filter: remove candidates with unreasonable sizes.
+        // Cap at 3x needed with a ceiling of 2500g/ml. When the target is
+        // a matched product size (e.g. 750ml), this allows up to 2250ml.
+        // When it's a small recipe qty (e.g. 50g), allows up to 150g.
+        final maxSize = (neededBase * 3.0).clamp(0, 2500.0);
+        final sizeFiltered = viable.where((entry) {
+          final parsed = ProductNameParser.parse(entry.$1.name);
+          final productBase = _productToBaseUnit(parsed);
+          if (productBase == null) return true; // keep if size unknown
+          return productBase <= maxSize;
+        }).toList();
+        final candidates = sizeFiltered.isNotEmpty ? sizeFiltered : viable;
+        return _pickBestSize(candidates, neededBase);
       }
     }
 
@@ -384,8 +396,11 @@ class SmartMatchingService {
       final productBase = _productToBaseUnit(parsed);
       if (productBase == null) continue;
 
-      // Prefer smallest product that's >= needed
-      if (productBase >= neededBase && productBase < bestFitSize) {
+      // Prefer smallest product that's >= needed, capped at max reasonable size
+      final maxSize = (neededBase * 3.0).clamp(0, 2500.0);
+      if (productBase >= neededBase &&
+          productBase < bestFitSize &&
+          productBase <= maxSize) {
         bestFit = (product, productBase);
         bestFitSize = productBase;
       }
@@ -442,11 +457,13 @@ class SmartMatchingService {
     'crouton', 'crumb', 'pie', 'tart',
     // Drinks
     'juice', 'drink', 'cooldrink', 'cordial', 'squash', 'soda',
-    // Cleaning / non-food / personal care
+    // Cleaning / non-food / personal care / beauty
     'dishwasher', 'detergent', 'cleaner', 'soap', 'shampoo', 'bleach',
     'laundry', 'fabric', 'softener', 'sanitizer', 'disinfectant',
     'bath', 'lotion', 'moistur', 'teeth', 'toothbrush', 'toothpaste',
     'deodorant', 'nappy', 'diaper', 'wipe',
+    'parfum', 'perfume', 'cologne', 'cashmere', 'candle', 'fragrance',
+    'cosmetic', 'lipstick', 'mascara', 'skincare',
     // Seafood (disqualifies when ingredient isn't seafood)
     'mussel', 'oyster', 'prawn', 'anchovy', 'sardine',
     // Condiments/sauces/processed (when matching fresh/basic ingredients)

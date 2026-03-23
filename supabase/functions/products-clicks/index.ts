@@ -11,8 +11,8 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
-const ALGOLIA_APP_ID = "J5E3VS7IJ5";
-const ALGOLIA_API_KEY = "fe59c1bdb3fab89368efb742f9e7f31a";
+const ALGOLIA_APP_ID = Deno.env.get("ALGOLIA_APP_ID") || "";
+const ALGOLIA_API_KEY = Deno.env.get("ALGOLIA_API_KEY") || "";
 const ALGOLIA_INDEX = "Prod_ProductIndex";
 const ALGOLIA_URL = `https://${ALGOLIA_APP_ID.toLowerCase()}-dsn.algolia.net/1/indexes/*/queries`;
 
@@ -29,7 +29,7 @@ const CLICKS_CATEGORY_SEARCH: Record<string, string> = {
 };
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": "https://sfnavipqilqgzmtedfuh.supabase.co",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
 };

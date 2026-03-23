@@ -755,12 +755,12 @@ class IngredientLookup {
     'vanilla essence': IngredientSearchHint(
       searchQuery: 'vanilla essence',
       requiredWords: {'vanilla', 'essence'},
-      excludeWords: {'porridge', 'yoghurt', 'ice'},
+      excludeWords: {'porridge', 'yoghurt', 'ice', 'parfum', 'perfume', 'cashmere', 'candle', 'body', 'bath', 'lotion'},
     ),
     'vanilla extract': IngredientSearchHint(
       searchQuery: 'vanilla essence',
       requiredWords: {'vanilla', 'essence'},
-      excludeWords: {'porridge', 'yoghurt', 'ice'},
+      excludeWords: {'porridge', 'yoghurt', 'ice', 'parfum', 'perfume', 'cashmere', 'candle', 'body', 'bath', 'lotion'},
     ),
     'cornflour': IngredientSearchHint(
       searchQuery: 'maizena cornflour',

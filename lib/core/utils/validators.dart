@@ -18,14 +18,31 @@ class Validators {
     return null; // null means validation passed
   }
 
-  /// Validate password
+  /// Validate password for login (lenient — let Supabase handle auth)
   static String? password(String? value) {
     if (value == null || value.isEmpty) {
       return 'Password is required';
     }
 
-    if (value.length < 6) {
-      return 'Password must be at least 6 characters';
+    return null;
+  }
+
+  /// Validate password for signup (strict — enforce complexity)
+  static String? newPassword(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Password is required';
+    }
+
+    if (value.length < 8) {
+      return 'Password must be at least 8 characters';
+    }
+
+    if (!RegExp(r'[a-zA-Z]').hasMatch(value)) {
+      return 'Password must contain at least one letter';
+    }
+
+    if (!RegExp(r'[0-9]').hasMatch(value)) {
+      return 'Password must contain at least one number';
     }
 
     return null;

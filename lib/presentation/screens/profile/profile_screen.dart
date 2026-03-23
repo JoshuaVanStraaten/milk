@@ -222,17 +222,6 @@ class ProfileScreen extends ConsumerWidget {
                   ),
                 ],
 
-                const SizedBox(height: 12),
-
-                _InfoCard(
-                  icon: Icons.mail_outline,
-                  title: 'Mailing List',
-                  subtitle: profile.mailingList
-                      ? 'Subscribed'
-                      : 'Not subscribed',
-                  isDark: isDark,
-                ),
-
                 const SizedBox(height: 40),
 
                 // Sign Out Button

@@ -509,7 +509,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                       config: config,
                       deals: entry.value,
                       isDark: isDark,
-                      onViewAll: () => context.go('/stores'),
+                      onViewAll: () {
+                        ref.read(selectedRetailerProvider.notifier).state = entry.key;
+                        context.go('/stores');
+                      },
                     ),
                   ),
                 );

@@ -20,7 +20,8 @@ class MyListsScreen extends ConsumerStatefulWidget {
   ConsumerState<MyListsScreen> createState() => _MyListsScreenState();
 }
 
-class _MyListsScreenState extends ConsumerState<MyListsScreen> {
+class _MyListsScreenState extends ConsumerState<MyListsScreen>
+    with WidgetsBindingObserver {
   final Set<String> _selectedIds = {};
   bool get _isSelectionMode => _selectedIds.isNotEmpty;
 
@@ -30,9 +31,27 @@ class _MyListsScreenState extends ConsumerState<MyListsScreen> {
   final _firstListCardKey = GlobalKey();
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // Refresh lists whenever this screen is built (e.g. navigating back)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.invalidate(userListsProvider);
+    });
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _tutorialCoachMark?.finish();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      ref.invalidate(userListsProvider);
+    }
   }
 
   void _maybeShowListsTutorial({bool hasLists = false}) {

@@ -930,106 +930,50 @@ Keep animations subtle — they accent the data, not distract from it. `prefers-
 
 ---
 
-### Sprint 14: List Price Comparison from Browse
+### Sprint 14: List Price Comparison
 
-**Model:** Opus 4.6 (UX flow design) → Sonnet 4.6 (implementation)
-**Goal:** Let users compare an entire shopping list's prices across retailers from a single browse-like view — find the cheapest store for the whole basket, not just individual items.
+**Status:** COMPLETED
 
-#### Why this matters
+**Model:** Opus 4.6 (UX design, architecture) → Sonnet 4.6 (implementation)
+**Goal:** Let users compare an entire shopping list's prices across retailers — find the cheapest store for the whole basket, not just individual items.
 
-Currently, users can compare prices for individual products (tap → detail → compare). But they can't answer: "Where is my entire shopping list cheapest?" without manually comparing each item. The recipe comparison sheet does this for recipes — this extends the same concept to any shopping list.
+**Completed:**
+- [x] 14a. Compare button — emerald pill in list header (next to total price, contextual placement)
+- [x] 14b. ListComparisonNotifier — parallel search across 4 grocery retailers, progressive loading
+- [x] 14c. ListComparisonSheet — full-screen bottom sheet with retailer tabs, winner card, trophy Lottie
+- [x] 14d. Fair comparison — only items matched at ALL retailers count toward cheapest (common-items logic)
+- [x] 14e. Match quality gate — only exact (>=0.80) and similar (>=0.55) matches accepted, fallback rejected
+- [x] 14f. Fuel cost integration — per-retailer fuel cost from Sprint 13 (optional, if vehicle configured)
+- [x] 14g. Human-centered savings — relatable SA grocery items with emoji ("That's a loaf of bread and 2L of milk!")
+- [x] 14h. Apply retailer — "Shop at X" re-assigns all list items to selected retailer in Supabase
+- [x] 14i. Per-item cheapest — green highlight on the cheapest price for each item across retailers
+- [x] 14j. 47 unit tests — models, savings translator, common-items logic, edge cases
 
-#### 14a. Entry Point — "Compare List" Button
+#### Key design decisions
 
-**Where:** `list_detail_screen.dart` — new action in the AppBar or as a prominent button.
+- **Common-items comparison:** Winner is determined using ONLY items found at ALL retailers. Prevents a retailer "winning" by matching fewer items at lower total. Winner card shows "Based on X items found at all stores".
+- **Match threshold:** Raised to >=0.55 (similar) minimum. Fallback matches (<0.55) treated as not found. Aligns with existing compare_sheet.dart behavior.
+- **Compare button placement:** Moved from AppBar to list header (next to total price) after UX review — contextual proximity to the data it acts on. Keeps AppBar clean with 3 actions: sync, add, menu.
+- **SavingsTranslator:** Uses March 2026 SA grocery prices (bread R16, milk R27, sugar R20, eggs R65, chicken R75).
 
-**Options considered:**
+#### Files created
 
-1. **AppBar action icon** (compare_arrows) — consistent with product compare pattern, non-intrusive
-2. **FAB long-press option** — discoverable but hidden
-3. **Button below list total** — visible but takes space
+| File | Purpose |
+|------|---------|
+| `lib/data/models/list_comparison.dart` | ListItemMatch, ListRetailerBasket, ListComparisonState, SavingsTranslator |
+| `lib/presentation/providers/list_comparison_provider.dart` | ListComparisonNotifier with parallel search, fuel cost, apply retailer |
+| `lib/presentation/widgets/lists/list_comparison_sheet.dart` | Full-screen comparison sheet with winner card, tabs, progress chips |
+| `test/list_comparison_test.dart` | 47 unit tests |
 
-**Decision: AppBar action icon** — matches the existing compare paradigm. Icon: `Icons.compare_arrows`. Only enabled when list has 2+ items with retailer assignments.
+#### Files modified
 
-#### 14b. Comparison View — Full-Screen Sheet
-
-Opens a full-screen bottom sheet (like the recipe retailer comparison sheet) showing:
-
-```
-┌─────────────────────────────────────────┐
-│  Compare List Prices          X close   │
-│─────────────────────────────────────────│
-│  [PnP] [Woolworths] [Checkers] [Shoprite]│
-│  ─────────────────────────────────────  │
-│                                         │
-│  Pick n Pay — R342.50         [Cheapest]│
-│                                         │
-│  Full Cream Milk 2L        R 32.99      │
-│  Large Eggs 18s            R 54.99      │
-│  Sasko Cake Flour 2.5kg   R 34.99      │
-│  ... (all items)                        │
-│  Items not found (2)       ──────       │
-│  ┌ Vanilla Essence         No match     │
-│  └ Fresh Basil             No match     │
-│                                         │
-│  ─────────────────────────────────────  │
-│  Subtotal (8/10 items)     R 342.50     │
-│  + Fuel (PnP Centurion)   R 7.40       │
-│  ─────────────────────────────────────  │
-│  Total                     R 349.90     │
-│                                         │
-│  [  Shop at Pick n Pay  ]               │
-└─────────────────────────────────────────┘
-```
-
-**Key UX decisions:**
-
-- Reuses `RetailerComparisonNotifier` pattern — searches each item across all retailers
-- Per-retailer tab shows: matched items + prices, unmatched items, subtotal
-- Integrates fuel cost from Sprint 13 (if vehicle configured)
-- "Cheapest" badge on the tab with lowest total (products + fuel)
-- Tapping an item row opens product swap (same as recipe comparison — find alternative at that retailer)
-- "Shop at X" button could: (a) create a new list with all items re-assigned to that retailer, or (b) just close and show a summary
-
-**Difference from recipe comparison:**
-- Recipe comparison searches by ingredient name (fuzzy). List comparison searches by exact product name (already matched).
-- Recipe comparison creates a new list. List comparison re-prices an existing list.
-- List comparison includes fuel costs. Recipe comparison doesn't (yet — could add in future).
-
-#### 14c. Search Strategy
-
-For each list item, search the target retailer's API:
-- If item has a product name from a retailer (e.g. "PnP Full Cream Milk 2L"), search for it at other retailers
-- Use `ProductNameParser` to extract the generic name (strip brand, keep size) for cross-retailer search
-- Use `SmartMatchingService` for scoring matches (same as price compare)
-- Sequential per-retailer to avoid API flood (same pattern as recipe comparison)
-
-#### 14d. Implementation Order
-
-1. **"Compare List" button** — AppBar action on `list_detail_screen.dart`
-2. **ListComparisonNotifier** — Riverpod provider that searches all items across all retailers
-3. **ListComparisonSheet** — full-screen bottom sheet with retailer tabs (reuse `retailer_comparison_sheet.dart` patterns)
-4. **Fuel cost integration** — pull from Sprint 13's `FuelCostService`
-5. **Product swap** — tap item → open matching sheet for that retailer
-6. **Testing** — manual on-device
-
-#### 14e. Files to Create/Modify
-
-| File | Action |
+| File | Change |
 |------|--------|
-| `lib/presentation/providers/list_comparison_provider.dart` | **Create** — ListComparisonNotifier |
-| `lib/presentation/widgets/lists/list_comparison_sheet.dart` | **Create** — comparison UI |
-| `lib/presentation/screens/lists/list_detail_screen.dart` | Modify — add compare button |
-| `lib/presentation/providers/list_provider.dart` | Modify — expose list items for comparison |
-
-#### 14f. Dependency
-
-- Sprint 13 (Fuel Cost Estimates) should be done first so the comparison includes fuel costs
-- If Sprint 13 isn't done yet, the comparison works without fuel — just product totals per retailer
+| `lib/presentation/screens/lists/list_detail_screen.dart` | Added compare button to _ListHeader, import |
 
 ---
 
-### Sprint 13: Admin Dashboard
+### Sprint 15: Admin Dashboard
 
 **Model:** Opus 4.6
 **Goal:** Build an admin dashboard to monitor users, track app health, and identify backend issues.
@@ -1047,7 +991,7 @@ For each list item, search the target retailer's API:
 
 ---
 
-### Sprint 14: Onboarding Flow Redesign
+### Sprint 16: Onboarding Flow Redesign
 
 **Model:** Opus 4.6
 **Goal:** Design and build a compelling onboarding flow that converts new users and explains the app's value proposition.
@@ -1064,19 +1008,65 @@ For each list item, search the target retailer's API:
 
 ---
 
-### Sprint 15: Security Audit (Saturday 2026-03-22)
+### Sprint 17: Security Audit ✅
 
 **Model:** Opus 4.6
 **Goal:** Full security audit of Flutter app → Supabase backend. Identify and fix vulnerabilities before wider public rollout.
 
-**Scope:**
+**Completed:**
 
-- **Flutter client:** Secure storage audit, API key exposure, certificate pinning, reverse engineering resistance, input validation
-- **Supabase backend:** RLS policy review (all tables), Edge Function auth/CORS, SQL injection vectors, auth flow security
-- **API security:** Rate limiting, request validation, CSRF protection, token management
-- **Data privacy:** PII handling, GDPR-like compliance, data encryption at rest/transit
-- **Dependency audit:** Known CVEs in Flutter/Dart packages, Supabase client versions
-- **Penetration testing:** Auth bypass attempts, privilege escalation, API fuzzing
+- **P0 Fix:** `.env` had production service_role key mislabeled as anon key — all RLS bypassed. Fixed to correct anon key.
+- **RLS verified:** All 13 production tables have RLS enabled with correct policies. Fixed `Shopping_List_Overview` and `Shopping_List_Item_Level` policies to support email-based sharing fallback. Backfilled `Shared_With` column on existing share records.
+- **Edge Functions hardened:** Removed hardcoded Algolia (Clicks) and Klevu (Dis-Chem) credentials → moved to `Deno.env.get()` + Supabase secrets. Fixed CORS wildcard `*` → restricted origin on all 8 functions. Fixed SSRF in image-proxy with strict domain whitelist.
+- **Client hardened:** Removed hardcoded POC anon key from `live_api_config.dart` → loads from `.env`. Added ownership checks to `shareList()` and `deleteList()`. Removed debug user enumeration query. Strengthened password policy (8+ chars, letter + number for signup; lenient for login to not lock out existing users). Cleared local cache on sign-out to prevent cross-user data leakage.
+- **UX fix:** "View all products" now navigates to Browse with the correct retailer pre-selected.
+
+**Still remaining (pre-public launch):**
+
+- [ ] Rotate Supabase service_role key (Dashboard → Settings → API) — manual, do in Supabase Dashboard
+- [ ] Rotate Gemini API key (Google Cloud Console) — manual, do in Google Cloud Console then update `.env`
+- [ ] Move Gemini API calls to Edge Function proxy (stop exposing key in APK) — code change: create `supabase/functions/gemini-proxy/index.ts`, update `gemini_service.dart` to call proxy instead of Gemini directly
+- [ ] Add rate limiting to Edge Functions — add per-IP rate limiting middleware to all 8+ Edge Functions
+
+---
+
+### Sprint 17b: Recipe Comparison Fix ✅
+
+**Model:** Opus 4.6
+**Goal:** Fix recipe ingredient matching inconsistency in Compare Prices and oversized product matching.
+
+**Completed:**
+
+- **Price consistency:** Source retailer's prices are now reused directly in comparison (no re-searching), so recipe total matches comparison total.
+- **Size-aware matching for comparison:** `RetailerComparisonNotifier.runComparison()` now passes `ingredient.quantity`/`unit` to `matchIngredient()` — was missing entirely, so `_pickBestSize()` never ran.
+- **Cross-retailer size targeting:** Other retailers now target the matched product's size (e.g. if PnP matched 750ml, Shoprite targets ~750ml too) instead of the raw recipe qty (30ml).
+- **Size ratio cap:** Added 3x cap with 2500g/ml ceiling in `_pickBestSize()` and pre-filtering in `matchIngredient()`. Prevents 10kg sugar, 5L oil, 12.5kg flour matches.
+- **Brand-stripped search:** List comparison now searches with `normalizedName` (strips brand) so cross-retailer search works properly.
+- **Perfume/beauty blocking:** Added parfum, perfume, cologne, fragrance, cashmere, etc. to `_disqualifyingWords` and vanilla essence `excludeWords`.
+- **IngredientLookup hints in comparison:** Both recipe and list comparison now use the same hint filtering for consistent results.
+
+**Files changed:** `smart_matching_service.dart`, `recipe_provider.dart`, `list_comparison_provider.dart`, `ingredient_lookup.dart`
+
+---
+
+### Sprint 18: Tutorial Update
+
+**Model:** Sonnet 4.6
+**Goal:** Update the in-app tutorial/onboarding to cover new features added since the tutorial was last updated.
+
+**New features to cover in tutorial:**
+
+- **Vehicle & fuel configuration** — Show users how to set up their vehicle type, fuel type, and tank size in Profile → Vehicle Config. Explain that this powers trip cost estimates.
+- **Trip cost estimates** — Demonstrate the fuel cost breakdown when viewing nearby stores (how much it costs to drive to each store).
+- **Price comparison on products** — Show the compare button on product cards, explain how cross-retailer price matching works.
+- **List price comparison** — Demonstrate the "Compare list" feature that compares an entire shopping list across retailers to find the cheapest store.
+- **Sharing lists** — Walk through sharing a shopping list with another user by email, and how real-time collaboration works.
+- **Recipe generation & export** — Show AI recipe generation and exporting ingredients to a shopping list.
+
+**Files to update:**
+- `lib/data/services/tutorial_service.dart` — Add new tutorial steps/targets
+- `lib/presentation/providers/tutorial_provider.dart` — Register new tutorial keys
+- `lib/presentation/screens/home/home_screen.dart` — Tutorial coach marks for new home screen sections
 
 ---
 
@@ -1089,6 +1079,7 @@ For each list item, search the target retailer's API:
 - **SPAR integration** — franchise model with no centralized API; revisit if they launch e-commerce or if SPAR2U app traffic is captured via mitmproxy
 - **More retailers** — Game, Food Lover's Market if demand warrants
 - **Lottie animation for AI error messages** — animated error state when Gemini recipe generation fails or AI matching encounters errors (currently shows plain text/icon)
+- **Mailing list** — Backend `mailing_list` column exists on `user_profiles` but no subscription flow or email service configured. Hidden from Profile UI until ready. Need to set up email service (Resend/SendGrid), opt-in toggle, and preference management.
 
 ## Decisions Made
 

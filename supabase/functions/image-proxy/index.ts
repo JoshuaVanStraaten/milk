@@ -24,7 +24,7 @@ const USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
 
 const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": "https://sfnavipqilqgzmtedfuh.supabase.co",
   "Access-Control-Allow-Methods": "GET, OPTIONS",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
@@ -33,11 +33,28 @@ const CORS_HEADERS = {
 // In-memory session cache (persists across requests in same Deno isolate)
 const sessionCache: Map<string, { cookies: string; expires: number }> = new Map();
 
+// Allowed hostnames for image fetching (SSRF protection)
+const ALLOWED_HOSTS = new Set([
+  "www.checkers.co.za",
+  "checkers.co.za",
+  "products.checkers.co.za",
+  "images.checkers.co.za",
+  "www.shoprite.co.za",
+  "shoprite.co.za",
+  "products.shoprite.co.za",
+  "images.shoprite.co.za",
+]);
+
 // Extract retailer and product code from the image URL
 function parseImageUrl(url: string): { retailer: string; code: string; storagePath: string } | null {
   try {
     const parsed = new URL(url);
-    const hostname = parsed.hostname;
+    const hostname = parsed.hostname.toLowerCase();
+
+    // Strict domain whitelist to prevent SSRF
+    if (!ALLOWED_HOSTS.has(hostname)) {
+      return null;
+    }
 
     let retailer: string;
     if (hostname.includes("checkers")) {

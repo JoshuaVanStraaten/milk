@@ -6,6 +6,7 @@ import '../../data/models/list_comparison.dart';
 import '../../data/models/list_item.dart';
 import '../../data/services/fuel_cost_service.dart';
 import '../../data/services/fuel_price_service.dart';
+import '../../data/services/ingredient_lookup.dart';
 import '../../data/services/product_name_parser.dart';
 import 'fuel_price_provider.dart';
 import 'store_provider.dart';
@@ -81,22 +82,67 @@ class ListComparisonNotifier extends StateNotifier<ListComparisonState> {
       // Search items sequentially within each retailer to avoid API flood
       final results = <String, ListItemMatch>{};
       for (final item in items) {
+        // If this item already has a price from the same retailer (e.g. from
+        // recipe matching), reuse it directly instead of re-searching.
+        if (item.itemRetailer == retailerName && item.effectivePrice > 0) {
+          results[item.itemId] = ListItemMatch(
+            itemId: item.itemId,
+            itemName: item.itemName,
+            quantity: item.itemQuantity,
+            matchedProductName: item.itemName,
+            matchedPrice: item.effectivePrice,
+            matchedRetailer: retailerName,
+            confidenceScore: 1.0,
+            matchType: MatchType.exact,
+          );
+          continue;
+        }
+
         try {
           final parsed = ProductNameParser.parse(item.itemName);
-          final query = parsed.searchQuery;
+
+          // Use normalizedName (brand-stripped) for cross-retailer search so
+          // "Snowflake Cake Flour 2.5kg" searches as "cake flour" — giving
+          // each retailer's API a fair chance to return its own brands.
+          // Fall back to searchQuery if normalizedName is empty.
+          final query = parsed.normalizedName.isNotEmpty
+              ? parsed.normalizedName
+              : parsed.searchQuery;
+
+          // Extract recipe quantity from item note ("Need: 250g") if available,
+          // so size-aware matching uses the recipe amount, not the product size.
+          double? ingredientQty = parsed.sizeValue;
+          String? ingredientUnit = parsed.sizeUnit;
+          if (item.itemNote != null) {
+            final needMatch = RegExp(
+              r'Need:\s*(\d+\.?\d*)\s*(g|kg|ml|l|units?|pieces?)',
+              caseSensitive: false,
+            ).firstMatch(item.itemNote!);
+            if (needMatch != null) {
+              ingredientQty = double.tryParse(needMatch.group(1)!);
+              ingredientUnit = needMatch.group(2);
+            }
+          }
+
+          // Resolve ingredient lookup hint for better filtering
+          final hint = IngredientLookup.resolve(query);
+          final apiQuery = hint?.searchQuery ?? query;
 
           final response = await api
               .searchProducts(
-                query: query,
+                query: apiQuery,
                 store: store,
                 retailer: retailerName,
-                pageSize: 10,
+                pageSize: 15,
               )
               .timeout(const Duration(seconds: 12));
 
           final best = await smartMatcher.matchIngredient(
-            ingredientName: item.itemName,
+            ingredientName: query,
             candidates: response.products,
+            ingredientQuantity: ingredientQty,
+            ingredientUnit: ingredientUnit,
+            hint: hint,
           );
 
           if (best != null) {
@@ -104,17 +150,41 @@ class ListComparisonNotifier extends StateNotifier<ListComparisonState> {
             final priceNum = (promoPrice != null && promoPrice > 0)
                 ? promoPrice
                 : best.priceNumeric;
+            final bestParsed = ProductNameParser.parse(best.name);
             final confidence =
-                ProductNameParser.computeConfidence(
-              parsed,
-              ProductNameParser.parse(best.name),
-            );
+                ProductNameParser.computeConfidence(parsed, bestParsed);
 
-            // Only accept exact (>=0.80) or similar (>=0.55) matches.
-            // Fallback matches (<0.55) are too unreliable for price
-            // comparison — treat them as not found to ensure fair
-            // apples-to-apples comparison across retailers.
-            if (confidence >= 0.55) {
+            // Reject matches where sizes differ drastically.
+            // E.g. "Milk 500ml" matching "Milk 6x1L" or "Flour 2.5kg"
+            // matching "Flour 12.5kg" are not useful for price comparison.
+            // computeConfidence already gates on size (caps at 0.54 when
+            // sizeScore <= 0.1), but sizes that differ 2-3x can still slip
+            // through. Use a stricter check for list comparison.
+            bool sizeAcceptable = true;
+            if (parsed.sizeValue != null && bestParsed.sizeValue != null &&
+                parsed.sizeUnit != null && bestParsed.sizeUnit != null) {
+              final srcTotal = parsed.totalSize ?? parsed.sizeValue!;
+              final matchTotal = bestParsed.totalSize ?? bestParsed.sizeValue!;
+              // Only compare when units are compatible (both weight or both volume)
+              final srcU = parsed.sizeUnit!.toLowerCase();
+              final matchU = bestParsed.sizeUnit!.toLowerCase();
+              final bothWeight = {'g', 'kg'}.contains(srcU) && {'g', 'kg'}.contains(matchU);
+              final bothVolume = {'ml', 'l'}.contains(srcU) && {'ml', 'l'}.contains(matchU);
+              if (bothWeight || bothVolume) {
+                final srcNorm = (srcU == 'kg' || srcU == 'l') ? srcTotal * 1000 : srcTotal;
+                final matchNorm = (matchU == 'kg' || matchU == 'l') ? matchTotal * 1000 : matchTotal;
+                if (srcNorm > 0) {
+                  final ratio = matchNorm / srcNorm;
+                  if (ratio > 3.0 || ratio < 0.33) {
+                    sizeAcceptable = false;
+                  }
+                }
+              }
+            }
+
+            // Only accept exact (>=0.80) or similar (>=0.55) matches
+            // with acceptable size ratio.
+            if (confidence >= 0.55 && sizeAcceptable) {
               results[item.itemId] = ListItemMatch(
                 itemId: item.itemId,
                 itemName: item.itemName,

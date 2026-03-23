@@ -171,8 +171,9 @@ class _ListDetailScreenState extends ConsumerState<ListDetailScreen> {
 
               const Divider(height: 1),
 
-              // Trip Cost breakdown (collapsible)
-              TripCostCard(items: itemsState.items, isDark: isDark),
+              // Trip Cost breakdown (collapsible) — hide when list is empty
+              if (itemsState.items.isNotEmpty)
+                TripCostCard(items: itemsState.items, isDark: isDark),
 
               // Items List with real-time state
               Expanded(child: _buildItemsList(itemsState, isDark)),
@@ -443,10 +444,13 @@ class _ListDetailScreenState extends ConsumerState<ListDetailScreen> {
   }
 
   Widget _buildEmptyState(BuildContext context, bool isDark) {
-    return EmptyState(
-      type: EmptyStateType.emptyList,
-      actionLabel: 'Browse Products',
-      onAction: () => context.push('/stores'),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.only(bottom: 80),
+      child: EmptyState(
+        type: EmptyStateType.emptyList,
+        actionLabel: 'Browse Products',
+        onAction: () => context.push('/stores'),
+      ),
     );
   }
 
@@ -485,6 +489,7 @@ class _ListDetailScreenState extends ConsumerState<ListDetailScreen> {
                   ref,
                   listId: widget.listId,
                   listName: list.listName,
+                  ownerEmail: list.ownerEmail,
                 );
               },
             ),

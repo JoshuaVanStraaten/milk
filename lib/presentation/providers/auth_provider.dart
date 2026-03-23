@@ -2,6 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../data/models/user_profile.dart';
 import '../../data/repositories/auth_repository.dart';
+import '../../data/local/cached_list_repository.dart';
+import 'list_provider.dart';
 import 'vehicle_config_provider.dart';
 
 /// Provider for the AuthRepository instance
@@ -154,6 +156,14 @@ class AuthNotifier extends StateNotifier<AsyncValue<UserProfile?>> {
 
     try {
       await _authRepository.signOut();
+
+      // Clear cached list data from previous user
+      final cache = CachedListRepository();
+      await cache.clearAll();
+
+      // Invalidate list providers so next user gets fresh data
+      _ref.invalidate(userListsProvider);
+
       _ref.read(vehicleConfigProvider.notifier).reload();
       state = const AsyncValue.data(null);
     } catch (e, stackTrace) {
