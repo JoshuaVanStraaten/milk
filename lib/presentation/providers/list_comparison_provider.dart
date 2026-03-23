@@ -6,7 +6,6 @@ import '../../data/models/list_comparison.dart';
 import '../../data/models/list_item.dart';
 import '../../data/services/fuel_cost_service.dart';
 import '../../data/services/fuel_price_service.dart';
-import '../../data/services/ingredient_lookup.dart';
 import '../../data/services/product_name_parser.dart';
 import 'fuel_price_provider.dart';
 import 'store_provider.dart';
@@ -49,7 +48,6 @@ class ListComparisonNotifier extends StateNotifier<ListComparisonState> {
     );
 
     final api = _ref.read(liveApiServiceProvider);
-    final smartMatcher = _ref.read(smartMatchingServiceProvider);
 
     // Fuel cost setup (optional — null if vehicle not configured)
     final vehicle = _ref.read(vehicleConfigProvider);
@@ -101,110 +99,62 @@ class ListComparisonNotifier extends StateNotifier<ListComparisonState> {
         try {
           final parsed = ProductNameParser.parse(item.itemName);
 
-          // Use normalizedName (brand-stripped) for cross-retailer search so
-          // "Snowflake Cake Flour 2.5kg" searches as "cake flour" — giving
-          // each retailer's API a fair chance to return its own brands.
-          // Fall back to searchQuery if normalizedName is empty.
-          final query = parsed.normalizedName.isNotEmpty
-              ? parsed.normalizedName
-              : parsed.searchQuery;
-
-          // Extract recipe quantity from item note ("Need: 250g") if available,
-          // so size-aware matching uses the recipe amount, not the product size.
-          double? ingredientQty = parsed.sizeValue;
-          String? ingredientUnit = parsed.sizeUnit;
-          if (item.itemNote != null) {
-            final needMatch = RegExp(
-              r'Need:\s*(\d+\.?\d*)\s*(g|kg|ml|l|units?|pieces?)',
-              caseSensitive: false,
-            ).firstMatch(item.itemNote!);
-            if (needMatch != null) {
-              ingredientQty = double.tryParse(needMatch.group(1)!);
-              ingredientUnit = needMatch.group(2);
-            }
-          }
-
-          // Resolve ingredient lookup hint for better filtering
-          final hint = IngredientLookup.resolve(query);
-          final apiQuery = hint?.searchQuery ?? query;
+          // Use searchQuery (keeps brand + size) for the API search so we
+          // find the same product at other retailers — apples-to-apples.
+          // This matches the normal price comparison (compare_sheet.dart).
+          final query = parsed.searchQuery;
 
           final response = await api
               .searchProducts(
-                query: apiQuery,
+                query: query,
                 store: store,
                 retailer: retailerName,
-                pageSize: 15,
+                pageSize: 10,
               )
               .timeout(const Duration(seconds: 12));
 
-          final best = await smartMatcher.matchIngredient(
-            ingredientName: query,
-            candidates: response.products,
-            ingredientQuantity: ingredientQty,
-            ingredientUnit: ingredientUnit,
-            hint: hint,
-          );
+          // Use the same classify() logic as the normal price comparison.
+          // This ensures strict product-to-product matching: if no exact
+          // match is found, the item is left as unmatched.
+          final sourceParsed = parsed;
+          ComparisonMatch? bestMatch;
 
-          if (best != null) {
-            final promoPrice = double.tryParse(best.promotionPrice);
-            final priceNum = (promoPrice != null && promoPrice > 0)
-                ? promoPrice
-                : best.priceNumeric;
-            final bestParsed = ProductNameParser.parse(best.name);
-            final confidence =
-                ProductNameParser.computeConfidence(parsed, bestParsed);
-
-            // Reject matches where sizes differ drastically.
-            // E.g. "Milk 500ml" matching "Milk 6x1L" or "Flour 2.5kg"
-            // matching "Flour 12.5kg" are not useful for price comparison.
-            // computeConfidence already gates on size (caps at 0.54 when
-            // sizeScore <= 0.1), but sizes that differ 2-3x can still slip
-            // through. Use a stricter check for list comparison.
-            bool sizeAcceptable = true;
-            if (parsed.sizeValue != null && bestParsed.sizeValue != null &&
-                parsed.sizeUnit != null && bestParsed.sizeUnit != null) {
-              final srcTotal = parsed.totalSize ?? parsed.sizeValue!;
-              final matchTotal = bestParsed.totalSize ?? bestParsed.sizeValue!;
-              // Only compare when units are compatible (both weight or both volume)
-              final srcU = parsed.sizeUnit!.toLowerCase();
-              final matchU = bestParsed.sizeUnit!.toLowerCase();
-              final bothWeight = {'g', 'kg'}.contains(srcU) && {'g', 'kg'}.contains(matchU);
-              final bothVolume = {'ml', 'l'}.contains(srcU) && {'ml', 'l'}.contains(matchU);
-              if (bothWeight || bothVolume) {
-                final srcNorm = (srcU == 'kg' || srcU == 'l') ? srcTotal * 1000 : srcTotal;
-                final matchNorm = (matchU == 'kg' || matchU == 'l') ? matchTotal * 1000 : matchTotal;
-                if (srcNorm > 0) {
-                  final ratio = matchNorm / srcNorm;
-                  if (ratio > 3.0 || ratio < 0.33) {
-                    sizeAcceptable = false;
-                  }
-                }
-              }
+          for (final candidate in response.products) {
+            final candidateParsed = ProductNameParser.parse(candidate.name);
+            final match = ProductNameParser.classify(
+              source: sourceParsed,
+              candidate: candidateParsed,
+              retailer: retailerName,
+              name: candidate.name,
+              price: candidate.price,
+              priceNumeric: candidate.priceNumeric,
+              promotionPrice:
+                  candidate.hasPromo ? candidate.promotionPrice : null,
+              hasPromo: candidate.hasPromo,
+              imageUrl: candidate.imageUrl,
+              sourcePrice: item.effectivePrice,
+            );
+            if (match != null &&
+                (bestMatch == null ||
+                    match.confidenceScore > bestMatch.confidenceScore)) {
+              bestMatch = match;
             }
+          }
 
-            // Only accept exact (>=0.80) or similar (>=0.55) matches
-            // with acceptable size ratio.
-            if (confidence >= 0.55 && sizeAcceptable) {
-              results[item.itemId] = ListItemMatch(
-                itemId: item.itemId,
-                itemName: item.itemName,
-                quantity: item.itemQuantity,
-                matchedProductName: best.name,
-                matchedPrice: priceNum,
-                matchedImageUrl: best.imageUrl,
-                matchedRetailer: retailerName,
-                confidenceScore: confidence,
-                matchType: confidence >= 0.80
-                    ? MatchType.exact
-                    : MatchType.similar,
-              );
-            } else {
-              results[item.itemId] = ListItemMatch(
-                itemId: item.itemId,
-                itemName: item.itemName,
-                quantity: item.itemQuantity,
-              );
-            }
+          if (bestMatch != null &&
+              bestMatch.matchType != MatchType.fallback) {
+            final priceNum = bestMatch.priceNumeric;
+            results[item.itemId] = ListItemMatch(
+              itemId: item.itemId,
+              itemName: item.itemName,
+              quantity: item.itemQuantity,
+              matchedProductName: bestMatch.name,
+              matchedPrice: priceNum,
+              matchedImageUrl: bestMatch.imageUrl,
+              matchedRetailer: retailerName,
+              confidenceScore: bestMatch.confidenceScore,
+              matchType: bestMatch.matchType,
+            );
           } else {
             results[item.itemId] = ListItemMatch(
               itemId: item.itemId,

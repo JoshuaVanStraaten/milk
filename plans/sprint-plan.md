@@ -1041,15 +1041,37 @@ Keep animations subtle — they accent the data, not distract from it. `prefers-
 - **Size-aware matching for comparison:** `RetailerComparisonNotifier.runComparison()` now passes `ingredient.quantity`/`unit` to `matchIngredient()` — was missing entirely, so `_pickBestSize()` never ran.
 - **Cross-retailer size targeting:** Other retailers now target the matched product's size (e.g. if PnP matched 750ml, Shoprite targets ~750ml too) instead of the raw recipe qty (30ml).
 - **Size ratio cap:** Added 3x cap with 2500g/ml ceiling in `_pickBestSize()` and pre-filtering in `matchIngredient()`. Prevents 10kg sugar, 5L oil, 12.5kg flour matches.
-- **Brand-stripped search:** List comparison now searches with `normalizedName` (strips brand) so cross-retailer search works properly.
+- **Brand-stripped search:** ~~List comparison now searches with `normalizedName` (strips brand) so cross-retailer search works properly.~~ **Reverted** — this caused terrible matches (e.g. Coca-Cola matching Pepsi). List comparison now uses `searchQuery` (keeps brand+size) and `classify()` (strict product-to-product matching), same as the normal price compare sheet.
 - **Perfume/beauty blocking:** Added parfum, perfume, cologne, fragrance, cashmere, etc. to `_disqualifyingWords` and vanilla essence `excludeWords`.
-- **IngredientLookup hints in comparison:** Both recipe and list comparison now use the same hint filtering for consistent results.
+- ~~**IngredientLookup hints in comparison:** Both recipe and list comparison now use the same hint filtering for consistent results.~~ **Reverted** — ingredient hints are for recipe matching, not product-to-product comparison.
 
 **Files changed:** `smart_matching_service.dart`, `recipe_provider.dart`, `list_comparison_provider.dart`, `ingredient_lookup.dart`
 
 ---
 
-### Sprint 18: Tutorial Update
+### Sprint 18: List Price Refresh
+
+**Model:** Sonnet 4.6
+**Goal:** Add a refresh button to shopping lists that re-fetches current prices for products added from the browse screen, ensuring reused lists always show up-to-date prices.
+
+**Problem:** When users reuse old shopping lists, the prices stored on list items are stale (from when the product was originally added). There's no way to update them without manually removing and re-adding each item.
+
+**Implementation:**
+
+- **Refresh button** — Add a refresh icon button to the list detail screen app bar (next to the compare button). Tapping it re-fetches live prices for all items that have a retailer assigned.
+- **Per-item price update** — For each list item with `itemRetailer` set, search the retailer API using the item name, find the best match using `classify()`, and update `itemPrice`/`itemTotalPrice` in Supabase.
+- **Visual feedback** — Show a progress indicator during refresh, then a snackbar with "Prices updated — X of Y items refreshed" or similar.
+- **Skip unpriced items** — Items without a retailer (manually added, unmatched) are skipped.
+- **Staleness indicator (optional)** — Show a subtle "prices from X days ago" hint on lists that haven't been refreshed recently, using `updated_at` from list items.
+
+**Files:**
+- `lib/presentation/screens/lists/list_detail_screen.dart` — Refresh button in app bar
+- `lib/presentation/providers/list_provider.dart` — `refreshPrices()` method on list items notifier
+- `lib/data/models/list_item.dart` — May need `updatedAt` field if not already present
+
+---
+
+### Sprint 19: Tutorial Update
 
 **Model:** Sonnet 4.6
 **Goal:** Update the in-app tutorial/onboarding to cover new features added since the tutorial was last updated.
