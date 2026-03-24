@@ -15,7 +15,7 @@ Choose the best model for each task based on complexity:
 
 ## Sprint Order (priority-based, dependencies respected)
 
-### Sprint 1: Quick Bug Fixes (low risk, high impact)
+### Sprint 1: Quick Bug Fixes (low risk, high impact) ✅
 
 **Model:** Sonnet 4.6
 **Goal:** Fix 4 isolated bugs that don't touch core logic.
@@ -61,7 +61,7 @@ Choose the best model for each task based on complexity:
 
 ---
 
-### Sprint 2: Product Card Redesign + Compare Button
+### Sprint 2: Product Card Redesign + Compare Button ✅
 
 **Model:** Opus 4.6 (UI/UX design decisions) → Sonnet 4.6 (implementation)
 **Goal:** Smaller, more appealing product cards with inline compare button.
@@ -89,7 +89,7 @@ Choose the best model for each task based on complexity:
 
 ---
 
-### Sprint 3: Smart Product Matching (Core Feature)
+### Sprint 3: Smart Product Matching (Core Feature) ✅
 
 **Model:** Opus 4.6 (algorithm design, prompt engineering, architecture)
 **Goal:** Dramatically improve price comparison and recipe ingredient matching accuracy.
@@ -392,7 +392,7 @@ Frozen | Food Cupboard | Snacks | Beverages
 
 ---
 
-### Sprint 11: Additional Retailers — Makro, Dis-Chem, Clicks
+### Sprint 11: Additional Retailers — Makro, Dis-Chem, Clicks ✅
 
 **Model:** Opus 4.6 (API reverse-engineering, architecture) → Sonnet 4.6 (implementation)
 **Goal:** Expand retailer coverage from 4 to 7 — add Makro, Dis-Chem, and Clicks.
@@ -474,7 +474,7 @@ Frozen | Food Cupboard | Snacks | Beverages
 
 ---
 
-### Sprint 12: Final UI/UX Polish Pass
+### Sprint 12: Final UI/UX Polish Pass ✅
 
 **Model:** Opus 4.6 (design review & strategy) → Sonnet 4.6 (implementation)
 **Goal:** Professional, exciting look across the entire app — now across all 7 retailers.
@@ -661,7 +661,7 @@ void initState() {
 
 ---
 
-### Sprint 13: Fuel Cost Estimates & Trip Comparison
+### Sprint 13: Fuel Cost Estimates & Trip Comparison ✅
 
 **Status:** COMPLETED
 
@@ -930,7 +930,7 @@ Keep animations subtle — they accent the data, not distract from it. `prefers-
 
 ---
 
-### Sprint 14: List Price Comparison
+### Sprint 14: List Price Comparison ✅
 
 **Status:** COMPLETED
 
@@ -1071,24 +1071,26 @@ Keep animations subtle — they accent the data, not distract from it. `prefers-
 
 ---
 
-### Sprint 19: Tutorial Update
+### Sprint 19: Tutorial Update ✅
 
 **Model:** Sonnet 4.6
 **Goal:** Update the in-app tutorial/onboarding to cover new features added since the tutorial was last updated.
+**Status:** COMPLETED — `eaa5be8`
 
-**New features to cover in tutorial:**
+**What was done:**
+- Added compare button tutorial step to Browse screen (step 5)
+- Activated list detail tutorial with 4 steps: add items, compare list, share & more, item management
+- Added profile tutorial with scroll-to-target for vehicle config card
+- Fixed closure capture bug in step counters (Dart closures capture by reference)
+- Recipe export tutorial already covered in existing result dialog — verified, no changes needed
 
-- **Vehicle & fuel configuration** — Show users how to set up their vehicle type, fuel type, and tank size in Profile → Vehicle Config. Explain that this powers trip cost estimates.
-- **Trip cost estimates** — Demonstrate the fuel cost breakdown when viewing nearby stores (how much it costs to drive to each store).
-- **Price comparison on products** — Show the compare button on product cards, explain how cross-retailer price matching works.
-- **List price comparison** — Demonstrate the "Compare list" feature that compares an entire shopping list across retailers to find the cheapest store.
-- **Sharing lists** — Walk through sharing a shopping list with another user by email, and how real-time collaboration works.
-- **Recipe generation & export** — Show AI recipe generation and exporting ingredients to a shopping list.
-
-**Files to update:**
-- `lib/data/services/tutorial_service.dart` — Add new tutorial steps/targets
-- `lib/presentation/providers/tutorial_provider.dart` — Register new tutorial keys
-- `lib/presentation/screens/home/home_screen.dart` — Tutorial coach marks for new home screen sections
+**Files updated:**
+- `lib/data/services/tutorial_service.dart` — Added listDetail + profile keys/getters/completers
+- `lib/presentation/widgets/tutorial/tutorial_targets.dart` — New steps + profile builder
+- `lib/presentation/widgets/products/live_product_card.dart` — compareButtonKey param
+- `lib/presentation/screens/products/live_browse_screen.dart` — Wired compare button key
+- `lib/presentation/screens/lists/list_detail_screen.dart` — Wired list detail tutorial
+- `lib/presentation/screens/profile/profile_screen.dart` — Converted to StatefulWidget, wired profile tutorial with scroll-to-target
 
 ---
 

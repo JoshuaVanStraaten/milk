@@ -4,7 +4,7 @@
 
 Flutter app for South African grocery shoppers. Compares live prices across Pick n Pay, Woolworths, Checkers, and Shoprite. GPS-based store selection, live product browsing, AI recipe generation, shopping lists with real-time collaboration, deals feed.
 
-**Package:** `com.ubicorp.milkza` | **Version:** `1.1.0+2` | **Play Store:** Closed beta (live)
+**Package:** `com.ubicorp.milkza` | **Version:** `1.2.0+5` | **Play Store:** Closed beta (live)
 
 ## Current Phase: Bug Fixes & Polish
 
