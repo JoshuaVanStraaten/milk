@@ -119,6 +119,7 @@ class _LiveBrowseScreenState extends ConsumerState<LiveBrowseScreen> {
   final _searchBarKey = GlobalKey();
   final _categoryChipKey = GlobalKey();
   final _filterIconKey = GlobalKey();
+  final _compareButtonKey = GlobalKey();
 
   // Category state
   ProductCategory? _selectedCategory;
@@ -160,6 +161,7 @@ class _LiveBrowseScreenState extends ConsumerState<LiveBrowseScreen> {
         searchBarKey: _searchBarKey,
         categoryChipKey: _categoryChipKey,
         filterIconKey: _filterIconKey,
+        compareButtonKey: _compareButtonKey,
       );
 
       _tutorialCoachMark = TutorialCoachMark(
@@ -542,6 +544,7 @@ class _LiveBrowseScreenState extends ConsumerState<LiveBrowseScreen> {
           index: index % 10,
           child: LiveProductCard(
             product: product,
+            compareButtonKey: index == 0 ? _compareButtonKey : null,
             onTap: () {
               showProductDetailCard(
                 context: context,

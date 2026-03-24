@@ -244,8 +244,10 @@ List<TargetFocus> buildBrowseTutorialTargets({
   required GlobalKey searchBarKey,
   required GlobalKey categoryChipKey,
   required GlobalKey filterIconKey,
+  GlobalKey? compareButtonKey,
 }) {
-  const total = 4;
+  final hasCompare = compareButtonKey != null;
+  final total = hasCompare ? 5 : 4;
 
   return [
     // Step 1: Store selector
@@ -350,6 +352,32 @@ List<TargetFocus> buildBrowseTutorialTargets({
         ),
       ],
     ),
+
+    // Step 5: Compare button on product cards (if key provided)
+    if (hasCompare)
+      TargetFocus(
+        identify: 'compare_button',
+        keyTarget: compareButtonKey,
+        shape: ShapeLightFocus.Circle,
+        paddingFocus: 10,
+        contents: [
+          TargetContent(
+            align: ContentAlign.bottom,
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            builder: (context, controller) {
+              return TutorialTooltip(
+                title: 'Compare Prices',
+                description:
+                    'Tap compare on any product to see prices across all retailers instantly.',
+                stepIndex: 4,
+                totalSteps: total,
+                onTap: controller.next,
+                onSkip: controller.skip,
+              );
+            },
+          ),
+        ],
+      ),
   ];
 }
 
@@ -535,27 +563,61 @@ List<TargetFocus> buildListsTutorialTargets({
 
 List<TargetFocus> buildListDetailTutorialTargets({
   required GlobalKey addItemButtonKey,
+  GlobalKey? compareListKey,
+  GlobalKey? menuButtonKey,
 }) {
-  const total = 2;
+  final targets = <TargetFocus>[];
+  final hasCompare = compareListKey != null;
+  final hasMenu = menuButtonKey != null;
+  final total = 2 + (hasCompare ? 1 : 0) + (hasMenu ? 1 : 0);
+  var step = 0;
 
-  return [
-    // Step 1: Add items
-    TargetFocus(
-      identify: 'add_item_button',
-      keyTarget: addItemButtonKey,
+  // Step 1: Add items
+  final step0 = step++;
+  targets.add(TargetFocus(
+    identify: 'add_item_button',
+    keyTarget: addItemButtonKey,
+    shape: ShapeLightFocus.RRect,
+    radius: 16,
+    paddingFocus: 8,
+    contents: [
+      TargetContent(
+        align: ContentAlign.bottom,
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        builder: (context, controller) {
+          return TutorialTooltip(
+            title: 'Add Items',
+            description:
+                'Tap + to add items manually or browse products from any store.',
+            stepIndex: step0,
+            totalSteps: total,
+            onTap: controller.next,
+            onSkip: controller.skip,
+          );
+        },
+      ),
+    ],
+  ));
+
+  // Step 2: Compare list (if key provided)
+  if (hasCompare) {
+    final stepN = step++;
+    targets.add(TargetFocus(
+      identify: 'compare_list',
+      keyTarget: compareListKey,
       shape: ShapeLightFocus.RRect,
-      radius: 16,
-      paddingFocus: 8,
+      radius: 12,
+      paddingFocus: 6,
       contents: [
         TargetContent(
-          align: ContentAlign.top,
+          align: ContentAlign.bottom,
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
           builder: (context, controller) {
             return TutorialTooltip(
-              title: 'Add Items',
+              title: 'Compare Your List',
               description:
-                  'Add items manually or browse products from any store. You can also compare prices before adding.',
-              stepIndex: 0,
+                  'Compare your entire shopping list across retailers to find the cheapest store for everything.',
+              stepIndex: stepN,
               totalSteps: total,
               onTap: controller.next,
               onSkip: controller.skip,
@@ -563,28 +625,94 @@ List<TargetFocus> buildListDetailTutorialTargets({
           },
         ),
       ],
-    ),
+    ));
+  }
 
-    // Step 2: Item management hint (positioned at center of screen)
-    TargetFocus(
-      identify: 'item_management',
-      targetPosition: TargetPosition(
-        const Size(300, 100),
-        const Offset(50, 300),
-      ),
-      shape: ShapeLightFocus.RRect,
-      radius: 16,
+  // Step 3: Share & options menu (if key provided)
+  if (hasMenu) {
+    final stepN = step++;
+    targets.add(TargetFocus(
+      identify: 'menu_button',
+      keyTarget: menuButtonKey,
+      shape: ShapeLightFocus.Circle,
+      paddingFocus: 8,
       contents: [
         TargetContent(
           align: ContentAlign.bottom,
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
           builder: (context, controller) {
             return TutorialTooltip(
-              title: 'Managing Items',
+              title: 'Share & More',
               description:
-                  'Tap an item to edit it. Swipe left to quickly delete. Long-press to select multiple items for bulk deletion.',
-              stepIndex: 1,
+                  'Share this list with friends or family for real-time collaboration. They can add, check off, and edit items together.',
+              stepIndex: stepN,
               totalSteps: total,
+              onTap: controller.next,
+              onSkip: controller.skip,
+            );
+          },
+        ),
+      ],
+    ));
+  }
+
+  // Step 4: Item management hint (positioned at center of screen)
+  final stepLast = step;
+  targets.add(TargetFocus(
+    identify: 'item_management',
+    targetPosition: TargetPosition(
+      const Size(300, 100),
+      const Offset(50, 300),
+    ),
+    shape: ShapeLightFocus.RRect,
+    radius: 16,
+    contents: [
+      TargetContent(
+        align: ContentAlign.bottom,
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        builder: (context, controller) {
+          return TutorialTooltip(
+            title: 'Managing Items',
+            description:
+                'Tap an item to edit it. Swipe left to quickly delete. Long-press to select multiple items for bulk deletion.',
+            stepIndex: stepLast,
+            totalSteps: total,
+            onTap: controller.next,
+            onSkip: controller.skip,
+          );
+        },
+      ),
+    ],
+  ));
+
+  return targets;
+}
+
+// =============================================================================
+// PROFILE TUTORIAL TARGETS
+// =============================================================================
+
+List<TargetFocus> buildProfileTutorialTargets({
+  required GlobalKey vehicleCardKey,
+}) {
+  return [
+    TargetFocus(
+      identify: 'vehicle_config',
+      keyTarget: vehicleCardKey,
+      shape: ShapeLightFocus.RRect,
+      radius: 16,
+      paddingFocus: 6,
+      contents: [
+        TargetContent(
+          align: ContentAlign.bottom,
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          builder: (context, controller) {
+            return TutorialTooltip(
+              title: 'Set Up Your Vehicle',
+              description:
+                  'Configure your vehicle type and fuel to see trip cost estimates when shopping at nearby stores.',
+              stepIndex: 0,
+              totalSteps: 1,
               onTap: controller.next,
               onSkip: controller.skip,
             );

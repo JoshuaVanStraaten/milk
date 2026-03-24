@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lottie/lottie.dart';
 import 'package:go_router/go_router.dart';
+import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/saved_location.dart';
@@ -13,15 +14,81 @@ import '../../widgets/common/vehicle_config_sheet.dart';
 import '../../providers/saved_locations_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/tutorial_provider.dart';
+import '../../widgets/tutorial/tutorial_targets.dart';
 
-class ProfileScreen extends ConsumerWidget {
+class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
+  TutorialCoachMark? _tutorialCoachMark;
+  bool _tutorialTriggered = false;
+  final _vehicleCardKey = GlobalKey();
+
+  @override
+  void dispose() {
+    _tutorialCoachMark?.finish();
+    super.dispose();
+  }
+
+  void _tryShowProfileTutorial() {
+    if (_tutorialTriggered) return;
+    final tutorialService = ref.read(tutorialServiceProvider);
+    if (tutorialService.isProfileTutorialCompleted) return;
+    if (_vehicleCardKey.currentContext == null) return;
+    _tutorialTriggered = true;
+
+    // Scroll to vehicle card first, then show tutorial
+    Future.delayed(const Duration(milliseconds: 400), () async {
+      if (!mounted) return;
+
+      if (!mounted) return;
+      final vehicleContext = _vehicleCardKey.currentContext;
+      if (vehicleContext != null) {
+        await Scrollable.ensureVisible(
+          vehicleContext,
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeInOut,
+          alignment: 0.5,
+        );
+      }
+
+      await Future.delayed(const Duration(milliseconds: 300));
+      if (!mounted) return;
+
+      final targets = buildProfileTutorialTargets(
+        vehicleCardKey: _vehicleCardKey,
+      );
+
+      _tutorialCoachMark = TutorialCoachMark(
+        targets: targets,
+        colorShadow: Colors.black,
+        opacityShadow: 0.8,
+        hideSkip: true,
+        paddingFocus: 10,
+        focusAnimationDuration: const Duration(milliseconds: 300),
+        unFocusAnimationDuration: const Duration(milliseconds: 300),
+        onFinish: () {
+          ref.read(tutorialServiceProvider).completeProfileTutorial();
+        },
+        onSkip: () {
+          ref.read(tutorialServiceProvider).skipAll();
+          return true;
+        },
+      )..show(context: context);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final userProfileAsync = ref.watch(currentUserProfileProvider);
     final themeState = ref.watch(themeProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) => _tryShowProfileTutorial());
 
     return Scaffold(
       appBar: AppBar(
@@ -186,7 +253,7 @@ class ProfileScreen extends ConsumerWidget {
                 // My Vehicle Section
                 _SectionHeader(title: 'My Vehicle', isDark: isDark),
                 const SizedBox(height: 12),
-                _VehicleCard(isDark: isDark),
+                _VehicleCard(key: _vehicleCardKey, isDark: isDark),
 
                 const SizedBox(height: 24),
 
@@ -594,7 +661,7 @@ class _LocationsCard extends ConsumerWidget {
 /// Card showing the user's vehicle configuration for fuel cost estimates.
 class _VehicleCard extends ConsumerWidget {
   final bool isDark;
-  const _VehicleCard({required this.isDark});
+  const _VehicleCard({super.key, required this.isDark});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

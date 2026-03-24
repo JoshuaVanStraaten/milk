@@ -16,9 +16,12 @@ import '../../widgets/common/app_snackbar.dart';
 import '../../widgets/common/empty_states.dart';
 import '../../widgets/common/lottie_loading_indicator.dart';
 import '../compare/compare_sheet.dart';
+import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
+import '../../providers/tutorial_provider.dart';
 import '../../widgets/lists/share_list_sheet.dart';
 import '../../widgets/lists/list_comparison_sheet.dart';
 import '../../widgets/lists/trip_cost_card.dart';
+import '../../widgets/tutorial/tutorial_targets.dart';
 
 class ListDetailScreen extends ConsumerStatefulWidget {
   final String listId;
@@ -32,6 +35,13 @@ class ListDetailScreen extends ConsumerStatefulWidget {
 class _ListDetailScreenState extends ConsumerState<ListDetailScreen> {
   final Set<String> _selectedIds = {};
   bool get _isSelectionMode => _selectedIds.isNotEmpty;
+
+  // Tutorial
+  TutorialCoachMark? _tutorialCoachMark;
+  bool _tutorialTriggered = false;
+  final _addItemKey = GlobalKey();
+  final _compareListKey = GlobalKey();
+  final _menuButtonKey = GlobalKey();
 
   void _exitSelectionMode() {
     setState(() => _selectedIds.clear());
@@ -92,10 +102,52 @@ class _ListDetailScreenState extends ConsumerState<ListDetailScreen> {
   }
 
   @override
+  void dispose() {
+    _tutorialCoachMark?.finish();
+    super.dispose();
+  }
+
+  void _tryShowListDetailTutorial() {
+    if (_tutorialTriggered) return;
+    final tutorialService = ref.read(tutorialServiceProvider);
+    if (tutorialService.isListDetailTutorialCompleted) return;
+    _tutorialTriggered = true;
+
+    Future.delayed(const Duration(milliseconds: 600), () {
+      if (!mounted) return;
+
+      final targets = buildListDetailTutorialTargets(
+        addItemButtonKey: _addItemKey,
+        compareListKey: _compareListKey.currentContext != null ? _compareListKey : null,
+        menuButtonKey: _menuButtonKey,
+      );
+
+      _tutorialCoachMark = TutorialCoachMark(
+        targets: targets,
+        colorShadow: Colors.black,
+        opacityShadow: 0.8,
+        hideSkip: true,
+        paddingFocus: 10,
+        focusAnimationDuration: const Duration(milliseconds: 300),
+        unFocusAnimationDuration: const Duration(milliseconds: 300),
+        onFinish: () {
+          ref.read(tutorialServiceProvider).completeListDetailTutorial();
+        },
+        onSkip: () {
+          ref.read(tutorialServiceProvider).skipAll();
+          return true;
+        },
+      )..show(context: context);
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final listAsync = ref.watch(listByIdProvider(widget.listId));
     final itemsState = ref.watch(realtimeListItemsProvider(widget.listId));
     final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) => _tryShowListDetailTutorial());
 
     return Scaffold(
       appBar: AppBar(
@@ -134,12 +186,14 @@ class _ListDetailScreenState extends ConsumerState<ListDetailScreen> {
                     ),
                   ),
                 IconButton(
+                  key: _addItemKey,
                   icon: const Icon(Icons.add),
                   onPressed: () {
                     _showAddItemDialog(context);
                   },
                 ),
                 IconButton(
+                  key: _menuButtonKey,
                   icon: const Icon(Icons.more_vert),
                   onPressed: () {
                     _showListOptions(context, ref, listAsync.value);
@@ -155,6 +209,7 @@ class _ListDetailScreenState extends ConsumerState<ListDetailScreen> {
               _ListHeader(
                 list: list,
                 isDark: isDark,
+                compareListKey: _compareListKey,
                 onCompare: itemsState.items
                         .where((i) => !i.completedItem)
                         .isEmpty
@@ -594,11 +649,13 @@ class _ListHeader extends StatelessWidget {
   final dynamic list;
   final bool isDark;
   final VoidCallback? onCompare;
+  final GlobalKey? compareListKey;
 
   const _ListHeader({
     required this.list,
     required this.isDark,
     this.onCompare,
+    this.compareListKey,
   });
 
   @override
@@ -649,6 +706,7 @@ class _ListHeader extends StatelessWidget {
           ),
           if (onCompare != null)
             Material(
+              key: compareListKey,
               color: AppColors.primary.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(12),
               child: InkWell(

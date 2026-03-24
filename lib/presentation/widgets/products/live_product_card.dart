@@ -25,6 +25,9 @@ class LiveProductCard extends StatelessWidget {
   /// Callback when compare button is tapped. If null, compare button is hidden.
   final VoidCallback? onCompare;
 
+  /// Optional key for tutorial targeting on the compare button.
+  final GlobalKey? compareButtonKey;
+
   const LiveProductCard({
     super.key,
     required this.product,
@@ -33,6 +36,7 @@ class LiveProductCard extends StatelessWidget {
     this.showAddButton = true,
     this.showCompareButton = true,
     this.onCompare,
+    this.compareButtonKey,
   });
 
   @override
@@ -119,7 +123,7 @@ class LiveProductCard extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (showCompareButton && onCompare != null) ...[
-                    _CompareButton(size: 26, isDark: isDark, onTap: onCompare!),
+                    _CompareButton(size: 26, isDark: isDark, onTap: onCompare!, tutorialKey: compareButtonKey),
                     const SizedBox(width: 4),
                   ],
                   if (showAddButton)
@@ -233,11 +237,13 @@ class _CompareButton extends StatelessWidget {
   final double size;
   final bool isDark;
   final VoidCallback onTap;
+  final GlobalKey? tutorialKey;
 
   const _CompareButton({
     required this.size,
     required this.isDark,
     required this.onTap,
+    this.tutorialKey,
   });
 
   @override
@@ -246,6 +252,7 @@ class _CompareButton extends StatelessWidget {
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: Container(
+        key: tutorialKey,
         width: size,
         height: size,
         decoration: BoxDecoration(

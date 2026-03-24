@@ -7,6 +7,8 @@ class TutorialService {
   static const _recipesTutorialKey = 'tutorial_recipes_completed';
   static const _recipeResultTutorialKey = 'tutorial_recipe_result_completed';
   static const _listsTutorialKey = 'tutorial_lists_completed';
+  static const _listDetailTutorialKey = 'tutorial_list_detail_completed';
+  static const _profileTutorialKey = 'tutorial_profile_completed';
   static const _allTutorialKey = 'tutorial_completed';
 
   final SharedPreferences _prefs;
@@ -27,6 +29,12 @@ class TutorialService {
   bool get isListsTutorialCompleted =>
       _prefs.getBool(_allTutorialKey) ?? _prefs.getBool(_listsTutorialKey) ?? false;
 
+  bool get isListDetailTutorialCompleted =>
+      _prefs.getBool(_allTutorialKey) ?? _prefs.getBool(_listDetailTutorialKey) ?? false;
+
+  bool get isProfileTutorialCompleted =>
+      _prefs.getBool(_allTutorialKey) ?? _prefs.getBool(_profileTutorialKey) ?? false;
+
   Future<void> completeHomeTutorial() => _prefs.setBool(_homeTutorialKey, true);
 
   Future<void> completeBrowseTutorial() => _prefs.setBool(_browseTutorialKey, true);
@@ -37,6 +45,10 @@ class TutorialService {
 
   Future<void> completeListsTutorial() => _prefs.setBool(_listsTutorialKey, true);
 
+  Future<void> completeListDetailTutorial() => _prefs.setBool(_listDetailTutorialKey, true);
+
+  Future<void> completeProfileTutorial() => _prefs.setBool(_profileTutorialKey, true);
+
   Future<void> skipAll() => _prefs.setBool(_allTutorialKey, true);
 
   Future<void> resetAll() async {
@@ -45,6 +57,8 @@ class TutorialService {
     await _prefs.remove(_recipesTutorialKey);
     await _prefs.remove(_recipeResultTutorialKey);
     await _prefs.remove(_listsTutorialKey);
+    await _prefs.remove(_listDetailTutorialKey);
+    await _prefs.remove(_profileTutorialKey);
     await _prefs.remove(_allTutorialKey);
   }
 }
