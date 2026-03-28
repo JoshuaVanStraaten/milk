@@ -16,6 +16,7 @@ import '../../data/services/ingredient_lookup.dart';
 import '../../data/services/product_name_parser.dart';
 import '../../core/constants/retailers.dart';
 import 'store_provider.dart'; // includes smartMatchingServiceProvider
+import 'subscription_provider.dart';
 
 // =============================================================================
 // SERVICE PROVIDERS
@@ -125,6 +126,23 @@ class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
     state = state.copyWith(clearError: true);
   }
 
+  /// Check if the user can generate a recipe (premium or under free limit).
+  /// Returns true if allowed, false if paywalled.
+  Future<bool> checkCanGenerate() async {
+    final repo = _ref.read(subscriptionRepositoryProvider);
+    return repo.canGenerateRecipe();
+  }
+
+  /// Record that a recipe was generated (for usage tracking)
+  Future<void> _recordUsage(String recipeName) async {
+    final repo = _ref.read(subscriptionRepositoryProvider);
+    await repo.recordRecipeGeneration(recipeName);
+    // Invalidate usage providers so UI updates
+    _ref.invalidate(recipeUsageCountProvider);
+    _ref.invalidate(canGenerateRecipeProvider);
+    _ref.invalidate(remainingFreeRecipesProvider);
+  }
+
   /// Generate a recipe from user request
   Future<void> generateRecipe({
     required String recipeRequest,
@@ -133,6 +151,19 @@ class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
     bool autoMatch = true,
     String? preferredRetailer,
   }) async {
+    // Soft launch: track usage but don't block generation.
+    // The UI shows "X/3 free recipes this week" to set expectations,
+    // but users can still generate past the limit.
+    // TODO: Enforce limit when ready to monetize — uncomment the block below:
+    // final canGenerate = await checkCanGenerate();
+    // if (!canGenerate) {
+    //   state = state.copyWith(
+    //     error: 'weekly_limit_reached',
+    //     errorTitle: 'Recipe Limit Reached',
+    //   );
+    //   return;
+    // }
+
     state = state.copyWith(
       isLoading: true,
       clearError: true,
@@ -147,6 +178,9 @@ class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
       );
 
       state = state.copyWith(generatedRecipe: recipe);
+
+      // Record usage for free tier tracking
+      await _recordUsage(recipeRequest);
 
       // Auto-match ingredients using live API
       if (autoMatch) {

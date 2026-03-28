@@ -1,18 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../providers/subscription_provider.dart';
+// TODO: Re-import when enforcing recipe limits
+// import '../../../data/repositories/subscription_repository.dart';
+// import 'premium_paywall_sheet.dart';
 
 /// Card widget for recipe generation input
-class RecipeInputCard extends StatefulWidget {
+class RecipeInputCard extends ConsumerStatefulWidget {
   final Function(String request, int servings, List<String>? dietary)
   onGenerate;
 
   const RecipeInputCard({super.key, required this.onGenerate});
 
   @override
-  State<RecipeInputCard> createState() => _RecipeInputCardState();
+  ConsumerState<RecipeInputCard> createState() => _RecipeInputCardState();
 }
 
-class _RecipeInputCardState extends State<RecipeInputCard> {
+class _RecipeInputCardState extends ConsumerState<RecipeInputCard> {
   final _recipeController = TextEditingController();
   int _servings = 4;
   final Set<String> _selectedDietary = {};
@@ -262,21 +267,76 @@ class _RecipeInputCardState extends State<RecipeInputCard> {
 
           const SizedBox(height: 24),
 
+          // Usage counter
+          _buildUsageCounter(isDark),
+
+          const SizedBox(height: 12),
+
           // Generate button
-          FilledButton.icon(
-            onPressed: _recipeController.text.trim().isNotEmpty
-                ? _handleGenerate
-                : null,
-            icon: const Icon(Icons.auto_awesome),
-            label: const Text('Generate Recipe'),
-            style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          ),
+          _buildGenerateButton(isDark),
         ],
+      ),
+    );
+  }
+
+  Widget _buildUsageCounter(bool isDark) {
+    final usageAsync = ref.watch(recipeUsageCountProvider);
+    final count = usageAsync.valueOrNull ?? 0;
+
+    // Soft launch: simple usage counter, no premium/free distinction
+    return Row(
+      children: [
+        Icon(
+          Icons.auto_awesome,
+          color: AppColors.primary,
+          size: 16,
+        ),
+        const SizedBox(width: 6),
+        Text(
+          '$count ${count == 1 ? 'recipe' : 'recipes'} generated this week',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGenerateButton(bool isDark) {
+    final hasInput = _recipeController.text.trim().isNotEmpty;
+
+    // TODO: Uncomment when ready to enforce recipe limits
+    // final canGenerateAsync = ref.watch(canGenerateRecipeProvider);
+    // final canGenerate = canGenerateAsync.valueOrNull ?? true;
+    // if (!canGenerate) {
+    //   return FilledButton.icon(
+    //     onPressed: hasInput
+    //         ? () => showPremiumPaywallSheet(context)
+    //         : null,
+    //     icon: const Icon(Icons.lock_outline),
+    //     label: const Text('Upgrade to Generate'),
+    //     style: FilledButton.styleFrom(
+    //       padding: const EdgeInsets.symmetric(vertical: 16),
+    //       backgroundColor: const Color(0xFFFFD700),
+    //       foregroundColor: Colors.black,
+    //       shape: RoundedRectangleBorder(
+    //         borderRadius: BorderRadius.circular(12),
+    //       ),
+    //     ),
+    //   );
+    // }
+
+    return FilledButton.icon(
+      onPressed: hasInput ? _handleGenerate : null,
+      icon: const Icon(Icons.auto_awesome),
+      label: const Text('Generate Recipe'),
+      style: FilledButton.styleFrom(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
       ),
     );
   }

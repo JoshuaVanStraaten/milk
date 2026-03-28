@@ -8,6 +8,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../data/models/saved_location.dart';
 import '../../../data/models/vehicle_config.dart';
 import '../../providers/auth_provider.dart';
+import '../../routes/app_router.dart';
 import '../../providers/vehicle_config_provider.dart';
 import '../../widgets/common/address_search_field.dart';
 import '../../widgets/common/vehicle_config_sheet.dart';
@@ -257,6 +258,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
                 const SizedBox(height: 24),
 
+                // Premium Section
+                _SectionHeader(title: 'Subscription', isDark: isDark),
+                const SizedBox(height: 12),
+                _PremiumCard(isDark: isDark),
+
+                const SizedBox(height: 24),
+
                 // Account Section Header
                 _SectionHeader(title: 'Account', isDark: isDark),
 
@@ -328,6 +336,77 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 }
 
 /// Section header widget
+class _PremiumCard extends StatelessWidget {
+  final bool isDark;
+
+  const _PremiumCard({required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: () => context.push(AppRoutes.premium),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.surfaceDarkMode : AppColors.surface,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                Icons.rocket_launch_rounded,
+                color: AppColors.primary,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Early Access',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: isDark
+                          ? AppColors.textPrimaryDark
+                          : AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'All features free for a limited time',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.chevron_right,
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondary,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _SectionHeader extends StatelessWidget {
   final String title;
   final bool isDark;

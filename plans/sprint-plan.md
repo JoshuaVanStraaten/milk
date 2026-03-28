@@ -408,7 +408,7 @@ Frozen | Food Cupboard | Snacks | Beverages
 > - SPAR2U SA app backend remains unknown (APK decompilation blocked by download site JS)
 > - **Revisit if:** SPAR launches a centralized e-commerce platform, or someone captures SPAR2U network traffic via mitmproxy/HTTP Toolkit
 
-#### Sprint 11.1: Makro — IN PROGRESS
+#### Sprint 11.1: Makro ✅ COMPLETE
 
 **Edge Function** (`supabase/functions/products-makro/index.ts`) — DEPLOYED
 
@@ -422,22 +422,16 @@ Frozen | Food Cupboard | Snacks | Beverages
 - **Promo detection fix:** priceTag filtering only uses tags with actual discount keywords (off, save, %, for r, was r, half price) — prevents false positives from "New", "Best Seller", "Bundle Deal" labels
 - **Home screen integration:** Multi-page fetch (4 pages) for Makro since promos are sparse; parses "X% off - Was RY.YY" and "Save RX.XX" promo formats
 - **Browse promo filter fix:** Shows skeleton loading while auto-fetching more pages instead of flashing "No promos" between fetches
+- Store database: 22 Makro warehouse locations imported to Supabase with PostGIS
+- Image handling: direct FCC CDN URLs (`{@width}/{@height}/{@quality}` → 312/312/70) — no proxy needed
 
-**Flutter Registration** — DONE
+**Flutter Registration:**
 
 - `retailers.dart` — Makro added with brand color, icon, slug, edge function name
 - `app_colors.dart` — `makro = Color(0xFF003DA5)` (Makro blue)
 - `product_categories.dart` — Makro category mappings (search-based, not facet-based)
 
-**Remaining for 11.1:**
-
-- Store database: compile 22 Makro warehouse locations (name, lat, lng, address, city, province) from makro.co.za/pages/store-finder
-- Import to Supabase `stores` table with PostGIS location column
-- Verify `stores-nearby` edge function returns nearest Makro
-- Image handling: Makro images load directly (FCC CDN URLs with `{@width}/{@height}/{@quality}` placeholders replaced with 312/312/70) — no proxy needed
-- On-device testing: browse, search, category filter, price compare, recipe export
-
-#### Sprint 11.2: Dis-Chem — NOT STARTED
+#### Sprint 11.2: Dis-Chem ✅ COMPLETE
 
 - Magento 2 REST API (`GET https://www.dischem.co.za/rest/V1/products?searchCriteria[...]`)
 - No auth needed — fully open public API
@@ -446,31 +440,24 @@ Frozen | Food Cupboard | Snacks | Beverages
 - Categories API: `GET /rest/V1/categories` — full tree, no auth
 - Limited grocery range — primarily health food, supplements, baby, snacks
 - 318 stores nationwide
+- Edge Function deployed, Flutter registration complete, store database imported
 
-#### Sprint 11.3: Clicks — NOT STARTED (DEFERRED)
+#### Sprint 11.3: Clicks ✅ COMPLETE
 
-- SAP Hybris + Algolia search — requires Algolia key extraction from browser DevTools
+- SAP Hybris + Algolia search — Algolia keys extracted and stored as Supabase secrets
 - Limited grocery — food cupboard, snacks, chocolates only
 - 600+ stores
-- **Action needed:** Open clicks.co.za, search for a product, capture `X-Algolia-Application-Id`, `X-Algolia-API-Key`, and index name from network requests
+- Edge Function deployed, Flutter registration complete, store database imported
 
-#### Common remaining tasks (11b-11h)
+#### Common tasks (11b-11h) ✅ ALL COMPLETE
 
-**11b. Retailer Config** — Makro DONE, Dis-Chem/Clicks pending
-
-**11c. Store Database** — Makro pending (22 stores), Dis-Chem/Clicks pending
-
-**11d. Category Mapping** — Makro DONE, Dis-Chem/Clicks pending
-
-**11e. Price Comparison** — Works out-of-the-box (retailer-agnostic matching). Tab scrolling needed for 5+ retailer tabs in comparison sheet.
-
-**11f. Recipe Matching** — Retailer-agnostic, should work as-is. May need ingredient_lookup.dart expansion for Makro bulk naming conventions.
-
-**11g. Image Handling** — Makro: direct CDN URLs work. Dis-Chem/Clicks: TBD.
-
-**11h. Testing** — 105 matching tests passing. Cross-retailer tests needed after Dis-Chem/Clicks data available.
-
-**Estimated complexity:** High — each retailer is a mini-project. Tackle as sub-sprints: 11.1-Makro, 11.2-DisChem, 11.3-Clicks.
+- **11b. Retailer Config** — All 3 retailers registered (retailers.dart, app_colors.dart)
+- **11c. Store Database** — All stores imported to Supabase with PostGIS
+- **11d. Category Mapping** — All 3 retailers mapped in product_categories.dart
+- **11e. Price Comparison** — Working across all 7 retailers with scrollable tabs
+- **11f. Recipe Matching** — Retailer-agnostic, works as-is
+- **11g. Image Handling** — Makro: direct CDN. Dis-Chem: Magento media URLs. Clicks: Hybris media URLs.
+- **11h. Testing** — Cross-retailer matching verified
 
 ---
 
@@ -1091,6 +1078,74 @@ Keep animations subtle — they accent the data, not distract from it. `prefers-
 - `lib/presentation/screens/products/live_browse_screen.dart` — Wired compare button key
 - `lib/presentation/screens/lists/list_detail_screen.dart` — Wired list detail tutorial
 - `lib/presentation/screens/profile/profile_screen.dart` — Converted to StatefulWidget, wired profile tutorial with scroll-to-target
+
+---
+
+### Sprint 20: Milk Premium — Subscription Infrastructure (Soft Launch)
+
+**Model:** Opus 4.6 (business model, architecture) → Sonnet 4.6 (implementation)
+**Goal:** Build subscription tracking infrastructure. Show usage limits in UI but don't enforce them. Collect usage data to inform future monetization.
+**Branch:** `feat/milk-premium-subscription`
+**Status:** IN PROGRESS
+
+**Strategy (team decision 2026-03-28):** Soft launch — everything free. Show "2/3 free recipes this week" counter to set expectations. Don't block users when they exceed the limit. Collect usage data. Enforce caps + enable payment later when we have enough users and usage data.
+
+#### Phase 1: Infrastructure — DONE (code written, not deployed)
+
+- [x] Supabase migration SQL (`database/migrations/create_subscription_tables.sql`) — `user_subscriptions` + `recipe_usage` tables with RLS
+- [x] Subscription model (`lib/data/models/subscription.dart`)
+- [x] Subscription repository (`lib/data/repositories/subscription_repository.dart`) — usage tracking, weekly limit check, trial activation
+- [x] Subscription providers (`lib/presentation/providers/subscription_provider.dart`)
+
+#### Phase 2: UI — DONE (code written, not deployed)
+
+- [x] Premium paywall bottom sheet (`lib/presentation/widgets/recipes/premium_paywall_sheet.dart`)
+- [x] Premium screen in Profile (`lib/presentation/screens/profile/premium_screen.dart`)
+- [x] Recipe provider gate (`lib/presentation/providers/recipe_provider.dart`) — usage check + tracking
+- [x] Recipe input card usage counter (`lib/presentation/widgets/recipes/recipe_input_card.dart`)
+- [x] Profile screen Premium card (`lib/presentation/screens/profile/profile_screen.dart`)
+- [x] `/premium` route (`lib/presentation/routes/app_router.dart`)
+- [x] `flutter analyze` — zero warnings
+
+#### Phase 2b: Soft Launch Adjustment — DONE
+
+- [x] `recipe_provider.dart` — commented out hard block (line ~155). Usage still recorded via `_recordUsage()`, but generation is never blocked.
+- [x] `recipe_screen.dart` — commented out `weekly_limit_reached` error interceptor that auto-showed paywall sheet (line ~208)
+- [x] `recipe_input_card.dart` — commented out "Upgrade to Generate" locked button (line ~331). Always shows regular "Generate Recipe" button.
+- [x] Counter still visible ("2/3 free recipes this week") — sets expectations without blocking
+- [x] `flutter analyze` — zero warnings
+
+#### Phase 3: Manual Setup — TODO
+
+- [ ] **Upgrade Gemini to pay-as-you-go** — BLOCKER (19/20 RPD on free tier, will break with real users)
+- [ ] **Run SQL migration** on production Supabase (`sfnavipqilqgzmtedfuh`)
+
+#### When Ready to Monetize — TODOs to Undo (Future Sprint)
+
+All soft-launch code is marked with `// TODO: Uncomment when ready to enforce recipe limits`. Search the codebase for this string to find all locations. Here's the full list:
+
+1. **`lib/presentation/providers/recipe_provider.dart` (~line 155)**
+   - Uncomment the `checkCanGenerate()` call and the `weekly_limit_reached` error block
+   - This re-enables the hard gate that blocks generation past 3/week for free users
+
+2. **`lib/presentation/screens/recipes/recipe_screen.dart` (~line 208)**
+   - Uncomment the `weekly_limit_reached` error interceptor
+   - Re-import `premium_paywall_sheet.dart` (line ~20)
+   - This auto-shows the paywall bottom sheet when a free user hits the limit
+
+3. **`lib/presentation/widgets/recipes/recipe_input_card.dart` (~line 331)**
+   - Uncomment the `canGenerate` check and "Upgrade to Generate" locked button
+   - Re-import `premium_paywall_sheet.dart` (line ~6)
+   - This changes the generate button to a gold "Upgrade" button when limit is reached
+
+4. **Payment integration (new work):**
+   - [ ] Add `purchases_flutter` package (RevenueCat SDK)
+   - [ ] Create `lib/data/services/purchase_service.dart`
+   - [ ] RevenueCat dashboard + Google Play Console product setup (R29.99/mo, R249.99/yr)
+   - [ ] Wire up purchase buttons in `premium_screen.dart` (currently `// TODO`)
+   - [ ] Move Gemini API key server-side (`supabase/functions/gemini-proxy/index.ts`) — required before enforcing payment to prevent APK key extraction and paywall bypass
+
+**Pricing (future):** R29.99/mo or R249.99/yr (30% discount). Free tier: 3 recipes/week.
 
 ---
 

@@ -17,6 +17,8 @@ import '../../widgets/recipes/ingredient_matching_sheet.dart';
 import '../../widgets/recipes/ingredients_input_card.dart';
 import '../../widgets/recipes/recipe_suggestions_card.dart';
 import '../../widgets/common/ai_error_dialog.dart';
+// TODO: Re-import when enforcing recipe limits
+// import '../../widgets/recipes/premium_paywall_sheet.dart';
 import '../../widgets/tutorial/tutorial_targets.dart';
 import '../../widgets/recipes/export_preparation_sheet.dart';
 
@@ -204,6 +206,12 @@ class _GenerateRecipeTabState extends ConsumerState<_GenerateRecipeTab> {
     // Listen for recipe generation errors
     ref.listen<RecipeGenerationState>(recipeGenerationProvider, (prev, next) {
       if (next.hasError && prev?.error != next.error) {
+        // TODO: Uncomment when ready to enforce recipe limits
+        // if (next.error == 'weekly_limit_reached') {
+        //   ref.read(recipeGenerationProvider.notifier).clearError();
+        //   showPremiumPaywallSheet(context);
+        //   return;
+        // }
         showAIErrorDialog(
           context,
           title: next.errorTitle ?? 'Error',

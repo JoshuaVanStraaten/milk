@@ -16,6 +16,7 @@ import '../screens/lists/my_lists_screen.dart';
 import '../screens/lists/create_list_screen.dart';
 import '../screens/lists/list_detail_screen.dart';
 import '../screens/profile/profile_screen.dart';
+import '../screens/profile/premium_screen.dart';
 import '../screens/main/main_shell_screen.dart';
 import '../screens/recipes/recipe_screen.dart';
 
@@ -38,6 +39,7 @@ class AppRoutes {
   static const String recipes = '/recipes';
   static const String lists = '/lists';
   static const String profile = '/profile';
+  static const String premium = '/premium';
 }
 
 /// Router notifier that listens to auth state changes
@@ -198,6 +200,15 @@ final routerProvider = Provider<GoRouter>((ref) {
         pageBuilder: (context, state) => AppPageTransitions.fade(
           state: state,
           child: const MainShellScreen(currentIndex: 4, child: ProfileScreen()),
+        ),
+      ),
+
+      // Premium subscription screen
+      GoRoute(
+        path: AppRoutes.premium,
+        pageBuilder: (context, state) => AppPageTransitions.slideFromRight(
+          state: state,
+          child: const PremiumScreen(),
         ),
       ),
 
