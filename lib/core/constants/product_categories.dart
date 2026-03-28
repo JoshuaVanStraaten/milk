@@ -50,6 +50,7 @@ class ProductCategories {
         'woolworths': 'Fruit-Vegetables-Salads',
         'checkers': 'Fruit & Veg',
         'shoprite': 'Fruit & Veg',
+        'spar': 'Fruit & Veg',
       },
     ),
     ProductCategory(
@@ -60,6 +61,7 @@ class ProductCategories {
         'woolworths': 'Milk-Dairy-Eggs',
         'checkers': 'Dairy & Eggs',
         'shoprite': 'Dairy & Eggs',
+        'spar': 'Dairy & Eggs',
       },
     ),
     ProductCategory(
@@ -70,6 +72,7 @@ class ProductCategories {
         'woolworths': 'Meat-Poultry-Fish',
         'checkers': 'Meat & Poultry',
         'shoprite': 'Meat & Poultry',
+        'spar': 'Meat & Poultry',
       },
     ),
     ProductCategory(
@@ -80,6 +83,7 @@ class ProductCategories {
         'woolworths': 'Bakery',
         'checkers': 'Bakery',
         'shoprite': 'Bakery',
+        'spar': 'Bakery',
       },
     ),
     ProductCategory(
@@ -90,6 +94,7 @@ class ProductCategories {
         'woolworths': 'Frozen-Food',
         'checkers': 'Frozen',
         'shoprite': 'Frozen',
+        'spar': 'Frozen',
       },
     ),
     ProductCategory(
@@ -101,6 +106,7 @@ class ProductCategories {
         'checkers': 'Food Cupboard',
         'shoprite': 'Food Cupboard',
         'makro': 'Food Cupboard',
+        'spar': 'Food Cupboard',
       },
     ),
     ProductCategory(
@@ -112,6 +118,7 @@ class ProductCategories {
         'checkers': 'Snacks',
         'shoprite': 'Snacks',
         'makro': 'Snacks',
+        'spar': 'Snacks',
       },
     ),
     ProductCategory(
@@ -123,6 +130,7 @@ class ProductCategories {
         'checkers': 'Beverages',
         'shoprite': 'Beverages',
         'makro': 'Beverages',
+        'spar': 'Beverages',
       },
     ),
 

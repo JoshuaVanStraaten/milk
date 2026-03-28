@@ -246,6 +246,19 @@ class LiveProductsResponse {
     return currentPage < (totalPages! - 1);
   }
 
+  /// Create a copy with an updated products list.
+  LiveProductsResponse copyWith({List<LiveProduct>? products}) {
+    return LiveProductsResponse(
+      products: products ?? this.products,
+      currentPage: currentPage,
+      totalPages: totalPages,
+      totalResults: totalResults,
+      pageSize: pageSize,
+      retailer: retailer,
+      source: source,
+    );
+  }
+
   /// Empty response (used as initial state)
   static const LiveProductsResponse empty = LiveProductsResponse(
     products: [],

@@ -212,7 +212,10 @@ class ProductNameParser {
       'i&j', 'sea harvest', "fry's", 'frys',
       // Store brands
       'pnp', 'pick n pay', 'checkers', 'shoprite', 'woolworths',
-      'no name', 'housebrand', 'ritebrand',
+      'no name', 'housebrand', 'ritebrand', 'spar',
+      // SPAR-specific brands
+      'buttanutt', 'maggie scratcher', 'lancewood', 'alettes',
+      "alette's", 'bakali',
       // Health
       'dettol', 'savlon', 'disprin', 'panado',
       // Cooking
@@ -228,8 +231,29 @@ class ProductNameParser {
   /// Store brand patterns — used to detect store-own products.
   static const _storeBrands = {
     'pnp', 'pick n pay', 'checkers', 'shoprite', 'woolworths',
-    'no name', 'housebrand', 'ritebrand',
+    'no name', 'housebrand', 'ritebrand', 'spar',
   };
+
+  /// SPAR barcode suffix pattern (e.g. "SK6009518602649")
+  static final _sparBarcodeRegex = RegExp(r'\s+SK\d{10,16}$', caseSensitive: false);
+
+  /// Preprocess SPAR product names: strip barcode suffix, handle ALL CAPS.
+  /// Called before standard parsing.
+  static String _preprocessSpar(String name) {
+    // Strip "SK" + barcode suffix (10-16 digits at end of name)
+    var cleaned = name.replaceAll(_sparBarcodeRegex, '');
+
+    // Detect trailing brand duplication:
+    // e.g. "AERO MILK CHOCOLATE 85G NESTLE" → brand at end should not confuse parser
+    // The Edge Function already converts to title case, but handle raw ALL CAPS too
+    if (cleaned == cleaned.toUpperCase() && cleaned.length > 10) {
+      // ALL CAPS input — no conversion here (Edge Function handles it),
+      // but ensure size units stay consistent
+      cleaned = cleaned.trim();
+    }
+
+    return cleaned.trim();
+  }
 
   /// Generic/filler words that should not drive matching.
   /// These words appear across unrelated product categories and inflate
@@ -299,7 +323,9 @@ class ProductNameParser {
   /// Parse a product name into brand, size, pack count, variants, and
   /// normalized form.
   static ParsedProductName parse(String name) {
-    final lower = name.toLowerCase().trim();
+    // Preprocess SPAR names: strip barcode suffix before standard parsing
+    final preprocessed = _preprocessSpar(name);
+    final lower = preprocessed.toLowerCase().trim();
 
     // -- Extract brand (longest match first) --
     String? brand;
@@ -429,7 +455,7 @@ class ProductNameParser {
       variants: variants,
       variantGroups: variantGroups,
       normalizedName: normalized,
-      originalName: name,
+      originalName: preprocessed,
     );
   }
 

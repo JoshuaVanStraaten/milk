@@ -10,6 +10,7 @@ import '../../data/services/live_api_service.dart';
 import '../../data/services/fallback_product_service.dart';
 import '../../data/services/location_service.dart';
 import '../../data/services/smart_matching_service.dart';
+import '../../data/services/spar_promo_cache.dart';
 import 'recipe_provider.dart' show geminiServiceProvider;
 import 'theme_provider.dart'; // for sharedPreferencesProvider
 
@@ -27,11 +28,14 @@ final liveApiServiceProvider = Provider<LiveApiService>((ref) {
 
 /// Wraps [LiveApiService] with automatic DB fallback.
 /// Use this for browse/search/compare — transparent failover.
+/// Also enriches SPAR results with catalogue promo data.
 final fallbackProductServiceProvider = Provider<FallbackProductService>((ref) {
   final liveApi = ref.read(liveApiServiceProvider);
+  final sparPromoCache = ref.read(sparPromoCacheProvider);
   return FallbackProductService(
     liveApi: liveApi,
     supabase: Supabase.instance.client,
+    sparPromoCache: sparPromoCache,
   );
 });
 
@@ -44,6 +48,13 @@ final locationServiceProvider = Provider<LocationService>((ref) {
 final smartMatchingServiceProvider = Provider<SmartMatchingService>((ref) {
   final gemini = ref.read(geminiServiceProvider);
   return SmartMatchingService(gemini: gemini);
+});
+
+/// SPAR catalogue specials cache — lazy-loaded, 6-hour TTL.
+/// Used by FallbackProductService to cross-reference SPAR products
+/// against current catalogue promotions.
+final sparPromoCacheProvider = Provider<SparPromoCache>((ref) {
+  return SparPromoCache();
 });
 
 // =============================================================================

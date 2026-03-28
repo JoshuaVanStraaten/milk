@@ -247,6 +247,58 @@ class LiveApiService {
   }
 
   // ──────────────────────────────────────────────────────────────────────────
+  // FETCH SPECIALS (catalogue promos)
+  // ──────────────────────────────────────────────────────────────────────────
+
+  /// Fetch promotional specials for a retailer.
+  ///
+  /// Currently only SPAR supports this — scrapes my-catalogue.co.za
+  /// for current catalogue specials with real prices.
+  Future<LiveProductsResponse> fetchSpecials({
+    required String retailer,
+    required NearbyStore store,
+  }) async {
+    final config = Retailers.fromName(retailer);
+    if (config == null) {
+      throw LiveApiException('Unknown retailer: $retailer');
+    }
+
+    final url = LiveApiConfig.edgeFunctionUrl(config.edgeFunctionName);
+
+    final body = <String, dynamic>{
+      'store_code': store.storeCode,
+      'specials': true,
+    };
+
+    _logger.d('Fetching $retailer specials');
+
+    final response = await _retryWithBackoff(
+      () => _client
+          .post(
+            Uri.parse(url),
+            headers: LiveApiConfig.headers,
+            body: jsonEncode(body),
+          )
+          .timeout(const Duration(seconds: 45))
+          .then((r) {
+            if (r.statusCode != 200) {
+              throw LiveApiException(
+                'Failed to fetch $retailer specials',
+                statusCode: r.statusCode,
+                body: r.body,
+              );
+            }
+            return r;
+          }),
+      label: 'specials-$retailer',
+    );
+
+    return LiveProductsResponse.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
   // COMPARE PRODUCTS
   // ──────────────────────────────────────────────────────────────────────────
 

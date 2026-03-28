@@ -148,25 +148,40 @@ class HomeDealsNotifier extends StateNotifier<HomeDealsState> {
       for (final entry in storeSelection.stores.entries) {
         futures.add(() async {
           try {
-            // Fetch multiple pages — more for retailers with sparse promos
-            final allPageProducts = <LiveProduct>[];
-            final maxPages = Retailers.isPharmacy(entry.key) ||
-                    entry.key == 'Makro'
-                ? 4  // Pharmacy/Makro have sparse promos, fetch more
-                : 2;
+            // SPAR: fetch catalogue specials (not browse API)
+            // Other retailers: browse multiple pages for promos
+            final List<LiveProduct> products;
 
-            for (int page = 0; page < maxPages; page++) {
-              final response = await api.browseProducts(
-                retailer: entry.key,
-                store: entry.value,
-                page: page,
-              );
-              allPageProducts.addAll(response.products);
-              // Stop early if page had few results (small catalog)
-              if (response.products.length < 20) break;
+            if (entry.key == 'SPAR') {
+              try {
+                final response = await api.fetchSpecials(
+                  retailer: entry.key,
+                  store: entry.value,
+                );
+                products = response.products;
+              } catch (e) {
+                debugPrint('SPAR specials fetch failed: $e');
+                return;
+              }
+            } else {
+              final allPageProducts = <LiveProduct>[];
+              final maxPages = Retailers.isPharmacy(entry.key) ||
+                      entry.key == 'Makro'
+                  ? 4  // Pharmacy/Makro have sparse promos, fetch more
+                  : 2;
+
+              for (int page = 0; page < maxPages; page++) {
+                final response = await api.browseProducts(
+                  retailer: entry.key,
+                  store: entry.value,
+                  page: page,
+                );
+                allPageProducts.addAll(response.products);
+                // Stop early if page had few results (small catalog)
+                if (response.products.length < 20) break;
+              }
+              products = allPageProducts;
             }
-
-            final products = allPageProducts;
 
             final promos = products.where((p) => p.hasPromo).map((p) {
               // Calculate savings

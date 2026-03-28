@@ -42,6 +42,7 @@ class AppColors {
   static const Color makro = Color(0xFF003DA5); // Makro blue
   static const Color disChem = Color(0xFF00A94F); // Dis-Chem green
   static const Color clicks = Color(0xFF005BAA); // Clicks blue
+  static const Color spar = Color(0xFFDC1E35); // SPAR red
 
   // Utility Colors (Light)
   static const Color divider = Color(0xFFE5E7EB);

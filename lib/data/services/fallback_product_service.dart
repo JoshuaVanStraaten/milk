@@ -14,22 +14,27 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/live_product.dart';
 import '../models/nearby_store.dart';
 import 'live_api_service.dart';
+import 'spar_promo_cache.dart';
 
 class FallbackProductService {
   final LiveApiService _liveApi;
   final SupabaseClient _supabase;
+  final SparPromoCache _sparPromoCache;
 
   FallbackProductService({
     required LiveApiService liveApi,
     required SupabaseClient supabase,
+    required SparPromoCache sparPromoCache,
   }) : _liveApi = liveApi,
-       _supabase = supabase;
+       _supabase = supabase,
+       _sparPromoCache = sparPromoCache;
 
   // ──────────────────────────────────────────────────────────────────────────
   // BROWSE
   // ──────────────────────────────────────────────────────────────────────────
 
   /// Browse products — tries live API first, falls back to DB.
+  /// For SPAR, enriches results with catalogue promo data.
   Future<LiveProductsResponse> browseProducts({
     required String retailer,
     required NearbyStore store,
@@ -37,8 +42,9 @@ class FallbackProductService {
     int page = 0,
     int pageSize = 24,
   }) async {
+    LiveProductsResponse response;
     try {
-      return await _liveApi.browseProducts(
+      response = await _liveApi.browseProducts(
         retailer: retailer,
         store: store,
         category: category,
@@ -48,8 +54,10 @@ class FallbackProductService {
       debugPrint(
         'Live API browse failed for $retailer: $e — using DB fallback',
       );
-      return _dbBrowse(retailer: retailer, page: page, pageSize: pageSize);
+      response = await _dbBrowse(retailer: retailer, page: page, pageSize: pageSize);
     }
+
+    return _enrichSparPromos(response, retailer, store);
   }
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -57,14 +65,16 @@ class FallbackProductService {
   // ──────────────────────────────────────────────────────────────────────────
 
   /// Search products — tries live API first, falls back to DB.
+  /// For SPAR, enriches results with catalogue promo data.
   Future<LiveProductsResponse> searchProducts({
     required String retailer,
     required NearbyStore store,
     required String query,
     int pageSize = 24,
   }) async {
+    LiveProductsResponse response;
     try {
-      return await _liveApi.searchProducts(
+      response = await _liveApi.searchProducts(
         retailer: retailer,
         store: store,
         query: query,
@@ -74,8 +84,10 @@ class FallbackProductService {
       debugPrint(
         'Live API search failed for $retailer: $e — using DB fallback',
       );
-      return _dbSearch(retailer: retailer, query: query, pageSize: pageSize);
+      response = await _dbSearch(retailer: retailer, query: query, pageSize: pageSize);
     }
+
+    return _enrichSparPromos(response, retailer, store);
   }
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -83,6 +95,7 @@ class FallbackProductService {
   // ──────────────────────────────────────────────────────────────────────────
 
   /// Compare product across retailers — each retailer falls back independently.
+  /// For SPAR, enriches results with catalogue promo data.
   Future<Map<String, List<LiveProduct>>> compareProduct({
     required String productName,
     required Map<String, NearbyStore> stores,
@@ -92,6 +105,7 @@ class FallbackProductService {
 
     for (final entry in stores.entries) {
       futures.add(() async {
+        List<LiveProduct> products;
         try {
           final response = await _liveApi.searchProducts(
             retailer: entry.key,
@@ -99,7 +113,7 @@ class FallbackProductService {
             query: productName,
             pageSize: 5,
           );
-          results[entry.key] = response.products;
+          products = response.products;
         } catch (e) {
           debugPrint('Compare failed for ${entry.key}: $e — using DB fallback');
           try {
@@ -108,16 +122,48 @@ class FallbackProductService {
               query: productName,
               pageSize: 5,
             );
-            results[entry.key] = fallback.products;
+            products = fallback.products;
           } catch (_) {
-            results[entry.key] = [];
+            products = [];
           }
         }
+
+        // Enrich SPAR results with promo data
+        if (entry.key == 'SPAR' && products.isNotEmpty) {
+          await _sparPromoCache.getSpecials(_liveApi, entry.value);
+          products = _sparPromoCache.enrichWithPromos(products);
+        }
+
+        results[entry.key] = products;
       }());
     }
 
     await Future.wait(futures);
     return results;
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // SPAR PROMO ENRICHMENT
+  // ──────────────────────────────────────────────────────────────────────────
+
+  /// Enrich SPAR product responses with catalogue promo data.
+  /// No-op for non-SPAR retailers.
+  Future<LiveProductsResponse> _enrichSparPromos(
+    LiveProductsResponse response,
+    String retailer,
+    NearbyStore store,
+  ) async {
+    if (retailer != 'SPAR') return response;
+
+    try {
+      await _sparPromoCache.getSpecials(_liveApi, store);
+      return response.copyWith(
+        products: _sparPromoCache.enrichWithPromos(response.products),
+      );
+    } catch (e) {
+      debugPrint('SPAR promo enrichment failed: $e');
+      return response;
+    }
   }
 
   // ──────────────────────────────────────────────────────────────────────────

@@ -129,6 +129,10 @@ class _LiveBrowseScreenState extends ConsumerState<LiveBrowseScreen> {
   bool _promosOnly = false;
   bool _fetchingMorePromos = false;
 
+  // SPAR catalogue specials (loaded on demand when promo filter is on)
+  List<LiveProduct>? _sparSpecials;
+  bool _loadingSparSpecials = false;
+
   @override
   void initState() {
     super.initState();
@@ -214,11 +218,42 @@ class _LiveBrowseScreenState extends ConsumerState<LiveBrowseScreen> {
     });
   }
 
+  Future<void> _fetchSparSpecials() async {
+    final storeState = ref.read(storeSelectionProvider);
+    final api = ref.read(liveApiServiceProvider);
+
+    storeState.whenData((selection) async {
+      final store = selection.forRetailer('SPAR');
+      if (store == null) {
+        if (mounted) setState(() => _loadingSparSpecials = false);
+        return;
+      }
+
+      try {
+        final response = await api.fetchSpecials(
+          retailer: 'SPAR',
+          store: store,
+        );
+        if (mounted) {
+          setState(() {
+            _sparSpecials = response.products;
+            _loadingSparSpecials = false;
+          });
+        }
+      } catch (e) {
+        debugPrint('Failed to fetch SPAR specials for browse: $e');
+        if (mounted) setState(() => _loadingSparSpecials = false);
+      }
+    });
+  }
+
   void _onRetailerChanged(String retailer) {
     _searchController.clear();
     setState(() {
       _isSearching = false;
       _selectedCategory = null; // Reset category on retailer change
+      _sparSpecials = null; // Clear SPAR specials cache
+      _loadingSparSpecials = false;
     });
     ref.read(liveSearchProvider.notifier).clear();
     ref.read(selectedRetailerProvider.notifier).state = retailer;
@@ -462,25 +497,44 @@ class _LiveBrowseScreenState extends ConsumerState<LiveBrowseScreen> {
         // Apply client-side sort & promo filter
         var products = applySort(response.products, _sortOption);
         if (_promosOnly) {
-          products = products.where((p) => p.hasPromo).toList();
+          final retailer = ref.read(selectedRetailerProvider);
 
-          final canFetchMore = response.hasMorePages && response.currentPage < 5;
-
-          // Auto-fetch more pages if we have too few promo products
-          // but more pages are available. Cap at 5 pages to avoid
-          // excessive API calls for retailers with sparse promotions.
-          if (products.length < 6 && canFetchMore && !_fetchingMorePromos) {
-            _fetchingMorePromos = true;
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              ref.read(liveProductsProvider.notifier).loadNextPage().then((_) {
-                if (mounted) setState(() => _fetchingMorePromos = false);
+          // SPAR: show catalogue specials instead of filtering browse results
+          // (KwikSPAR API doesn't return promo data)
+          if (retailer == 'SPAR') {
+            if (_sparSpecials != null) {
+              products = _sparSpecials!;
+            } else if (_loadingSparSpecials) {
+              return const ProductGridSkeleton();
+            } else {
+              // Trigger fetch
+              _loadingSparSpecials = true;
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                _fetchSparSpecials();
               });
-            });
-          }
+              return const ProductGridSkeleton();
+            }
+          } else {
+            products = products.where((p) => p.hasPromo).toList();
 
-          // Show skeleton while still fetching and no promos found yet
-          if (products.isEmpty && (canFetchMore || _fetchingMorePromos)) {
-            return const ProductGridSkeleton();
+            final canFetchMore = response.hasMorePages && response.currentPage < 5;
+
+            // Auto-fetch more pages if we have too few promo products
+            // but more pages are available. Cap at 5 pages to avoid
+            // excessive API calls for retailers with sparse promotions.
+            if (products.length < 6 && canFetchMore && !_fetchingMorePromos) {
+              _fetchingMorePromos = true;
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                ref.read(liveProductsProvider.notifier).loadNextPage().then((_) {
+                  if (mounted) setState(() => _fetchingMorePromos = false);
+                });
+              });
+            }
+
+            // Show skeleton while still fetching and no promos found yet
+            if (products.isEmpty && (canFetchMore || _fetchingMorePromos)) {
+              return const ProductGridSkeleton();
+            }
           }
 
           if (products.isEmpty) {

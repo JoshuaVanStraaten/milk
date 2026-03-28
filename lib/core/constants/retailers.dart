@@ -112,6 +112,14 @@ class Retailers {
       edgeFunctionName: 'products-clicks',
       slug: 'clicks',
     ),
+    'SPAR': RetailerConfig(
+      name: 'SPAR',
+      color: AppColors.spar,
+      colorLight: Color(0xFFFDE8EB), // Light red tint
+      icon: Icons.store,
+      edgeFunctionName: 'products-spar',
+      slug: 'spar',
+    ),
   };
 
   /// Look up a [RetailerConfig] by its API slug (e.g. "pnp", "checkers").
@@ -141,6 +149,7 @@ class Retailers {
     'Woolworths',
     'Checkers',
     'Shoprite',
+    'SPAR',
   };
 
   /// Whether [retailerName] is a grocery retailer (used for recipe matching).

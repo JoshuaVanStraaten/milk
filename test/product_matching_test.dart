@@ -1133,4 +1133,1932 @@ void main() {
       expect(result!.name, contains('Black Pepper'));
     });
   });
+
+  // ###########################################################################
+  // SECTION 4: SPAR INTEGRATION TESTS
+  // ###########################################################################
+
+  // =========================================================================
+  // A. SPAR name preprocessing — barcode stripping
+  // =========================================================================
+  group('SPAR barcode stripping', () {
+    test('strips SK barcode suffix from SPAR product names', () {
+      final parsed = ProductNameParser.parse(
+          'Albany Best Of Both Genius Speciality Bread 700g SK6009518602649');
+      expect(parsed.originalName,
+          equals('Albany Best Of Both Genius Speciality Bread 700g'));
+      expect(parsed.brand, equals('albany'));
+      expect(parsed.sizeValue, equals(700));
+      expect(parsed.sizeUnit, equals('g'));
+    });
+
+    test('strips barcode from SPAR own-brand product', () {
+      final parsed = ProductNameParser.parse(
+          'Cultured Buttermilk Low Fat 500g Spar SK6001008731242');
+      expect(parsed.originalName, isNot(contains('SK6001008731242')));
+      expect(parsed.sizeValue, equals(500));
+      expect(parsed.sizeUnit, equals('g'));
+    });
+
+    test('strips barcode from product with brand at end', () {
+      final parsed = ProductNameParser.parse(
+          'Aero Milk Chocolate 85g Nestle SK6009188000080');
+      expect(parsed.originalName, isNot(contains('SK6009188000080')));
+      expect(parsed.brand, equals('aero'));
+      expect(parsed.sizeValue, equals(85));
+    });
+
+    test('handles product with no barcode (non-SPAR)', () {
+      final parsed = ProductNameParser.parse('Clover Full Cream Milk 2L');
+      expect(parsed.originalName, equals('Clover Full Cream Milk 2L'));
+      expect(parsed.brand, equals('clover'));
+    });
+
+    test('strips barcode with 13-digit code', () {
+      final parsed = ProductNameParser.parse(
+          'Lucky Star Pilchards In Tomato Sauce 400g SK6009522300123');
+      expect(parsed.originalName, isNot(contains('SK')));
+      expect(parsed.brand, equals('lucky star'));
+      expect(parsed.sizeValue, equals(400));
+    });
+
+    test('strips barcode with varying lengths (10-16 digits)', () {
+      final p1 = ProductNameParser.parse('Test Product 100g SK0070650800138');
+      expect(p1.originalName, equals('Test Product 100g'));
+
+      final p2 = ProductNameParser.parse('Test Product 100g SK60095186016');
+      // 11 digits — should still strip
+      expect(p2.originalName, equals('Test Product 100g'));
+    });
+  });
+
+  // =========================================================================
+  // B. SPAR cross-retailer matching — exact matches
+  // =========================================================================
+  group('SPAR cross-retailer exact matching', () {
+    test('Albany bread matches across SPAR and PnP', () {
+      final spar = ProductNameParser.parse(
+          'Albany Superior Brown Bread 700g SK6009518602649');
+      final pnp = ProductNameParser.parse('Albany Superior Brown Bread 700g');
+      final confidence =
+          ProductNameParser.computeConfidence(spar, pnp);
+      expect(confidence, greaterThanOrEqualTo(0.80),
+          reason: 'Same brand + product + size should be exact match');
+    });
+
+    test('Clover milk matches across SPAR and Checkers', () {
+      final spar = ProductNameParser.parse(
+          'Clover Full Cream Milk 2l SK6001008000123');
+      final checkers =
+          ProductNameParser.parse('Clover Full Cream Milk 2L');
+      final confidence =
+          ProductNameParser.computeConfidence(spar, checkers);
+      expect(confidence, greaterThanOrEqualTo(0.80));
+    });
+
+    test('Nescafe matches across SPAR and Shoprite', () {
+      final spar =
+          ProductNameParser.parse('Nescafe Classic 200g SK6001108000456');
+      final shoprite =
+          ProductNameParser.parse('Nescafe Classic Instant Coffee 200g');
+      final confidence =
+          ProductNameParser.computeConfidence(spar, shoprite);
+      expect(confidence, greaterThanOrEqualTo(0.55),
+          reason: 'Same brand + size, slight name diff → similar');
+    });
+
+    test('Lucky Star pilchards matches exactly', () {
+      final spar = ProductNameParser.parse(
+          'Lucky Star Pilchards In Tomato Sauce 400g SK6009522300789');
+      final pnp = ProductNameParser.parse(
+          'Lucky Star Pilchards In Tomato Sauce 400g');
+      final confidence =
+          ProductNameParser.computeConfidence(spar, pnp);
+      expect(confidence, greaterThanOrEqualTo(0.80));
+    });
+
+    test('Koo Baked Beans matches exactly', () {
+      final spar = ProductNameParser.parse(
+          'Koo Baked Beans In Tomato Sauce 410g SK6001015200456');
+      final checkers = ProductNameParser.parse(
+          'KOO Baked Beans in Tomato Sauce 410g');
+      final confidence =
+          ProductNameParser.computeConfidence(spar, checkers);
+      expect(confidence, greaterThanOrEqualTo(0.80));
+    });
+
+    test('Cadbury Dairy Milk matches across retailers', () {
+      final spar = ProductNameParser.parse(
+          'Cadbury Dairy Milk Chocolate 150g SK6001065000123');
+      final pnp =
+          ProductNameParser.parse('Cadbury Dairy Milk Chocolate 150g');
+      final confidence =
+          ProductNameParser.computeConfidence(spar, pnp);
+      expect(confidence, greaterThanOrEqualTo(0.80));
+    });
+
+    test('Spekko Rice matches across retailers', () {
+      final spar = ProductNameParser.parse(
+          'Spekko Long Grain Parboiled Rice 2kg SK6001108200789');
+      final shoprite = ProductNameParser.parse(
+          'Spekko Long Grain Parboiled Rice 2Kg');
+      final confidence =
+          ProductNameParser.computeConfidence(spar, shoprite);
+      expect(confidence, greaterThanOrEqualTo(0.80));
+    });
+
+    test('Sunfoil Sunflower Oil matches across retailers', () {
+      final spar = ProductNameParser.parse(
+          'Sunfoil Sunflower Oil 2l SK6001240000456');
+      final pnp =
+          ProductNameParser.parse('Sunfoil Sunflower Oil 2L');
+      final confidence =
+          ProductNameParser.computeConfidence(spar, pnp);
+      expect(confidence, greaterThanOrEqualTo(0.80));
+    });
+
+    test('Tastic Rice matches across retailers', () {
+      final spar =
+          ProductNameParser.parse('Tastic Rice 2kg SK6001108100234');
+      final checkers =
+          ProductNameParser.parse('Tastic Long Grain Rice 2kg');
+      final confidence =
+          ProductNameParser.computeConfidence(spar, checkers);
+      expect(confidence, greaterThanOrEqualTo(0.55));
+    });
+
+    test('Omo Washing Powder matches across retailers', () {
+      final spar = ProductNameParser.parse(
+          'Omo Auto Washing Powder 2kg SK6001085000789');
+      final shoprite =
+          ProductNameParser.parse('Omo Auto Washing Powder 2kg');
+      final confidence =
+          ProductNameParser.computeConfidence(spar, shoprite);
+      expect(confidence, greaterThanOrEqualTo(0.80));
+    });
+  });
+
+  // =========================================================================
+  // C. SPAR own-brand vs branded — similar matches
+  // =========================================================================
+  group('SPAR own-brand vs branded', () {
+    test('SPAR milk vs Clover milk — similar (different brand, same product)',
+        () {
+      final spar = ProductNameParser.parse(
+          'Spar Full Cream Milk 2l SK6001008731000');
+      final clover =
+          ProductNameParser.parse('Clover Full Cream Milk 2L');
+      final confidence =
+          ProductNameParser.computeConfidence(spar, clover);
+      expect(confidence, greaterThanOrEqualTo(0.55),
+          reason: 'Different brand, same product type + size → similar');
+      expect(confidence, lessThan(0.80),
+          reason: 'Different brand should not be exact');
+    });
+
+    test('SPAR white sugar vs Selati white sugar — similar', () {
+      final spar = ProductNameParser.parse(
+          'Spar White Sugar 2.5kg SK6001008732000');
+      final selati =
+          ProductNameParser.parse('Selati White Sugar 2.5kg');
+      final confidence =
+          ProductNameParser.computeConfidence(spar, selati);
+      expect(confidence, greaterThanOrEqualTo(0.55));
+    });
+
+    test('SPAR brown bread vs Albany brown bread — similar', () {
+      final spar = ProductNameParser.parse(
+          'Spar Brown Bread 700g SK6001008733000');
+      final albany =
+          ProductNameParser.parse('Albany Superior Brown Bread 700g');
+      final confidence =
+          ProductNameParser.computeConfidence(spar, albany);
+      expect(confidence, greaterThanOrEqualTo(0.55));
+    });
+  });
+
+  // =========================================================================
+  // D. SPAR negative tests — should NOT match
+  // =========================================================================
+  group('SPAR negative matching', () {
+    test('Milk Chocolate should NOT match Full Cream Milk at exact/similar level', () {
+      final choc = ProductNameParser.parse(
+          'Aero Milk Chocolate 85g SK6009188000080');
+      final milk =
+          ProductNameParser.parse('Clover Full Cream Milk 2L');
+      final confidence =
+          ProductNameParser.computeConfidence(choc, milk);
+      expect(confidence, lessThan(0.55),
+          reason: 'Chocolate vs milk — shared word "milk" inflates score but should stay below similar threshold');
+    });
+
+    test('Buttermilk Rusks should NOT match Cultured Buttermilk', () {
+      final rusks = ProductNameParser.parse(
+          'Alettes Buttermilk Rusks 500g SK6009673800140');
+      final buttermilk = ProductNameParser.parse(
+          'Cultured Buttermilk Low Fat 500ml SK6001008731242');
+      final confidence =
+          ProductNameParser.computeConfidence(rusks, buttermilk);
+      expect(confidence, lessThan(0.55),
+          reason: 'Rusks vs liquid buttermilk = different categories');
+    });
+
+    test('Rice Vinegar should NOT match Spekko Rice', () {
+      final vinegar = ProductNameParser.parse(
+          'Amoy White Rice Vinegar 150ml SK4892773231202');
+      final rice = ProductNameParser.parse(
+          'Spekko Long Grain Parboiled Rice 2kg SK6001108200789');
+      final confidence =
+          ProductNameParser.computeConfidence(vinegar, rice);
+      expect(confidence, lessThan(0.30));
+    });
+
+    test('Coconut Milk should NOT match Full Cream Milk', () {
+      final coconut = ProductNameParser.parse(
+          'A Taste Of Thai Lite Coconut Milk 400ml SK0070650800138');
+      final milk =
+          ProductNameParser.parse('Clover Full Cream Milk 2L');
+      final confidence =
+          ProductNameParser.computeConfidence(coconut, milk);
+      expect(confidence, lessThan(0.55),
+          reason: 'Coconut milk vs dairy milk = different product');
+    });
+
+    test('Canned Milk should NOT match Fresh Milk', () {
+      final canned = ProductNameParser.parse(
+          'Nestle Condensed Milk 385g SK6001068300123');
+      final fresh =
+          ProductNameParser.parse('Clover Full Cream Milk 2L');
+      final confidence =
+          ProductNameParser.computeConfidence(canned, fresh);
+      expect(confidence, lessThan(0.55));
+    });
+  });
+
+  // =========================================================================
+  // E. SPAR size normalization
+  // =========================================================================
+  group('SPAR size normalization', () {
+    test('2l vs 2L — case insensitive match', () {
+      final spar =
+          ProductNameParser.parse('Clover Full Cream Milk 2l SK600100800');
+      final pnp =
+          ProductNameParser.parse('Clover Full Cream Milk 2L');
+      expect(spar.sizeValue, equals(pnp.sizeValue));
+      expect(spar.sizeUnit, equals(pnp.sizeUnit));
+    });
+
+    test('1kg vs 1000g — equivalent sizes', () {
+      final kg = ProductNameParser.parse('Bokomo Corn Flakes 1kg');
+      final g = ProductNameParser.parse('Bokomo Corn Flakes 1000g');
+      // Both parse correctly
+      expect(kg.sizeValue, equals(1));
+      expect(kg.sizeUnit, equals('kg'));
+      expect(g.sizeValue, equals(1000));
+      expect(g.sizeUnit, equals('g'));
+    });
+
+    test('multi-pack parsing: 6 X 200ml', () {
+      final parsed = ProductNameParser.parse(
+          'Steri Stumpie Chocolate 6 X 200ml SK600100800');
+      expect(parsed.packCount, equals(6));
+      expect(parsed.sizeValue, equals(200));
+      expect(parsed.sizeUnit, equals('ml'));
+      expect(parsed.totalSize, equals(1200));
+    });
+
+    test('SPAR product with size in different position', () {
+      final parsed = ProductNameParser.parse(
+          '12 Free Range Grade 1 Extra Large Eggs 59g Maggie Scratcher SK6009662390829');
+      // Should extract some size info
+      expect(parsed.originalName, isNot(contains('SK6009662390829')));
+    });
+  });
+
+  // =========================================================================
+  // F. SPAR confidence score ranges
+  // =========================================================================
+  group('SPAR confidence score ranges', () {
+    test('identical product across retailers → exact (≥0.80)', () {
+      final spar = ProductNameParser.parse(
+          'All Gold Tomato Sauce 700ml SK6009522300456');
+      final pnp =
+          ProductNameParser.parse('All Gold Tomato Sauce 700ml');
+      final confidence =
+          ProductNameParser.computeConfidence(spar, pnp);
+      expect(confidence, greaterThanOrEqualTo(0.80));
+    });
+
+    test('different brand same product → similar (≥0.50)', () {
+      final spar =
+          ProductNameParser.parse('Spar Tomato Sauce 700ml SK6001008734000');
+      final allGold =
+          ProductNameParser.parse('All Gold Tomato Sauce 700ml');
+      final confidence =
+          ProductNameParser.computeConfidence(spar, allGold);
+      expect(confidence, greaterThanOrEqualTo(0.50),
+          reason: 'Different brand, same product+size → at least 0.50');
+    });
+
+    test('completely different products → rejected (<0.30)', () {
+      final bread = ProductNameParser.parse(
+          'Albany Brown Bread 700g SK6001253010352');
+      final milk =
+          ProductNameParser.parse('Clover Full Cream Milk 2L');
+      final confidence =
+          ProductNameParser.computeConfidence(bread, milk);
+      expect(confidence, lessThan(0.30));
+    });
+
+    test('similar product different size → penalized but recognizable', () {
+      final small = ProductNameParser.parse(
+          'Nescafe Classic 100g SK6001108000111');
+      final large = ProductNameParser.parse(
+          'Nescafe Classic 200g SK6001108000222');
+      final confidence =
+          ProductNameParser.computeConfidence(small, large);
+      // Same brand + product but different size → penalized but still recognizable
+      expect(confidence, greaterThanOrEqualTo(0.50));
+      expect(confidence, lessThan(0.80),
+          reason: 'Different size should not be exact');
+    });
+  });
+
+  // =========================================================================
+  // G. SPAR brand detection
+  // =========================================================================
+  group('SPAR brand detection', () {
+    test('detects SPAR as own brand', () {
+      final parsed = ProductNameParser.parse(
+          'Spar Full Cream Milk 2l SK6001008731242');
+      expect(parsed.brand, equals('spar'));
+    });
+
+    test('detects Lancewood brand', () {
+      final parsed = ProductNameParser.parse(
+          'Lancewood Cultured Full Cream Buttermilk 500ml SK6009617225220');
+      expect(parsed.brand, equals('lancewood'));
+    });
+
+    test('detects Buttanutt brand', () {
+      final parsed = ProductNameParser.parse(
+          'Buttanutt 100% Almond Nut Butter 250g SK6009900424392');
+      expect(parsed.brand, equals('buttanutt'));
+    });
+
+    test('detects standard brand from SPAR product', () {
+      final parsed = ProductNameParser.parse(
+          'Coca-Cola Original Taste 2l SK5449000000996');
+      expect(parsed.brand, equals('coca-cola'));
+      expect(parsed.sizeValue, equals(2));
+      expect(parsed.sizeUnit, equals('l'));
+    });
+
+    test('detects All Gold brand from SPAR product', () {
+      final parsed = ProductNameParser.parse(
+          'All Gold Peeled And Diced Tomatoes 410g SK6009522309999');
+      expect(parsed.brand, equals('all gold'));
+    });
+  });
+
+  // =========================================================================
+  // H. SPAR variant detection
+  // =========================================================================
+  group('SPAR variant detection', () {
+    test('detects fat type variant', () {
+      final parsed = ProductNameParser.parse(
+          'Clover Low Fat Milk 2l SK6001008000111');
+      expect(parsed.variantGroups['fat_type'], equals('low fat'));
+    });
+
+    test('detects sauce type variant', () {
+      final parsed = ProductNameParser.parse(
+          'Lucky Star Pilchards In Tomato Sauce 400g SK6009522300789');
+      expect(parsed.variantGroups['sauce_type'], equals('in tomato sauce'));
+    });
+
+    test('detects grain variant', () {
+      final parsed = ProductNameParser.parse(
+          'Albany Superior Brown Bread 700g SK6009518602649');
+      expect(parsed.variantGroups['grain'], equals('brown'));
+    });
+
+    test('full cream vs low fat are different variants', () {
+      final full = ProductNameParser.parse(
+          'Clover Full Cream Milk 2l SK6001008000111');
+      final low = ProductNameParser.parse(
+          'Clover Low Fat Milk 2l SK6001008000222');
+      expect(full.variantGroups['fat_type'], equals('full cream'));
+      expect(low.variantGroups['fat_type'], equals('low fat'));
+      // Different variants should reduce confidence
+      final confidence =
+          ProductNameParser.computeConfidence(full, low);
+      expect(confidence, lessThan(0.80),
+          reason: 'Different fat variants should not be exact match');
+    });
+  });
+
+  // ###########################################################################
+  // SECTION 5: CROSS-RETAILER PRICE COMPARISON ACCURACY
+  // ###########################################################################
+  //
+  // Simulates the real flow: a product from one retailer → compared across
+  // all 5 grocery retailers. Validates that matches are correct products,
+  // correct sizes, and the comparison makes sense.
+
+  group('Cross-retailer price comparison accuracy', () {
+    late SmartMatchingService matcher;
+    setUp(() {
+      matcher = SmartMatchingService(gemini: GeminiService(apiKey: 'test-key'));
+    });
+
+    test('Clover Full Cream Milk 2L → matches correctly across 5 retailers',
+        () {
+      final source = _product('Clover Full Cream Milk 2L', price: 36.99);
+
+      final candidatesByRetailer = <String, List<LiveProduct>>{
+        'Pick n Pay': [
+          _product('Clover Full Cream Milk 2L', price: 35.99),
+          _product('Clover Low Fat Milk 2L', price: 34.99),
+          _product('PnP Full Cream Milk 2L', price: 29.99),
+          _product('Cadbury Dairy Milk Chocolate 150g', price: 39.99),
+        ],
+        'Checkers': [
+          _product('Clover Full Cream Milk 2L', price: 37.49),
+          _product('Parmalat Full Cream Milk 2L', price: 34.99),
+          _product('Clover Chocolate Milk 1L', price: 25.99),
+        ],
+        'Shoprite': [
+          _product('Clover Full Cream Milk 2L', price: 36.49),
+          _product('Clover Full Cream Milk 1L', price: 19.99),
+          _product('Danone Yoghurt 1L', price: 42.99),
+        ],
+        'Woolworths': [
+          _product('Woolworths Full Cream Milk 2L', price: 38.99),
+          _product('Clover Full Cream Milk 2L', price: 37.99),
+        ],
+        'SPAR': [
+          _product('Clover Full Cream Milk 2l SK6001008000123', price: 36.79),
+          _product('Spar Full Cream Milk 2l SK6001008731000', price: 31.99),
+          _product('Aero Milk Chocolate 85g SK6009188000080', price: 28.99),
+        ],
+      };
+
+      final result = matcher.findMatchesAlgorithm(
+        sourceProduct: source,
+        candidatesByRetailer: candidatesByRetailer,
+      );
+
+      // Each retailer should have a best match
+      for (final retailer in candidatesByRetailer.keys) {
+        final best = result.bestMatchPerRetailer[retailer];
+        expect(best, isNotNull, reason: '$retailer should find a match');
+
+        // Match should contain "milk" and "2l" — not chocolate or yoghurt
+        final matchName = best!.name.toLowerCase();
+        expect(matchName, contains('milk'),
+            reason: '$retailer match "$matchName" should be a milk product');
+        expect(matchName, isNot(contains('chocolate')),
+            reason: '$retailer should not match chocolate');
+        expect(matchName, isNot(contains('yoghurt')),
+            reason: '$retailer should not match yoghurt');
+
+        // Confidence should be at least similar-level
+        expect(best.confidenceScore, greaterThanOrEqualTo(0.55),
+            reason: '$retailer confidence ${best.confidenceScore} too low');
+      }
+
+      // PnP best match should be exact "Clover Full Cream Milk 2L"
+      final pnpBest = result.bestMatchPerRetailer['Pick n Pay']!;
+      expect(pnpBest.name, equals('Clover Full Cream Milk 2L'));
+      expect(pnpBest.matchType, equals(MatchType.exact));
+    });
+
+    test('Albany Brown Bread 700g → matches bread not chocolate', () {
+      final source =
+          _product('Albany Superior Brown Bread 700g', price: 22.99);
+
+      final candidatesByRetailer = <String, List<LiveProduct>>{
+        'SPAR': [
+          _product(
+              'Albany Best Of Both Genius Speciality Bread 700g SK6009518602649',
+              price: 20.99),
+          _product('Albany Superior Brown Bread 700g SK6001253010352',
+              price: 23.99),
+          _product('Cadbury Whole Nut 150g SK6001065000456', price: 44.99),
+        ],
+        'Checkers': [
+          _product('Albany Superior Brown Bread 700g', price: 21.99),
+          _product('Sasko Premium Brown Bread 700g', price: 19.99),
+        ],
+      };
+
+      final result = matcher.findMatchesAlgorithm(
+        sourceProduct: source,
+        candidatesByRetailer: candidatesByRetailer,
+      );
+
+      // SPAR should match the correct Albany bread
+      final sparBest = result.bestMatchPerRetailer['SPAR']!;
+      expect(sparBest.name.toLowerCase(), contains('albany'));
+      expect(sparBest.name.toLowerCase(), contains('brown'));
+      expect(sparBest.name.toLowerCase(), contains('bread'));
+      expect(sparBest.matchType, equals(MatchType.exact));
+
+      // Checkers should also match bread
+      final checkersBest = result.bestMatchPerRetailer['Checkers']!;
+      expect(checkersBest.name.toLowerCase(), contains('bread'));
+      expect(checkersBest.name.toLowerCase(), contains('700g'));
+    });
+
+    test('Lucky Star Pilchards 400g → matches canned fish not random items',
+        () {
+      final source = _product('Lucky Star Pilchards In Tomato Sauce 400g',
+          price: 24.99);
+
+      final candidatesByRetailer = <String, List<LiveProduct>>{
+        'SPAR': [
+          _product(
+              'Lucky Star Pilchards In Tomato Sauce 400g SK6009522300789',
+              price: 25.49),
+          _product('All Gold Tomato Sauce 700ml SK6009522309633',
+              price: 42.99),
+          _product('Lucky Star Pilchards In Chilli Sauce 400g SK6009522300456',
+              price: 26.99),
+        ],
+        'Pick n Pay': [
+          _product('Lucky Star Pilchards In Tomato Sauce 400g', price: 23.99),
+          _product('John West Sardines In Tomato Sauce 120g', price: 31.99),
+        ],
+      };
+
+      final result = matcher.findMatchesAlgorithm(
+        sourceProduct: source,
+        candidatesByRetailer: candidatesByRetailer,
+      );
+
+      // SPAR best should be same product (tomato sauce variant, not chilli)
+      final sparBest = result.bestMatchPerRetailer['SPAR']!;
+      expect(sparBest.name.toLowerCase(), contains('pilchards'));
+      expect(sparBest.name.toLowerCase(), contains('tomato'));
+      expect(sparBest.confidenceScore, greaterThanOrEqualTo(0.80));
+
+      // Should NOT match tomato sauce (bottle) — different product entirely
+      expect(sparBest.name.toLowerCase(), isNot(contains('700ml')));
+    });
+
+    test('Coca-Cola 2L → matches same drink not similar-named products', () {
+      final source =
+          _product('Coca-Cola Original Taste 2L', price: 22.99);
+
+      final candidatesByRetailer = <String, List<LiveProduct>>{
+        'SPAR': [
+          _product('Coca-Cola Original Taste 2l SK5449000000996',
+              price: 23.49),
+          _product('Coca-Cola Zero Sugar 2l SK5449000131805', price: 23.49),
+          _product('Fanta Orange 2l SK5449000011527', price: 21.49),
+        ],
+        'Shoprite': [
+          _product('Coca-Cola Original Taste 2L', price: 21.99),
+          _product('Pepsi Max 2L', price: 19.99),
+        ],
+      };
+
+      final result = matcher.findMatchesAlgorithm(
+        sourceProduct: source,
+        candidatesByRetailer: candidatesByRetailer,
+      );
+
+      // SPAR should match "Original Taste", not "Zero Sugar"
+      final sparBest = result.bestMatchPerRetailer['SPAR']!;
+      expect(sparBest.name.toLowerCase(), contains('original'));
+      expect(sparBest.name.toLowerCase(), isNot(contains('zero')));
+      expect(sparBest.confidenceScore, greaterThanOrEqualTo(0.80));
+    });
+
+    test('price differences calculated correctly', () {
+      final source = _product('Test Product 500g', price: 30.00);
+
+      final candidatesByRetailer = <String, List<LiveProduct>>{
+        'SPAR': [
+          _product('Test Product 500g SK6001000000001', price: 25.00),
+        ],
+        'Pick n Pay': [
+          _product('Test Product 500g', price: 35.00),
+        ],
+      };
+
+      final result = matcher.findMatchesAlgorithm(
+        sourceProduct: source,
+        candidatesByRetailer: candidatesByRetailer,
+      );
+
+      final sparMatch = result.bestMatchPerRetailer['SPAR']!;
+      expect(sparMatch.priceDifference, closeTo(-5.00, 0.01),
+          reason: 'SPAR is R5 cheaper');
+      expect(sparMatch.isCheaper, isTrue);
+
+      final pnpMatch = result.bestMatchPerRetailer['Pick n Pay']!;
+      expect(pnpMatch.priceDifference, closeTo(5.00, 0.01),
+          reason: 'PnP is R5 more expensive');
+      expect(pnpMatch.isCheaper, isFalse);
+    });
+
+    test('size mismatch penalizes confidence', () {
+      final source = _product('Nescafe Classic 200g', price: 89.99);
+
+      final candidatesByRetailer = <String, List<LiveProduct>>{
+        'SPAR': [
+          _product('Nescafe Classic 50g SK6001108000111', price: 32.99),
+          _product('Nescafe Classic 200g SK6001108000222', price: 91.99),
+        ],
+      };
+
+      final result = matcher.findMatchesAlgorithm(
+        sourceProduct: source,
+        candidatesByRetailer: candidatesByRetailer,
+      );
+
+      // Should prefer the 200g (same size) over the 50g
+      final sparBest = result.bestMatchPerRetailer['SPAR']!;
+      expect(sparBest.name, contains('200g'));
+    });
+  });
+
+  // ###########################################################################
+  // SECTION 6: RECIPE INGREDIENT MATCHING ACCURACY
+  // ###########################################################################
+
+  group('Recipe ingredient matching accuracy across retailers', () {
+    late SmartMatchingService matcher;
+    setUp(() {
+      matcher = SmartMatchingService(gemini: GeminiService(apiKey: 'test-key'));
+    });
+
+    test('butter → matches butter products, not buttermilk/butterscotch',
+        () async {
+      final hint = IngredientLookup.resolve('butter');
+      expect(hint, isNotNull, reason: 'butter should have a lookup hint');
+
+      // Simulate candidates from SPAR
+      final sparCandidates = [
+        _product('Clover Butter 500g SK6001008000111', price: 54.99),
+        _product('Cultured Buttermilk 500ml SK6001008731242', price: 16.99),
+        _product('Butterscotch Pudding 100g SK6009000000111', price: 12.99),
+        _product('Buttanutt Almond Butter 250g SK6009900424392', price: 82.99),
+      ];
+
+      final result = await matcher.matchIngredient(
+        ingredientName: 'butter',
+        candidates: sparCandidates,
+        hint: hint,
+      );
+
+      expect(result, isNotNull);
+      expect(result!.name.toLowerCase(), contains('butter'));
+      expect(result.name.toLowerCase(), isNot(contains('buttermilk')));
+      expect(result.name.toLowerCase(), isNot(contains('butterscotch')));
+    });
+
+    test('large eggs → matches egg products, not chocolate Mini Eggs',
+        () async {
+      final hint = IngredientLookup.resolve('eggs');
+
+      final candidates = [
+        _product('Large Eggs 6 Pack SK6009662390001', price: 34.99),
+        _product('Extra Large Free Range Eggs 6 SK6009662390002',
+            price: 42.99),
+        _product('Cadbury Mini Eggs 125g SK6001065000789', price: 32.99),
+      ];
+
+      final result = await matcher.matchIngredient(
+        ingredientName: 'large eggs',
+        candidates: candidates,
+        hint: hint,
+      );
+
+      expect(result, isNotNull);
+      final name = result!.name.toLowerCase();
+      expect(name, contains('eggs'));
+      expect(name, isNot(contains('cadbury')));
+    });
+
+    test('rice → matches rice grains, not rice vinegar or rice cakes',
+        () async {
+      final hint = IngredientLookup.resolve('rice');
+
+      final candidates = [
+        _product('Spekko Long Grain Parboiled Rice 2kg SK6001108200789',
+            price: 39.99),
+        _product('Amoy White Rice Vinegar 150ml SK4892773231202',
+            price: 52.00),
+        _product('Rice Cakes Plain 100g SK6001000000444', price: 28.99),
+        _product('Tastic Rice 2kg SK6001108100234', price: 42.99),
+      ];
+
+      final result = await matcher.matchIngredient(
+        ingredientName: 'rice',
+        candidates: candidates,
+        hint: hint,
+      );
+
+      expect(result, isNotNull);
+      final name = result!.name.toLowerCase();
+      expect(name, anyOf(contains('spekko'), contains('tastic')));
+      expect(name, isNot(contains('vinegar')));
+      expect(name, isNot(contains('cake')));
+    });
+
+    test('full cream milk → matches milk, not chocolate milk or coconut milk',
+        () async {
+      final hint = IngredientLookup.resolve('milk');
+
+      final candidates = [
+        _product('Clover Full Cream Milk 2l SK6001008000123', price: 36.79),
+        _product('Aero Milk Chocolate 85g SK6009188000080', price: 28.99),
+        _product('A Taste Of Thai Lite Coconut Milk 400ml SK0070650800138',
+            price: 36.99),
+        _product('Nestle Condensed Milk 385g SK6001068300123', price: 29.99),
+      ];
+
+      final result = await matcher.matchIngredient(
+        ingredientName: 'full cream milk',
+        candidates: candidates,
+        hint: hint,
+      );
+
+      expect(result, isNotNull);
+      final name = result!.name.toLowerCase();
+      expect(name, contains('full cream milk'));
+      expect(name, isNot(contains('chocolate')));
+      expect(name, isNot(contains('coconut')));
+    });
+
+    test('onion → matches fresh onions, not onion rings or onion soup',
+        () async {
+      final hint = IngredientLookup.resolve('onion');
+
+      final candidates = [
+        _product('Onions 1kg SK6001000000555', price: 19.99),
+        _product('Knorr Onion Soup 50g SK6001087300111', price: 14.99),
+        _product('Frozen Onion Rings 500g SK6001000000666', price: 42.99),
+        _product('Spring Onions Bunch SK6001000000777', price: 12.99),
+      ];
+
+      final result = await matcher.matchIngredient(
+        ingredientName: 'onion',
+        candidates: candidates,
+        hint: hint,
+      );
+
+      expect(result, isNotNull);
+      final name = result!.name.toLowerCase();
+      expect(name, anyOf(contains('onions 1kg'), contains('spring onion')));
+      expect(name, isNot(contains('soup')));
+      expect(name, isNot(contains('rings')));
+    });
+
+    test('sugar → matches sugar product, not sugar-free sweets', () async {
+      final hint = IngredientLookup.resolve('sugar');
+
+      final candidates = [
+        _product('Spar White Sugar 2.5kg SK6001008732000', price: 44.99),
+        _product('Sugar Free Sweets 100g SK6001000000888', price: 29.99),
+        _product('Selati White Sugar 1kg SK6001000001000', price: 19.99),
+      ];
+
+      final result = await matcher.matchIngredient(
+        ingredientName: 'sugar',
+        candidates: candidates,
+        hint: hint,
+      );
+
+      expect(result, isNotNull);
+      final name = result!.name.toLowerCase();
+      expect(name, contains('sugar'));
+      expect(name, isNot(contains('free')));
+    });
+
+    test('tinned tomatoes → matches canned tomato products', () async {
+      final hint = IngredientLookup.resolve('tinned tomatoes');
+
+      final candidates = [
+        _product('All Gold Peeled And Diced Tomatoes 410g SK6009522309999',
+            price: 18.99),
+        _product('All Gold Tomato Sauce 700ml SK6009522309633', price: 42.99),
+        _product('Koo Chopped Tomatoes 410g SK6001015000111', price: 16.99),
+      ];
+
+      final result = await matcher.matchIngredient(
+        ingredientName: 'tinned tomatoes',
+        candidates: candidates,
+        hint: hint,
+      );
+
+      expect(result, isNotNull);
+      final name = result!.name.toLowerCase();
+      expect(name, contains('tomato'));
+    });
+
+    test('chicken breast → matches poultry, not chicken soup', () async {
+      final hint = IngredientLookup.resolve('chicken');
+
+      final candidates = [
+        _product('Fresh Chicken Breast Fillets 500g SK6001000002222',
+            price: 69.99),
+        _product('Knorr Cream Of Chicken Soup 400g SK5012427143104',
+            price: 48.99),
+        _product('County Fair Frozen Chicken Portions 2kg SK6001000002333',
+            price: 89.99),
+      ];
+
+      final result = await matcher.matchIngredient(
+        ingredientName: 'chicken breast',
+        candidates: candidates,
+        hint: hint,
+      );
+
+      expect(result, isNotNull);
+      final name = result!.name.toLowerCase();
+      expect(name, contains('chicken'));
+      expect(name, isNot(contains('soup')));
+    });
+
+    test('olive oil → matches olive oil, not sunflower oil or cooking spray',
+        () async {
+      final hint = IngredientLookup.resolve('olive oil');
+
+      final candidates = [
+        _product('Star Extra Virgin Olive Oil 500ml SK6001000003333',
+            price: 79.99),
+        _product('Sunfoil Sunflower Oil 2L SK6001240000456', price: 59.99),
+        _product('Spray And Cook Original 300ml SK6001000003444',
+            price: 49.99),
+      ];
+
+      final result = await matcher.matchIngredient(
+        ingredientName: 'olive oil',
+        candidates: candidates,
+        hint: hint,
+      );
+
+      expect(result, isNotNull);
+      expect(result!.name.toLowerCase(), contains('olive oil'));
+    });
+
+    test('garlic → matches fresh garlic, not garlic bread or garlic sauce',
+        () async {
+      final hint = IngredientLookup.resolve('garlic');
+
+      final candidates = [
+        _product('Crushed Garlic 200g SK6001000004444', price: 32.99),
+        _product('Garlic Bread 350g SK6001000004555', price: 24.99),
+        _product('Ina Paarman Garlic And Pepper Sauce 300ml SK6001000004666',
+            price: 36.99),
+        _product('Fresh Garlic 150g SK6001000004777', price: 14.99),
+      ];
+
+      final result = await matcher.matchIngredient(
+        ingredientName: 'garlic',
+        candidates: candidates,
+        hint: hint,
+      );
+
+      expect(result, isNotNull);
+      final name = result!.name.toLowerCase();
+      expect(name, contains('garlic'));
+      expect(name, isNot(contains('bread')));
+      expect(name, isNot(contains('sauce')));
+    });
+  });
+
+  // ###########################################################################
+  // SECTION 7: INDIAN RECIPE INGREDIENT MATCHING
+  // ###########################################################################
+
+  group('Indian recipe ingredient matching', () {
+    late SmartMatchingService matcher;
+    setUp(() {
+      matcher = SmartMatchingService(gemini: GeminiService(apiKey: 'test-key'));
+    });
+
+    test('basmati rice → matches Tastic Basmati, not white rice or rice vinegar',
+        () async {
+      final hint = IngredientLookup.resolve('basmati rice');
+
+      final candidates = [
+        _product('Tastic Basmati Rice 1kg SK6001108200789', price: 44.99),
+        _product('Tastic Long Grain White Rice 2kg SK6001108200111', price: 39.99),
+        _product('PnP Rice Vinegar 250ml', price: 29.99),
+        _product('Woolworths Basmati Rice 500g', price: 32.99),
+        _product('Spekko Basmati Rice 1kg', price: 42.99),
+        _product('Spar Long Grain Parboiled Rice 2kg SK6001108200333',
+            price: 34.99),
+        _product('Checkers Housebrand White Rice 5kg', price: 74.99),
+      ];
+
+      final result = await matcher.matchIngredient(
+        ingredientName: 'basmati rice',
+        candidates: candidates,
+        hint: hint,
+      );
+
+      expect(result, isNotNull, reason: 'Should find a basmati rice match');
+      final name = result!.name.toLowerCase();
+      expect(name, contains('basmati'),
+          reason: 'Should match basmati rice specifically');
+      expect(name, isNot(contains('vinegar')),
+          reason: 'Rice vinegar is a condiment, not a grain');
+    });
+
+    test('turmeric → matches ground turmeric spice, not supplements', () async {
+      final hint = IngredientLookup.resolve('turmeric');
+
+      final candidates = [
+        _product('Robertsons Ground Turmeric 100ml SK6001000005111',
+            price: 24.99),
+        _product('Woolworths Turmeric Supplement 60 Capsules', price: 149.99),
+        _product('PnP Ground Turmeric 50g', price: 18.99),
+        _product('Checkers Housebrand Turmeric 100ml', price: 16.99),
+        _product('Spar Turmeric Spice 50g SK6001000005222', price: 19.99),
+      ];
+
+      final result = await matcher.matchIngredient(
+        ingredientName: 'turmeric',
+        candidates: candidates,
+        hint: hint,
+      );
+
+      expect(result, isNotNull, reason: 'Should find a turmeric match');
+      final name = result!.name.toLowerCase();
+      expect(name, contains('turmeric'),
+          reason: 'Should match turmeric spice product');
+      expect(name, isNot(contains('supplement')),
+          reason: 'Supplements are not cooking ingredients');
+      expect(name, isNot(contains('capsule')),
+          reason: 'Capsules are not cooking ingredients');
+    });
+
+    test('garam masala → matches spice blend', () async {
+      final hint = IngredientLookup.resolve('garam masala');
+
+      final candidates = [
+        _product('Robertsons Garam Masala 100ml SK6001000005333', price: 32.99),
+        _product('PnP Garam Masala Spice 50g', price: 24.99),
+        _product('Woolworths Garam Masala 45g', price: 34.99),
+        _product('Robertsons Chicken Spice 100ml SK6001000005444', price: 28.99),
+        _product('Checkers Curry Powder 100g', price: 19.99),
+      ];
+
+      final result = await matcher.matchIngredient(
+        ingredientName: 'garam masala',
+        candidates: candidates,
+        hint: hint,
+      );
+
+      expect(result, isNotNull, reason: 'Should find a garam masala match');
+      final name = result!.name.toLowerCase();
+      expect(name, contains('garam masala'),
+          reason: 'Should specifically match garam masala blend');
+      expect(name, isNot(contains('chicken spice')),
+          reason: 'Chicken spice is a different blend');
+      expect(name, isNot(contains('curry powder')),
+          reason: 'Curry powder is a different spice');
+    });
+
+    test('coriander → matches fresh or ground coriander, not coriander chips',
+        () async {
+      final hint = IngredientLookup.resolve('coriander');
+
+      final candidates = [
+        _product('Fresh Coriander Bunch SK6001000005555', price: 9.99),
+        _product('Robertsons Ground Coriander 100ml SK6001000005666',
+            price: 26.99),
+        _product('Simba Coriander And Lime Chips 125g', price: 19.99),
+        _product('Woolworths Fresh Coriander 30g', price: 14.99),
+        _product('PnP Ground Coriander 50g', price: 22.99),
+      ];
+
+      final result = await matcher.matchIngredient(
+        ingredientName: 'coriander',
+        candidates: candidates,
+        hint: hint,
+      );
+
+      expect(result, isNotNull, reason: 'Should find a coriander match');
+      final name = result!.name.toLowerCase();
+      expect(name, contains('coriander'),
+          reason: 'Should match coriander product');
+      expect(name, isNot(contains('chips')),
+          reason: 'Coriander-flavoured chips are not a cooking ingredient');
+      expect(name, isNot(contains('lime')),
+          reason: 'Flavoured chips are not a cooking ingredient');
+    });
+
+    test('chickpeas → matches canned chickpeas, not chickpea flour or hummus',
+        () async {
+      final hint = IngredientLookup.resolve('chickpeas');
+
+      final candidates = [
+        _product('Koo Chickpeas In Brine 410g SK6001015000222', price: 18.99),
+        _product('PnP Chickpea Flour 500g', price: 34.99),
+        _product('Woolworths Hummus Classic 200g', price: 39.99),
+        _product('Checkers Canned Chickpeas 400g', price: 16.99),
+        _product('Spar Chickpeas 410g SK6001015000333', price: 17.99),
+      ];
+
+      final result = await matcher.matchIngredient(
+        ingredientName: 'chickpeas',
+        candidates: candidates,
+        hint: hint,
+      );
+
+      expect(result, isNotNull, reason: 'Should find a chickpeas match');
+      final name = result!.name.toLowerCase();
+      expect(name, contains('chickpea'),
+          reason: 'Should match a chickpea product');
+      expect(name, isNot(contains('flour')),
+          reason: 'Chickpea flour is a different ingredient');
+      expect(name, isNot(contains('hummus')),
+          reason: 'Hummus is a prepared dip, not raw chickpeas');
+    });
+
+    test('yoghurt → matches plain/natural yoghurt, not drinks or frozen',
+        () async {
+      final hint = IngredientLookup.resolve('yoghurt');
+
+      final candidates = [
+        _product('Clover Plain Double Cream Yoghurt 500ml SK6001008000444',
+            price: 29.99),
+        _product('Danone Drinking Yoghurt Strawberry 1L', price: 34.99),
+        _product('Woolworths Frozen Yoghurt Vanilla 1L', price: 59.99),
+        _product('PnP Natural Yoghurt 500g', price: 24.99),
+        _product('Spar Low Fat Natural Yoghurt 500g SK6001008000555',
+            price: 22.99),
+        _product('Checkers Plain Yoghurt 1kg', price: 44.99),
+      ];
+
+      final result = await matcher.matchIngredient(
+        ingredientName: 'yoghurt',
+        candidates: candidates,
+        hint: hint,
+      );
+
+      expect(result, isNotNull, reason: 'Should find a yoghurt match');
+      final name = result!.name.toLowerCase();
+      expect(name, contains('yoghurt'),
+          reason: 'Should match yoghurt product');
+      expect(name, isNot(contains('drinking')),
+          reason: 'Yoghurt drinks are not plain yoghurt');
+      expect(name, isNot(contains('frozen')),
+          reason: 'Frozen yoghurt is a dessert, not cooking yoghurt');
+    });
+
+    test('lentils → matches dried or canned lentils, not lentil soup',
+        () async {
+      final hint = IngredientLookup.resolve('lentils');
+
+      final candidates = [
+        _product('PnP Brown Lentils 500g', price: 24.99),
+        _product('Woolworths Red Lentils 500g', price: 29.99),
+        _product('Knorr Lentil Soup 400g SK6001087300222', price: 48.99),
+        _product('Spar Green Lentils 500g SK6001000006111', price: 26.99),
+        _product('Checkers Canned Lentils 400g', price: 18.99),
+      ];
+
+      final result = await matcher.matchIngredient(
+        ingredientName: 'lentils',
+        candidates: candidates,
+        hint: hint,
+      );
+
+      expect(result, isNotNull, reason: 'Should find a lentils match');
+      final name = result!.name.toLowerCase();
+      expect(name, contains('lentil'),
+          reason: 'Should match a lentil product');
+      expect(name, isNot(contains('soup')),
+          reason: 'Lentil soup is a prepared product, not raw lentils');
+    });
+
+    test('ginger → matches fresh or crushed ginger, not ginger beer', () async {
+      final hint = IngredientLookup.resolve('ginger');
+
+      final candidates = [
+        _product('Fresh Ginger Root 200g SK6001000006222', price: 18.99),
+        _product('Woolworths Crushed Ginger 200g', price: 34.99),
+        _product('Stoney Ginger Beer 2L', price: 24.99),
+        _product('PnP Ground Ginger 50g', price: 22.99),
+        _product('Spar Fresh Ginger 250g SK6001000006333', price: 21.99),
+        _product('Fitch And Leedes Ginger Ale 1L', price: 29.99),
+      ];
+
+      final result = await matcher.matchIngredient(
+        ingredientName: 'ginger',
+        candidates: candidates,
+        hint: hint,
+      );
+
+      expect(result, isNotNull, reason: 'Should find a ginger match');
+      final name = result!.name.toLowerCase();
+      expect(name, contains('ginger'),
+          reason: 'Should match a ginger product');
+      expect(name, isNot(contains('beer')),
+          reason: 'Ginger beer is a beverage, not a cooking ingredient');
+      expect(name, isNot(contains('ale')),
+          reason: 'Ginger ale is a beverage, not a cooking ingredient');
+    });
+
+    test('chilli → matches fresh chillies or chilli flakes, not chilli sauce',
+        () async {
+      final hint = IngredientLookup.resolve('chilli');
+
+      final candidates = [
+        _product('Fresh Red Chillies 100g SK6001000006444', price: 14.99),
+        _product('Robertsons Chilli Flakes 12g SK6001000006555', price: 18.99),
+        _product('Nandos Peri-Peri Chilli Sauce 250ml', price: 42.99),
+        _product('Woolworths Dried Chilli Flakes 25g', price: 24.99),
+        _product('PnP Fresh Chillies Per 100g', price: 12.99),
+      ];
+
+      final result = await matcher.matchIngredient(
+        ingredientName: 'chilli',
+        candidates: candidates,
+        hint: hint,
+      );
+
+      expect(result, isNotNull, reason: 'Should find a chilli match');
+      final name = result!.name.toLowerCase();
+      expect(name, contains('chilli'),
+          reason: 'Should match a chilli product');
+      expect(name, isNot(contains('sauce')),
+          reason: 'Chilli sauce is a condiment, not raw chillies');
+      expect(name, isNot(contains('nando')),
+          reason: 'Branded sauce is not a raw ingredient');
+    });
+
+    test('coconut milk → matches canned coconut milk, not coconut water or cow milk',
+        () async {
+      final hint = IngredientLookup.resolve('coconut milk');
+
+      final candidates = [
+        _product('Aroy-D Coconut Milk 400ml SK6016017000111', price: 34.99),
+        _product('Liqui Fruit Coconut Water 330ml', price: 19.99),
+        _product('Clover Full Cream Milk 2L', price: 36.99),
+        _product('PnP Coconut Milk 400ml', price: 28.99),
+        _product('Woolworths Coconut Milk 400ml', price: 36.99),
+        _product('Spar Coconut Cream 400ml SK6016017000222', price: 32.99),
+      ];
+
+      final result = await matcher.matchIngredient(
+        ingredientName: 'coconut milk',
+        candidates: candidates,
+        hint: hint,
+      );
+
+      expect(result, isNotNull, reason: 'Should find a coconut milk match');
+      final name = result!.name.toLowerCase();
+      expect(name, contains('coconut'),
+          reason: 'Should match a coconut product');
+      expect(name, isNot(contains('water')),
+          reason: 'Coconut water is a different product');
+      expect(name, isNot(contains('clover')),
+          reason: 'Should not match cow milk');
+    });
+  });
+
+  // ###########################################################################
+  // SECTION 8: GREEK RECIPE INGREDIENT MATCHING
+  // ###########################################################################
+
+  group('Greek recipe ingredient matching', () {
+    late SmartMatchingService matcher;
+    setUp(() {
+      matcher = SmartMatchingService(gemini: GeminiService(apiKey: 'test-key'));
+    });
+
+    test('feta cheese → matches feta, not cheddar or cream cheese', () async {
+      final hint = IngredientLookup.resolve('feta cheese');
+
+      final candidates = [
+        _product('Clover Feta Cheese Plain 400g SK6001008000666', price: 64.99),
+        _product('Lancewood Cheddar Cheese 900g', price: 99.99),
+        _product('Philadelphia Cream Cheese 230g', price: 49.99),
+        _product('Woolworths Danish Feta 200g', price: 44.99),
+        _product('PnP Feta Cheese In Brine 400g', price: 59.99),
+        _product('Spar Feta Crumbled 200g SK6001008000777', price: 39.99),
+        _product('Checkers Feta 400g', price: 57.99),
+      ];
+
+      final result = await matcher.matchIngredient(
+        ingredientName: 'feta cheese',
+        candidates: candidates,
+        hint: hint,
+      );
+
+      expect(result, isNotNull, reason: 'Should find a feta cheese match');
+      final name = result!.name.toLowerCase();
+      expect(name, contains('feta'),
+          reason: 'Should match feta specifically');
+      expect(name, isNot(contains('cheddar')),
+          reason: 'Cheddar is a different cheese');
+      expect(name, isNot(contains('cream cheese')),
+          reason: 'Cream cheese is a different product');
+    });
+
+    test('olive oil → matches extra virgin olive oil, not sunflower oil',
+        () async {
+      final hint = IngredientLookup.resolve('olive oil');
+
+      final candidates = [
+        _product('Star Extra Virgin Olive Oil 500ml SK6001000007111',
+            price: 79.99),
+        _product('Sunfoil Sunflower Oil 2L', price: 59.99),
+        _product('PnP Extra Virgin Olive Oil 500ml', price: 74.99),
+        _product('Woolworths Extra Virgin Olive Oil 250ml', price: 49.99),
+        _product('Spar Olive Oil Extra Virgin 500ml SK6001000007222',
+            price: 72.99),
+        _product('Checkers Olive Oil 1L', price: 129.99),
+        _product('Spray And Cook Olive Oil 300ml', price: 49.99),
+      ];
+
+      final result = await matcher.matchIngredient(
+        ingredientName: 'olive oil',
+        candidates: candidates,
+        hint: hint,
+      );
+
+      expect(result, isNotNull, reason: 'Should find an olive oil match');
+      final name = result!.name.toLowerCase();
+      expect(name, contains('olive oil'),
+          reason: 'Should match olive oil product');
+      expect(name, isNot(contains('sunflower')),
+          reason: 'Sunflower oil is a different oil');
+    });
+
+    test('pita bread → matches pita/pitta bread, not regular bread', () async {
+      final hint = IngredientLookup.resolve('pita bread');
+
+      final candidates = [
+        _product('Woolworths Pita Breads 6 Pack', price: 29.99),
+        _product('Albany Superior White Bread 700g', price: 22.99),
+        _product('PnP Pitta Bread 6s', price: 24.99),
+        _product('Spar Pita Bread 6 Pack SK6001000007333', price: 26.99),
+        _product('Checkers Pitta Pockets 6s', price: 27.99),
+        _product('Sasko Premium Brown Bread 700g', price: 19.99),
+      ];
+
+      final result = await matcher.matchIngredient(
+        ingredientName: 'pita bread',
+        candidates: candidates,
+        hint: hint,
+      );
+
+      expect(result, isNotNull, reason: 'Should find a pita bread match');
+      final name = result!.name.toLowerCase();
+      expect(name, anyOf(contains('pita'), contains('pitta')),
+          reason: 'Should match pita/pitta bread');
+      expect(name, isNot(contains('albany')),
+          reason: 'Regular bread is not pita bread');
+      expect(name, isNot(contains('sasko')),
+          reason: 'Regular bread is not pita bread');
+    });
+
+    test('lemon → matches fresh lemons, not lemon juice or lemon drinks',
+        () async {
+      final hint = IngredientLookup.resolve('lemon');
+
+      final candidates = [
+        _product('Lemons Per Kg SK6001000007444', price: 29.99),
+        _product('Woolworths Lemons 4 Pack', price: 19.99),
+        _product('PnP 100% Lemon Juice 250ml', price: 24.99),
+        _product('Schweppes Sparkling Lemon 2L', price: 22.99),
+        _product('Spar Fresh Lemons 1kg SK6001000007555', price: 32.99),
+        _product('Checkers Lemons Net 1kg', price: 27.99),
+      ];
+
+      final result = await matcher.matchIngredient(
+        ingredientName: 'lemon',
+        candidates: candidates,
+        hint: hint,
+      );
+
+      expect(result, isNotNull, reason: 'Should find a lemon match');
+      final name = result!.name.toLowerCase();
+      expect(name, contains('lemon'),
+          reason: 'Should match a lemon product');
+      expect(name, isNot(contains('juice')),
+          reason: 'Lemon juice is a processed product');
+      expect(name, isNot(contains('schweppes')),
+          reason: 'Lemon drinks are not fresh lemons');
+      expect(name, isNot(contains('sparkling')),
+          reason: 'Sparkling drinks are not fresh lemons');
+    });
+
+    test('cucumber → matches fresh cucumber, not pickled gherkins', () async {
+      final hint = IngredientLookup.resolve('cucumber');
+
+      final candidates = [
+        _product('English Cucumber Each SK6001000007666', price: 14.99),
+        _product('Koo Pickled Gherkins 375ml', price: 34.99),
+        _product('Woolworths Fresh Cucumber Each', price: 12.99),
+        _product('PnP Cucumber Each', price: 11.99),
+        _product('Spar Cucumber SK6001000007777', price: 13.99),
+        _product('Wellington Pickled Cucumbers 380g', price: 29.99),
+      ];
+
+      final result = await matcher.matchIngredient(
+        ingredientName: 'cucumber',
+        candidates: candidates,
+        hint: hint,
+      );
+
+      expect(result, isNotNull, reason: 'Should find a cucumber match');
+      final name = result!.name.toLowerCase();
+      expect(name, contains('cucumber'),
+          reason: 'Should match a cucumber product');
+      expect(name, isNot(contains('pickled')),
+          reason: 'Pickled cucumbers/gherkins are not fresh cucumber');
+      expect(name, isNot(contains('gherkin')),
+          reason: 'Gherkins are not fresh cucumber');
+    });
+
+    test('lamb → matches lamb cuts, not lamb-flavoured stock', () async {
+      final hint = IngredientLookup.resolve('lamb');
+
+      final candidates = [
+        _product('Lamb Leg Per Kg SK6001000008111', price: 169.99),
+        _product('Knorr Lamb Flavoured Stock Cubes 24s', price: 34.99),
+        _product('Woolworths Lamb Loin Chops Per Kg', price: 189.99),
+        _product('PnP Lamb Shoulder Per Kg', price: 149.99),
+        _product('Spar Lamb Chops Per Kg SK6001000008222', price: 159.99),
+        _product('Checkers Lamb Rib Chops Per Kg', price: 154.99),
+      ];
+
+      final result = await matcher.matchIngredient(
+        ingredientName: 'lamb',
+        candidates: candidates,
+        hint: hint,
+      );
+
+      expect(result, isNotNull, reason: 'Should find a lamb match');
+      final name = result!.name.toLowerCase();
+      expect(name, contains('lamb'),
+          reason: 'Should match a lamb product');
+      expect(name, isNot(contains('stock')),
+          reason: 'Lamb stock cubes are not lamb meat');
+      expect(name, isNot(contains('flavour')),
+          reason: 'Flavoured products are not actual lamb');
+    });
+  });
+
+  // ###########################################################################
+  // SECTION 9: SA CLASSIC RECIPE INGREDIENT MATCHING
+  // ###########################################################################
+
+  group('SA classic recipe ingredient matching', () {
+    late SmartMatchingService matcher;
+    setUp(() {
+      matcher = SmartMatchingService(gemini: GeminiService(apiKey: 'test-key'));
+    });
+
+    test('maize meal → matches Iwisa/White Star, not corn flakes', () async {
+      final hint = IngredientLookup.resolve('maize meal');
+
+      final candidates = [
+        _product('Iwisa Maize Meal 5kg SK6001011000111', price: 64.99),
+        _product('White Star Super Maize Meal 2.5kg SK6001011000222',
+            price: 39.99),
+        _product('Kelloggs Corn Flakes 500g', price: 54.99),
+        _product('PnP Super Maize Meal 5kg', price: 59.99),
+        _product('Woolworths Organic Corn Kernels 410g', price: 29.99),
+        _product('Spar Maize Meal 2.5kg SK6001011000333', price: 37.99),
+        _product('Checkers Housebrand Maize Meal 5kg', price: 56.99),
+      ];
+
+      final result = await matcher.matchIngredient(
+        ingredientName: 'maize meal',
+        candidates: candidates,
+        hint: hint,
+      );
+
+      expect(result, isNotNull, reason: 'Should find a maize meal match');
+      final name = result!.name.toLowerCase();
+      expect(name, contains('maize meal'),
+          reason: 'Should match maize meal product');
+      expect(name, isNot(contains('corn flakes')),
+          reason: 'Corn flakes is a cereal, not maize meal');
+      expect(name, isNot(contains('corn kernels')),
+          reason: 'Corn kernels are not maize meal');
+    });
+
+    test('beef mince → matches minced beef, not beef stock or biltong',
+        () async {
+      final hint = IngredientLookup.resolve('beef mince');
+
+      final candidates = [
+        _product('Beef Mince Per Kg SK6001000009111', price: 99.99),
+        _product('Knorr Beef Stock Cubes 24s', price: 34.99),
+        _product('Safari Beef Biltong 80g', price: 49.99),
+        _product('Woolworths Lean Beef Mince Per Kg', price: 119.99),
+        _product('PnP Beef Mince 500g', price: 54.99),
+        _product('Spar Premium Beef Mince Per Kg SK6001000009222',
+            price: 109.99),
+        _product('Checkers Beef Mince Per Kg', price: 94.99),
+      ];
+
+      final result = await matcher.matchIngredient(
+        ingredientName: 'beef mince',
+        candidates: candidates,
+        hint: hint,
+      );
+
+      expect(result, isNotNull, reason: 'Should find a beef mince match');
+      final name = result!.name.toLowerCase();
+      expect(name, contains('mince'),
+          reason: 'Should match a mince product');
+      expect(name, isNot(contains('stock')),
+          reason: 'Beef stock is not beef mince');
+      expect(name, isNot(contains('biltong')),
+          reason: 'Biltong is dried meat, not mince');
+    });
+
+    test('tomato and onion mix → matches Koo/All Gold tinned mix', () async {
+      final hint = IngredientLookup.resolve('tomato and onion mix');
+
+      final candidates = [
+        _product('Koo Tomato And Onion Mix 410g SK6001015000444', price: 18.99),
+        _product('All Gold Tomato And Onion Mix 410g SK6009522300111',
+            price: 19.99),
+        _product('Fresh Tomatoes Per Kg', price: 24.99),
+        _product('PnP Tomato And Onion Smoor 410g', price: 16.99),
+        _product('Woolworths Tomato And Onion Relish 250ml', price: 32.99),
+        _product('Spar Tomato And Onion Mix 410g SK6001015000555', price: 17.99),
+      ];
+
+      final result = await matcher.matchIngredient(
+        ingredientName: 'tomato and onion mix',
+        candidates: candidates,
+        hint: hint,
+      );
+
+      expect(result, isNotNull,
+          reason: 'Should find a tomato and onion mix match');
+      final name = result!.name.toLowerCase();
+      expect(name, contains('tomato'),
+          reason: 'Should contain tomato');
+      expect(name, contains('onion'),
+          reason: 'Should contain onion');
+      expect(name, isNot(contains('fresh tomatoes')),
+          reason: 'Fresh tomatoes are not a prepared mix');
+    });
+
+    test('chutney → matches Mrs Balls chutney, not tomato sauce', () async {
+      final hint = IngredientLookup.resolve('chutney');
+
+      final candidates = [
+        _product('Mrs Balls Original Chutney 470g SK6001000010111',
+            price: 36.99),
+        _product('All Gold Tomato Sauce 700ml SK6009522309633', price: 42.99),
+        _product('Woolworths Fruit Chutney 250ml', price: 34.99),
+        _product('PnP Peach Chutney 470g', price: 32.99),
+        _product('Spar Fruit Chutney 470g SK6001000010222', price: 29.99),
+        _product('Checkers Mrs Balls Chutney 470g', price: 35.99),
+      ];
+
+      final result = await matcher.matchIngredient(
+        ingredientName: 'chutney',
+        candidates: candidates,
+        hint: hint,
+      );
+
+      expect(result, isNotNull, reason: 'Should find a chutney match');
+      final name = result!.name.toLowerCase();
+      expect(name, contains('chutney'),
+          reason: 'Should match a chutney product');
+      expect(name, isNot(contains('tomato sauce')),
+          reason: 'Tomato sauce is not chutney');
+    });
+
+    test('boerewors → matches fresh boerewors', () async {
+      final hint = IngredientLookup.resolve('boerewors');
+
+      final candidates = [
+        _product('Traditional Boerewors Per Kg SK6001000010333', price: 109.99),
+        _product('Woolworths Gourmet Boerewors Per Kg', price: 139.99),
+        _product('PnP Boerewors 500g', price: 64.99),
+        _product('Spar Premium Boerewors Per Kg SK6001000010444',
+            price: 119.99),
+        _product('Checkers Boerewors Per Kg', price: 104.99),
+        _product('Boerewors Roll Spice 100g', price: 24.99),
+      ];
+
+      final result = await matcher.matchIngredient(
+        ingredientName: 'boerewors',
+        candidates: candidates,
+        hint: hint,
+      );
+
+      expect(result, isNotNull, reason: 'Should find a boerewors match');
+      final name = result!.name.toLowerCase();
+      expect(name, contains('boerewors'),
+          reason: 'Should match a boerewors product');
+      expect(name, isNot(contains('spice')),
+          reason: 'Boerewors spice is not boerewors meat');
+    });
+
+    test('braai spice → matches Robertsons/similar braai spice blend',
+        () async {
+      final hint = IngredientLookup.resolve('braai spice');
+
+      final candidates = [
+        _product('Robertsons Braai Spice 200ml SK6001000010555', price: 34.99),
+        _product('Ina Paarman Braai And Grill Seasoning 200ml', price: 39.99),
+        _product('Woolworths Braai Spice 100g', price: 29.99),
+        _product('PnP Braai Spice 100g', price: 22.99),
+        _product('Spar Braai Spice 200ml SK6001000010666', price: 27.99),
+        _product('Checkers Braai Salt 500g', price: 19.99),
+        _product('Weber Briquettes 4kg', price: 89.99),
+      ];
+
+      final result = await matcher.matchIngredient(
+        ingredientName: 'braai spice',
+        candidates: candidates,
+        hint: hint,
+      );
+
+      expect(result, isNotNull, reason: 'Should find a braai spice match');
+      final name = result!.name.toLowerCase();
+      expect(name, contains('braai'),
+          reason: 'Should match a braai spice product');
+      expect(name, isNot(contains('briquettes')),
+          reason: 'Charcoal briquettes are not braai spice');
+    });
+  });
+
+  // ###########################################################################
+  // SECTION 10: CROSS-RETAILER PRODUCT SEARCH ACCURACY — 5 RETAILERS
+  // ###########################################################################
+  //
+  // Tests the full findMatchesAlgorithm flow with realistic product catalogs
+  // from all 5 grocery retailers. Each test validates correct matching,
+  // confidence scores, and SPAR SK barcode handling.
+
+  group('Cross-retailer product search accuracy - 5 retailers', () {
+    late SmartMatchingService matcher;
+    setUp(() {
+      matcher = SmartMatchingService(gemini: GeminiService(apiKey: 'test-key'));
+    });
+
+    test('Nescafe Gold Instant Coffee 200g → correct match across all 5 retailers',
+        () {
+      final source =
+          _product('Nescafe Gold Instant Coffee 200g', price: 119.99);
+
+      final candidatesByRetailer = <String, List<LiveProduct>>{
+        'Pick n Pay': [
+          _product('Nescafe Gold Instant Coffee 200g', price: 114.99),
+          _product('Nescafe Classic Instant Coffee 200g', price: 89.99),
+          _product('Jacobs Kronung Instant Coffee 200g', price: 109.99),
+          _product('PnP Instant Coffee 200g', price: 49.99),
+        ],
+        'Woolworths': [
+          _product('Nescafe Gold Instant Coffee 200g', price: 124.99),
+          _product('Woolworths Single Origin Instant Coffee 200g',
+              price: 89.99),
+          _product('Nescafe Gold Decaf 200g', price: 129.99),
+        ],
+        'Checkers': [
+          _product('Nescafe Gold Instant Coffee 200g', price: 117.99),
+          _product('Nescafe Gold Cappuccino Sachets 10s', price: 64.99),
+          _product('Ricoffy Instant Coffee 750g', price: 89.99),
+          _product('Frisco Instant Coffee 250g', price: 79.99),
+        ],
+        'Shoprite': [
+          _product('Nescafe Gold Instant Coffee 200g', price: 112.99),
+          _product('Nescafe Gold Instant Coffee 100g', price: 69.99),
+          _product('House Of Coffees Instant Coffee 200g', price: 64.99),
+        ],
+        'SPAR': [
+          _product('Nescafe Gold Instant Coffee 200g SK7613036800012',
+              price: 118.99),
+          _product('Nescafe Classic 200g SK7613036000111', price: 87.99),
+          _product('Spar Instant Coffee 200g SK6001008733000', price: 44.99),
+          _product('Nescafe Gold Cappuccino 10s SK7613036800222', price: 62.99),
+        ],
+      };
+
+      final result = matcher.findMatchesAlgorithm(
+        sourceProduct: source,
+        candidatesByRetailer: candidatesByRetailer,
+      );
+
+      // All retailers should have a match
+      for (final retailer in candidatesByRetailer.keys) {
+        final best = result.bestMatchPerRetailer[retailer];
+        expect(best, isNotNull,
+            reason: '$retailer should have a match for Nescafe Gold');
+
+        final matchName = best!.name.toLowerCase();
+        expect(matchName, contains('nescafe gold'),
+            reason: '$retailer should match Nescafe Gold, not another coffee');
+        expect(matchName, contains('200g'),
+            reason:
+                '$retailer should match 200g size, not different size or sachets');
+        expect(matchName, isNot(contains('cappuccino')),
+            reason: '$retailer should not match cappuccino sachets');
+        expect(matchName, isNot(contains('classic')),
+            reason: '$retailer should not match Nescafe Classic');
+        expect(matchName, isNot(contains('decaf')),
+            reason: '$retailer should not match decaf variant');
+
+        // Confidence should be high for exact same product
+        expect(best.confidenceScore, greaterThanOrEqualTo(0.80),
+            reason:
+                '$retailer confidence ${best.confidenceScore} too low for exact match');
+      }
+
+      // Verify SPAR product has SK barcode in name
+      final sparBest = result.bestMatchPerRetailer['SPAR']!;
+      expect(sparBest.name, contains('SK'),
+          reason: 'SPAR product should retain SK barcode suffix');
+    });
+
+    test('Koo Baked Beans In Tomato Sauce 410g → correct match across all 5',
+        () {
+      final source =
+          _product('Koo Baked Beans In Tomato Sauce 410g', price: 19.99);
+
+      final candidatesByRetailer = <String, List<LiveProduct>>{
+        'Pick n Pay': [
+          _product('Koo Baked Beans In Tomato Sauce 410g', price: 18.99),
+          _product('Koo Baked Beans In Curry Sauce 410g', price: 19.49),
+          _product('All Gold Tomato Sauce 700ml', price: 42.99),
+          _product('PnP Baked Beans 410g', price: 12.99),
+        ],
+        'Woolworths': [
+          _product('Koo Baked Beans In Tomato Sauce 410g', price: 20.99),
+          _product('Woolworths Baked Beans 410g', price: 16.99),
+        ],
+        'Checkers': [
+          _product('Koo Baked Beans In Tomato Sauce 410g', price: 18.49),
+          _product('Koo Four Bean Mix 410g', price: 22.99),
+          _product('Bull Brand Corned Meat 300g', price: 34.99),
+        ],
+        'Shoprite': [
+          _product('Koo Baked Beans In Tomato Sauce 410g', price: 17.99),
+          _product('Koo Baked Beans In Tomato Sauce 225g', price: 11.99),
+          _product('KOO Green Beans 410g', price: 18.99),
+        ],
+        'SPAR': [
+          _product('Koo Baked Beans In Tomato Sauce 410g SK6001015000789',
+              price: 18.79),
+          _product('Koo Baked Beans In Curry Sauce 410g SK6001015000890',
+              price: 19.29),
+          _product('Spar Baked Beans 410g SK6001008734000', price: 11.99),
+        ],
+      };
+
+      final result = matcher.findMatchesAlgorithm(
+        sourceProduct: source,
+        candidatesByRetailer: candidatesByRetailer,
+      );
+
+      for (final retailer in candidatesByRetailer.keys) {
+        final best = result.bestMatchPerRetailer[retailer];
+        expect(best, isNotNull,
+            reason: '$retailer should have a match');
+
+        final matchName = best!.name.toLowerCase();
+        expect(matchName, contains('baked beans'),
+            reason: '$retailer should match baked beans');
+        expect(matchName, contains('tomato'),
+            reason:
+                '$retailer should match tomato sauce variant specifically');
+        expect(matchName, isNot(contains('green beans')),
+            reason: '$retailer should not match green beans');
+        expect(matchName, isNot(contains('corned')),
+            reason: '$retailer should not match corned meat');
+
+        // 410g size preferred
+        expect(matchName, contains('410g'),
+            reason: '$retailer should match 410g, not smaller size');
+      }
+
+      // Verify correct Koo brand match for SPAR (not SPAR own brand)
+      final sparBest = result.bestMatchPerRetailer['SPAR']!;
+      expect(sparBest.name.toLowerCase(), contains('koo'),
+          reason: 'SPAR should match Koo brand, not Spar own brand');
+      expect(sparBest.confidenceScore, greaterThanOrEqualTo(0.80),
+          reason: 'SPAR confidence should be high for exact product');
+    });
+
+    test('Simba Chips Salt & Vinegar 125g → correct match across all 5', () {
+      final source =
+          _product('Simba Chips Salt & Vinegar 125g', price: 19.99);
+
+      final candidatesByRetailer = <String, List<LiveProduct>>{
+        'Pick n Pay': [
+          _product('Simba Chips Salt & Vinegar 125g', price: 18.99),
+          _product('Simba Chips Creamy Cheddar 125g', price: 18.99),
+          _product('Lays Salt & Vinegar 120g', price: 21.99),
+          _product('Simba Chips Salt & Vinegar 36g', price: 7.99),
+        ],
+        'Woolworths': [
+          _product('Simba Chips Salt & Vinegar 125g', price: 21.99),
+          _product('Woolworths Sea Salt Crisps 150g', price: 24.99),
+        ],
+        'Checkers': [
+          _product('Simba Chips Salt & Vinegar 125g', price: 17.99),
+          _product('Simba Chips Mrs Balls Chutney 125g', price: 18.99),
+          _product('NikNaks Original 135g', price: 18.99),
+        ],
+        'Shoprite': [
+          _product('Simba Chips Salt & Vinegar 125g', price: 17.49),
+          _product('Simba Chips Salt & Vinegar 200g', price: 29.99),
+          _product('Willards Crinkle Cut 125g', price: 16.99),
+        ],
+        'SPAR': [
+          _product('Simba Chips Salt And Vinegar 125g SK6009510800111',
+              price: 18.49),
+          _product('Simba Chips Creamy Cheddar 125g SK6009510800222',
+              price: 18.49),
+          _product('Spar Potato Chips Sea Salt 150g SK6001008735000',
+              price: 14.99),
+        ],
+      };
+
+      final result = matcher.findMatchesAlgorithm(
+        sourceProduct: source,
+        candidatesByRetailer: candidatesByRetailer,
+      );
+
+      for (final retailer in candidatesByRetailer.keys) {
+        final best = result.bestMatchPerRetailer[retailer];
+        expect(best, isNotNull,
+            reason: '$retailer should have a match');
+
+        final matchName = best!.name.toLowerCase();
+        expect(matchName, contains('simba'),
+            reason: '$retailer should match Simba brand');
+        expect(matchName, anyOf(contains('salt & vinegar'), contains('salt and vinegar')),
+            reason: '$retailer should match salt & vinegar flavour');
+        expect(matchName, isNot(contains('cheddar')),
+            reason: '$retailer should not match cheddar flavour');
+        expect(matchName, isNot(contains('chutney')),
+            reason: '$retailer should not match chutney flavour');
+
+        // Should prefer 125g over 36g or 200g
+        expect(matchName, contains('125g'),
+            reason: '$retailer should match 125g size');
+
+        expect(best.confidenceScore, greaterThanOrEqualTo(0.75),
+            reason:
+                '$retailer confidence ${best.confidenceScore} too low for Simba match');
+      }
+    });
+
+    test('Sunlight Dishwashing Liquid 750ml → correct match across all 5', () {
+      final source =
+          _product('Sunlight Dishwashing Liquid 750ml', price: 39.99);
+
+      final candidatesByRetailer = <String, List<LiveProduct>>{
+        'Pick n Pay': [
+          _product('Sunlight Dishwashing Liquid Regular 750ml', price: 37.99),
+          _product('Sunlight Dishwashing Liquid Lemon 750ml', price: 37.99),
+          _product('PnP Dishwashing Liquid 750ml', price: 19.99),
+          _product('Sunlight Hand Washing Powder 2kg', price: 49.99),
+        ],
+        'Woolworths': [
+          _product('Sunlight Dishwashing Liquid 750ml', price: 42.99),
+          _product('Woolworths Eco Dishwashing Liquid 500ml', price: 34.99),
+        ],
+        'Checkers': [
+          _product('Sunlight Dishwashing Liquid 750ml', price: 36.99),
+          _product('Morning Fresh Dishwashing Liquid 450ml', price: 54.99),
+          _product('Sunlight Laundry Bar 500g', price: 22.99),
+        ],
+        'Shoprite': [
+          _product('Sunlight Dishwashing Liquid Regular 750ml', price: 35.99),
+          _product('Sunlight Dishwashing Liquid Regular 400ml', price: 22.99),
+          _product('Sunlight 2-In-1 Auto Washing Powder 2kg', price: 69.99),
+        ],
+        'SPAR': [
+          _product('Sunlight Dishwashing Liquid 750ml SK6001085000111',
+              price: 38.49),
+          _product('Sunlight Laundry Bar 500g SK6001085000222', price: 21.99),
+          _product('Spar Dishwashing Liquid 750ml SK6001008736000',
+              price: 16.99),
+        ],
+      };
+
+      final result = matcher.findMatchesAlgorithm(
+        sourceProduct: source,
+        candidatesByRetailer: candidatesByRetailer,
+      );
+
+      for (final retailer in candidatesByRetailer.keys) {
+        final best = result.bestMatchPerRetailer[retailer];
+        expect(best, isNotNull,
+            reason: '$retailer should have a match');
+
+        final matchName = best!.name.toLowerCase();
+        expect(matchName, contains('sunlight'),
+            reason: '$retailer should match Sunlight brand');
+        expect(matchName, contains('dishwashing'),
+            reason: '$retailer should match dishwashing liquid');
+        expect(matchName, isNot(contains('laundry')),
+            reason: '$retailer should not match laundry products');
+        expect(matchName, isNot(contains('powder')),
+            reason: '$retailer should not match washing powder');
+        expect(matchName, isNot(contains('bar')),
+            reason: '$retailer should not match soap bar');
+
+        // Should match 750ml size
+        expect(matchName, contains('750ml'),
+            reason: '$retailer should match 750ml size');
+
+        expect(best.confidenceScore, greaterThanOrEqualTo(0.75),
+            reason:
+                '$retailer confidence ${best.confidenceScore} too low for Sunlight');
+      }
+    });
+
+    test('Pampers Baby Dry Size 4 Jumbo Pack → correct match across PnP, SPAR, Checkers',
+        () {
+      final source =
+          _product('Pampers Baby Dry Size 4 Jumbo Pack', price: 249.99);
+
+      final candidatesByRetailer = <String, List<LiveProduct>>{
+        'Pick n Pay': [
+          _product('Pampers Baby Dry Size 4 Jumbo Pack 64s', price: 239.99),
+          _product('Pampers Baby Dry Size 3 Jumbo Pack 68s', price: 239.99),
+          _product('Pampers Premium Care Size 4 44s', price: 279.99),
+          _product('Huggies Gold Size 4 60s', price: 219.99),
+          _product('Panadol Pain Tablets 24s', price: 49.99),
+        ],
+        'SPAR': [
+          _product('Pampers Baby Dry Size 4 Jumbo Pack 64s SK6001000011111',
+              price: 244.99),
+          _product('Pampers Baby Dry Size 5 Jumbo Pack 56s SK6001000011222',
+              price: 249.99),
+          _product('Spar Baby Wipes 80s SK6001008737000', price: 29.99),
+          _product('Pampers Active Baby Size 4 Maxi 76s SK6001000011333',
+              price: 259.99),
+        ],
+        'Checkers': [
+          _product('Pampers Baby Dry Size 4 Jumbo Pack 64s', price: 234.99),
+          _product('Pampers Baby Dry Size 4 Value Pack 38s', price: 149.99),
+          _product('Luvs Diapers Size 4 29s', price: 129.99),
+          _product('Checkers Baby Nappies Size 4 50s', price: 119.99),
+        ],
+      };
+
+      final result = matcher.findMatchesAlgorithm(
+        sourceProduct: source,
+        candidatesByRetailer: candidatesByRetailer,
+      );
+
+      for (final retailer in candidatesByRetailer.keys) {
+        final best = result.bestMatchPerRetailer[retailer];
+        expect(best, isNotNull,
+            reason: '$retailer should have a match');
+
+        final matchName = best!.name.toLowerCase();
+        expect(matchName, contains('pampers'),
+            reason: '$retailer should match Pampers brand');
+        expect(matchName, contains('size 4'),
+            reason: '$retailer should match Size 4');
+        expect(matchName, isNot(contains('panadol')),
+            reason: '$retailer should not match pharmacy items');
+        expect(matchName, isNot(contains('wipes')),
+            reason: '$retailer should not match baby wipes');
+
+        // Should prefer jumbo pack over value pack or different size
+        expect(matchName, contains('jumbo'),
+            reason: '$retailer should match jumbo pack');
+        expect(matchName, isNot(contains('size 3')),
+            reason: '$retailer should not match Size 3');
+        expect(matchName, isNot(contains('size 5')),
+            reason: '$retailer should not match Size 5');
+      }
+
+      // Verify SPAR has SK barcode
+      final sparBest = result.bestMatchPerRetailer['SPAR']!;
+      expect(sparBest.name, contains('SK'),
+          reason: 'SPAR product should retain SK barcode suffix');
+
+      // Verify price comparison makes sense
+      final pnpBest = result.bestMatchPerRetailer['Pick n Pay']!;
+      expect(pnpBest.priceNumeric, closeTo(239.99, 0.01),
+          reason: 'PnP price should be R239.99');
+
+      final checkersBest = result.bestMatchPerRetailer['Checkers']!;
+      expect(checkersBest.priceNumeric, closeTo(234.99, 0.01),
+          reason: 'Checkers price should be R234.99 for jumbo pack');
+      expect(checkersBest.priceDifference, closeTo(-15.00, 0.01),
+          reason: 'Checkers should be R15 cheaper than source');
+      expect(checkersBest.isCheaper, isTrue,
+          reason: 'Checkers should be flagged as cheaper');
+    });
+  });
 }
