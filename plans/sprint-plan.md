@@ -1081,14 +1081,14 @@ Keep animations subtle — they accent the data, not distract from it. `prefers-
 
 ---
 
-### Sprint 20: Milk Premium — Subscription Infrastructure (Soft Launch)
+### Sprint 20: Milk Premium — Subscription Infrastructure (Soft Launch) ✅
 
-**Model:** Opus 4.6 (business model, architecture) → Sonnet 4.6 (implementation)
-**Goal:** Build subscription tracking infrastructure. Show usage limits in UI but don't enforce them. Collect usage data to inform future monetization.
-**Branch:** `feat/milk-premium-subscription`
-**Status:** IN PROGRESS
+**Model:** Opus 4.6 (business model, architecture)
+**Goal:** Build subscription tracking infrastructure. Show usage in UI but don't enforce limits. Collect usage data to inform future monetization.
+**Branch:** `feat/milk-premium-subscription` → merged to `main`
+**Status:** COMPLETED — `293ba59`
 
-**Strategy (team decision 2026-03-28):** Soft launch — everything free. Show "2/3 free recipes this week" counter to set expectations. Don't block users when they exceed the limit. Collect usage data. Enforce caps + enable payment later when we have enough users and usage data.
+**Strategy (team decision 2026-03-28):** Soft launch — everything free. Simple usage counter ("X recipes generated this week") with no limit enforcement. Gemini upgraded to paid tier 1 with $3/mo spend cap. SQL migration deployed to production Supabase.
 
 #### Phase 1: Infrastructure — DONE (code written, not deployed)
 
@@ -1112,13 +1112,17 @@ Keep animations subtle — they accent the data, not distract from it. `prefers-
 - [x] `recipe_provider.dart` — commented out hard block (line ~155). Usage still recorded via `_recordUsage()`, but generation is never blocked.
 - [x] `recipe_screen.dart` — commented out `weekly_limit_reached` error interceptor that auto-showed paywall sheet (line ~208)
 - [x] `recipe_input_card.dart` — commented out "Upgrade to Generate" locked button (line ~331). Always shows regular "Generate Recipe" button.
-- [x] Counter still visible ("2/3 free recipes this week") — sets expectations without blocking
+- [x] Counter simplified to "X recipes generated this week" — no premium/free distinction during soft launch
+- [x] Premium screen redesigned as "Early Access" with Lottie animations (gift, confetti, premium)
+- [x] Features split into "Free during early access" (AI recipes) and "Always free" (comparison, lists, deals)
+- [x] Removed fake purchase buttons and trial flow from soft launch UI
 - [x] `flutter analyze` — zero warnings
 
-#### Phase 3: Manual Setup — TODO
+#### Phase 3: Manual Setup — DONE
 
-- [ ] **Upgrade Gemini to pay-as-you-go** — BLOCKER (19/20 RPD on free tier, will break with real users)
-- [ ] **Run SQL migration** on production Supabase (`sfnavipqilqgzmtedfuh`)
+- [x] **Upgraded Gemini to paid tier 1** — $3/mo spend cap, $300 free trial credit (90 days)
+- [x] **SQL migration run** on production Supabase (`sfnavipqilqgzmtedfuh`)
+- [x] **Budget alerts configured** in Google Cloud Console
 
 #### When Ready to Monetize — TODOs to Undo (Future Sprint)
 
