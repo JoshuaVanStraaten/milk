@@ -321,14 +321,36 @@ class _ListComparisonSheetState extends ConsumerState<_ListComparisonSheet>
 // Winner summary card
 // =============================================================================
 
-class _WinnerCard extends StatelessWidget {
+class _WinnerCard extends StatefulWidget {
   final ListComparisonState compState;
   final bool isDark;
 
   const _WinnerCard({required this.compState, required this.isDark});
 
   @override
+  State<_WinnerCard> createState() => _WinnerCardState();
+}
+
+class _WinnerCardState extends State<_WinnerCard>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _trophyController;
+
+  @override
+  void initState() {
+    super.initState();
+    _trophyController = AnimationController(vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _trophyController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final compState = widget.compState;
+    final isDark = widget.isDark;
     final cheapest =
         compState.cheapestWithFuelRetailer ?? compState.cheapestRetailer;
     if (cheapest == null) return const SizedBox.shrink();
@@ -365,9 +387,13 @@ class _WinnerCard extends StatelessWidget {
               children: [
                 Lottie.asset(
                   'assets/animations/trophy.json',
+                  controller: _trophyController,
                   width: 36,
                   height: 36,
-                  repeat: false,
+                  onLoaded: (composition) {
+                    _trophyController.duration = composition.duration;
+                    _trophyController.forward();
+                  },
                 ),
                 const SizedBox(width: 8),
                 Expanded(
