@@ -1133,4 +1133,442 @@ void main() {
       expect(result!.name, contains('Black Pepper'));
     });
   });
+
+  // ###########################################################################
+  // SECTION 3: PACKAGING WORD HANDLING
+  // ###########################################################################
+
+  group('packaging word handling', () {
+    test('Coca-Cola Plastic 2L matches Coca-Cola 2L (plastic stripped)', () {
+      final source = ProductNameParser.parse('Coca-Cola Plastic 2L');
+      final candidate = ProductNameParser.parse('Coca-Cola 2L');
+      final match = ProductNameParser.classify(
+        source: source,
+        candidate: candidate,
+        retailer: 'Shoprite',
+        name: 'Coca-Cola 2L',
+        price: 'R24.99',
+        priceNumeric: 24.99,
+        sourcePrice: 28.99,
+      );
+      expect(match, isNotNull);
+      expect(match!.confidenceScore, greaterThanOrEqualTo(0.80));
+    });
+
+    test('Coca-Cola Plastic 2L matches Coca-Cola Original 2L', () {
+      final source = ProductNameParser.parse('Coca-Cola Plastic 2L');
+      final candidate = ProductNameParser.parse('Coca-Cola Original 2L');
+      final match = ProductNameParser.classify(
+        source: source,
+        candidate: candidate,
+        retailer: 'Checkers',
+        name: 'Coca-Cola Original 2L',
+        price: 'R26.99',
+        priceNumeric: 26.99,
+        sourcePrice: 28.99,
+      );
+      expect(match, isNotNull);
+      expect(match!.confidenceScore, greaterThanOrEqualTo(0.55));
+    });
+
+    test('Clover Full Cream Milk Bottle 2L matches Clover Full Cream Milk 2L',
+        () {
+      final source =
+          ProductNameParser.parse('Clover Full Cream Milk Bottle 2L');
+      final candidate = ProductNameParser.parse('Clover Full Cream Milk 2L');
+      final match = ProductNameParser.classify(
+        source: source,
+        candidate: candidate,
+        retailer: 'Checkers',
+        name: 'Clover Full Cream Milk 2L',
+        price: 'R34.99',
+        priceNumeric: 34.99,
+        sourcePrice: 36.99,
+      );
+      expect(match, isNotNull);
+      expect(match!.confidenceScore, greaterThanOrEqualTo(0.80));
+    });
+
+    test('Rhodes Apricot Jam Tin 450g matches Rhodes Apricot Jam 450g', () {
+      final source = ProductNameParser.parse('Rhodes Apricot Jam Tin 450g');
+      final candidate = ProductNameParser.parse('Rhodes Apricot Jam 450g');
+      final match = ProductNameParser.classify(
+        source: source,
+        candidate: candidate,
+        retailer: 'Shoprite',
+        name: 'Rhodes Apricot Jam 450g',
+        price: 'R42.99',
+        priceNumeric: 42.99,
+        sourcePrice: 44.99,
+      );
+      expect(match, isNotNull);
+      expect(match!.confidenceScore, greaterThanOrEqualTo(0.80));
+    });
+
+    test('Koo Baked Beans Can 410g matches Koo Baked Beans 410g', () {
+      final source = ProductNameParser.parse('Koo Baked Beans Can 410g');
+      final candidate = ProductNameParser.parse('Koo Baked Beans 410g');
+      final match = ProductNameParser.classify(
+        source: source,
+        candidate: candidate,
+        retailer: 'Checkers',
+        name: 'Koo Baked Beans 410g',
+        price: 'R18.99',
+        priceNumeric: 18.99,
+        sourcePrice: 19.99,
+      );
+      expect(match, isNotNull);
+      expect(match!.confidenceScore, greaterThanOrEqualTo(0.80));
+    });
+
+    test('Nescafe Classic Sachet 200g matches Nescafe Classic 200g', () {
+      final source = ProductNameParser.parse('Nescafe Classic Sachet 200g');
+      final candidate = ProductNameParser.parse('Nescafe Classic 200g');
+      final match = ProductNameParser.classify(
+        source: source,
+        candidate: candidate,
+        retailer: 'Shoprite',
+        name: 'Nescafe Classic 200g',
+        price: 'R84.99',
+        priceNumeric: 84.99,
+        sourcePrice: 89.99,
+      );
+      expect(match, isNotNull);
+      // "sachet" is stripped as packaging, but normalizedName difference
+      // ("classic" vs empty) causes slight score reduction — still similar+
+      expect(match!.confidenceScore, greaterThanOrEqualTo(0.75));
+    });
+
+    test('Sunfoil Sunflower Oil Bottle 2L matches Sunfoil Sunflower Oil 2L',
+        () {
+      final source =
+          ProductNameParser.parse('Sunfoil Sunflower Oil Bottle 2L');
+      final candidate = ProductNameParser.parse('Sunfoil Sunflower Oil 2L');
+      final match = ProductNameParser.classify(
+        source: source,
+        candidate: candidate,
+        retailer: 'Checkers',
+        name: 'Sunfoil Sunflower Oil 2L',
+        price: 'R49.99',
+        priceNumeric: 49.99,
+        sourcePrice: 52.99,
+      );
+      expect(match, isNotNull);
+      expect(match!.confidenceScore, greaterThanOrEqualTo(0.80));
+    });
+
+    test('Lucky Star Pilchards Tin 400g matches Lucky Star Pilchards 400g',
+        () {
+      final source =
+          ProductNameParser.parse('Lucky Star Pilchards In Tomato Sauce Tin 400g');
+      final candidate =
+          ProductNameParser.parse('Lucky Star Pilchards In Tomato Sauce 400g');
+      final match = ProductNameParser.classify(
+        source: source,
+        candidate: candidate,
+        retailer: 'Shoprite',
+        name: 'Lucky Star Pilchards In Tomato Sauce 400g',
+        price: 'R29.99',
+        priceNumeric: 29.99,
+        sourcePrice: 31.99,
+      );
+      expect(match, isNotNull);
+      expect(match!.confidenceScore, greaterThanOrEqualTo(0.80));
+    });
+  });
+
+  // ###########################################################################
+  // SECTION 4: BRAND NORMALIZATION (hyphen vs space variants)
+  // ###########################################################################
+
+  group('brand normalization', () {
+    test('Coca-Cola matches Coca Cola (hyphen vs space)', () {
+      final source = ProductNameParser.parse('Coca-Cola 2L');
+      final candidate = ProductNameParser.parse('Coca Cola 2L');
+      final match = ProductNameParser.classify(
+        source: source,
+        candidate: candidate,
+        retailer: 'Woolworths',
+        name: 'Coca Cola 2L',
+        price: 'R27.99',
+        priceNumeric: 27.99,
+        sourcePrice: 28.99,
+      );
+      expect(match, isNotNull);
+      // Brand score is 1.0 (normalized), but name score is low because
+      // "coca-cola" (single token) ≠ "coca" + "cola" (two tokens).
+      // 0.75 = similar match, which is correct for cross-retailer matching.
+      expect(match!.confidenceScore, greaterThanOrEqualTo(0.70));
+    });
+
+    test('Weet-Bix matches Weetbix (hyphen vs no separator)', () {
+      final source = ProductNameParser.parse('Weet-Bix 450g');
+      final candidate = ProductNameParser.parse('Weetbix 450g');
+      final match = ProductNameParser.classify(
+        source: source,
+        candidate: candidate,
+        retailer: 'Checkers',
+        name: 'Weetbix 450g',
+        price: 'R45.99',
+        priceNumeric: 45.99,
+        sourcePrice: 47.99,
+      );
+      expect(match, isNotNull);
+      // Brand is exact (normalized), name tokens differ — similar match
+      expect(match!.confidenceScore, greaterThanOrEqualTo(0.70));
+    });
+
+    test('Sta-Soft matches Sta Soft (hyphen vs space)', () {
+      final source = ProductNameParser.parse('Sta-Soft Ultra Conc 500ml');
+      final candidate = ProductNameParser.parse('Sta Soft Ultra Conc 500ml');
+      final match = ProductNameParser.classify(
+        source: source,
+        candidate: candidate,
+        retailer: 'Shoprite',
+        name: 'Sta Soft Ultra Conc 500ml',
+        price: 'R32.99',
+        priceNumeric: 32.99,
+        sourcePrice: 34.99,
+      );
+      expect(match, isNotNull);
+      expect(match!.confidenceScore, greaterThanOrEqualTo(0.80));
+    });
+  });
+
+  // ###########################################################################
+  // SECTION 5: BEVERAGE CATEGORY MISMATCH (should NOT reject same-brand drinks)
+  // ###########################################################################
+
+  group('beverage category mismatch', () {
+    test(
+        'Coca-Cola Plastic 2L matches Coca Cola Soft Drink 2L (both are drinks)',
+        () {
+      final source = ProductNameParser.parse('Coca-Cola Plastic 2L');
+      final candidate = ProductNameParser.parse('Coca Cola Soft Drink 2L');
+      final match = ProductNameParser.classify(
+        source: source,
+        candidate: candidate,
+        retailer: 'Woolworths',
+        name: 'Coca Cola Soft Drink 2L',
+        price: 'R27.99',
+        priceNumeric: 27.99,
+        sourcePrice: 28.99,
+      );
+      expect(match, isNotNull);
+      expect(match!.confidenceScore, greaterThanOrEqualTo(0.55));
+    });
+
+    test('Fanta Orange 2L matches Fanta Orange Soft Drink 2L', () {
+      final source = ProductNameParser.parse('Fanta Orange 2L');
+      final candidate = ProductNameParser.parse('Fanta Orange Soft Drink 2L');
+      final match = ProductNameParser.classify(
+        source: source,
+        candidate: candidate,
+        retailer: 'Woolworths',
+        name: 'Fanta Orange Soft Drink 2L',
+        price: 'R23.99',
+        priceNumeric: 23.99,
+        sourcePrice: 24.99,
+      );
+      expect(match, isNotNull);
+      expect(match!.confidenceScore, greaterThanOrEqualTo(0.55));
+    });
+
+    test('Sprite 2L matches Sprite Soft Drink 2L', () {
+      final source = ProductNameParser.parse('Sprite 2L');
+      final candidate = ProductNameParser.parse('Sprite Soft Drink 2L');
+      final match = ProductNameParser.classify(
+        source: source,
+        candidate: candidate,
+        retailer: 'Woolworths',
+        name: 'Sprite Soft Drink 2L',
+        price: 'R23.99',
+        priceNumeric: 23.99,
+        sourcePrice: 24.99,
+      );
+      expect(match, isNotNull);
+      expect(match!.confidenceScore, greaterThanOrEqualTo(0.55));
+    });
+
+    test('Strawberries 400g does NOT match Strawberry Drink 500ml (valid mismatch)',
+        () {
+      final source = ProductNameParser.parse('Strawberries 400g');
+      final candidate = ProductNameParser.parse('Strawberry Drink 500ml');
+      final match = ProductNameParser.classify(
+        source: source,
+        candidate: candidate,
+        retailer: 'Checkers',
+        name: 'Strawberry Drink 500ml',
+        price: 'R15.99',
+        priceNumeric: 15.99,
+        sourcePrice: 24.99,
+      );
+      expect(match, isNull);
+    });
+
+    test('Apples 1kg does NOT match Apple Juice 1L (valid mismatch)', () {
+      final source = ProductNameParser.parse('Apples 1kg');
+      final candidate = ProductNameParser.parse('Ceres Apple Juice 1L');
+      final match = ProductNameParser.classify(
+        source: source,
+        candidate: candidate,
+        retailer: 'Checkers',
+        name: 'Ceres Apple Juice 1L',
+        price: 'R32.99',
+        priceNumeric: 32.99,
+        sourcePrice: 39.99,
+      );
+      expect(match, isNull);
+    });
+
+    test('Pepsi 2L matches Pepsi Soft Drink 2L', () {
+      final source = ProductNameParser.parse('Pepsi 2L');
+      final candidate = ProductNameParser.parse('Pepsi Soft Drink 2L');
+      final match = ProductNameParser.classify(
+        source: source,
+        candidate: candidate,
+        retailer: 'Woolworths',
+        name: 'Pepsi Soft Drink 2L',
+        price: 'R22.99',
+        priceNumeric: 22.99,
+        sourcePrice: 24.99,
+      );
+      expect(match, isNotNull);
+      expect(match!.confidenceScore, greaterThanOrEqualTo(0.55));
+    });
+
+    test('Schweppes Lemonade 2L matches Schweppes Lemonade Soft Drink 2L',
+        () {
+      final source = ProductNameParser.parse('Schweppes Lemonade 2L');
+      final candidate =
+          ProductNameParser.parse('Schweppes Lemonade Soft Drink 2L');
+      final match = ProductNameParser.classify(
+        source: source,
+        candidate: candidate,
+        retailer: 'Woolworths',
+        name: 'Schweppes Lemonade Soft Drink 2L',
+        price: 'R22.99',
+        priceNumeric: 22.99,
+        sourcePrice: 24.99,
+      );
+      expect(match, isNotNull);
+      expect(match!.confidenceScore, greaterThanOrEqualTo(0.55));
+    });
+  });
+
+  // ###########################################################################
+  // SECTION 6: PACK COUNT MATCHING (eggs, toilet rolls, etc.)
+  // ###########################################################################
+
+  group('pack count matching', () {
+    test('PnP Large Eggs 30 Pack vs Eggbert Large Eggs 30 Pack is exact match',
+        () {
+      final source = ProductNameParser.parse('PnP Large Eggs 30 Pack');
+      final candidate = ProductNameParser.parse('Eggbert Large Eggs 30 Pack');
+      final match = ProductNameParser.classify(
+        source: source,
+        candidate: candidate,
+        retailer: 'Checkers',
+        name: 'Eggbert Large Eggs 30 Pack',
+        price: 'R74.99',
+        priceNumeric: 74.99,
+        sourcePrice: 79.99,
+      );
+      expect(match, isNotNull);
+      // Store brand (PnP) vs unknown brand (Eggbert) on same product = exact
+      expect(match!.confidenceScore, greaterThanOrEqualTo(0.80));
+    });
+
+    test('PnP Large Eggs 30 Pack vs Ritebrand Large Eggs 30 Pack is exact match',
+        () {
+      final source = ProductNameParser.parse('PnP Large Eggs 30 Pack');
+      final candidate =
+          ProductNameParser.parse('Ritebrand Large Eggs 30 Pack');
+      final match = ProductNameParser.classify(
+        source: source,
+        candidate: candidate,
+        retailer: 'Shoprite',
+        name: 'Ritebrand Large Eggs 30 Pack',
+        price: 'R69.99',
+        priceNumeric: 69.99,
+        sourcePrice: 79.99,
+      );
+      expect(match, isNotNull);
+      // Both store brands on same product = exact
+      expect(match!.confidenceScore, greaterThanOrEqualTo(0.80));
+    });
+
+    test(
+        '30 Pack eggs vs 18 Pack eggs is fallback or rejected (different quantity)',
+        () {
+      final source = ProductNameParser.parse('PnP Large Eggs 30 Pack');
+      final candidate =
+          ProductNameParser.parse('Simple Truth Free-Range Large Eggs 18 Pack');
+      final match = ProductNameParser.classify(
+        source: source,
+        candidate: candidate,
+        retailer: 'Checkers',
+        name: 'Simple Truth Free-Range Large Eggs 18 Pack',
+        price: 'R84.99',
+        priceNumeric: 84.99,
+        sourcePrice: 79.99,
+      );
+      // 30 vs 18 is a 67% difference — should be fallback at most
+      if (match != null) {
+        expect(match.confidenceScore, lessThan(0.55));
+      }
+    });
+
+    test('30 Pack eggs vs 6 Pack eggs should not match as similar', () {
+      final source = ProductNameParser.parse('PnP Large Eggs 30 Pack');
+      final candidate = ProductNameParser.parse('PnP Large Eggs 6 Pack');
+      final match = ProductNameParser.classify(
+        source: source,
+        candidate: candidate,
+        retailer: 'Pick n Pay',
+        name: 'PnP Large Eggs 6 Pack',
+        price: 'R29.99',
+        priceNumeric: 29.99,
+        sourcePrice: 79.99,
+      );
+      // 30 vs 6 is a 5x difference — should be fallback at most
+      if (match != null) {
+        expect(match.confidenceScore, lessThan(0.55));
+      }
+    });
+
+    test('6 Pack eggs vs 6 Pack eggs from different brands is exact', () {
+      final source = ProductNameParser.parse('PnP Large Eggs 6 Pack');
+      final candidate = ProductNameParser.parse('Eggbert Large Eggs 6 Pack');
+      final match = ProductNameParser.classify(
+        source: source,
+        candidate: candidate,
+        retailer: 'Checkers',
+        name: 'Eggbert Large Eggs 6 Pack',
+        price: 'R22.99',
+        priceNumeric: 22.99,
+        sourcePrice: 24.99,
+      );
+      expect(match, isNotNull);
+      expect(match!.confidenceScore, greaterThanOrEqualTo(0.80));
+    });
+
+    test('Large Eggs vs Extra Large Eggs matches as similar or exact', () {
+      final source = ProductNameParser.parse('PnP Large Eggs 30 Pack');
+      final candidate =
+          ProductNameParser.parse('Eggbert Extra Large Eggs 30 Pack');
+      final match = ProductNameParser.classify(
+        source: source,
+        candidate: candidate,
+        retailer: 'Checkers',
+        name: 'Eggbert Extra Large Eggs 30 Pack',
+        price: 'R84.99',
+        priceNumeric: 84.99,
+        sourcePrice: 79.99,
+      );
+      // "Extra Large" vs "Large" — same pack count, similar product
+      expect(match, isNotNull);
+      expect(match!.confidenceScore, greaterThanOrEqualTo(0.55));
+    });
+  });
 }

@@ -231,6 +231,23 @@ class ProductNameParser {
     'no name', 'housebrand', 'ritebrand',
   };
 
+  /// Known beverage brands — when the source product is one of these, category
+  /// words like "drink", "soda", "cooldrink" in the candidate should NOT
+  /// trigger a mismatch (both products are drinks).
+  static const _beverageBrands = {
+    'coca-cola', 'coca cola', 'pepsi', 'pepsi max', 'fanta', 'sprite',
+    'schweppes', 'mountain dew', 'appletiser', 'grapetiser',
+    'liqui fruit', 'ceres', 'tropika', 'oros', 'energade', 'powerade',
+    'stoney', 'sparletta', 'iron brew', 'tab', 'jive', 'halls',
+    'bos', 'rooibos', 'cappy', 'valpre',
+  };
+
+  /// Category mismatch words that are beverage-related — these should be
+  /// skipped when the source product is a known beverage brand.
+  static const _beverageCategoryWords = {
+    'drink', 'soda', 'cooldrink', 'soft',
+  };
+
   /// Generic/filler words that should not drive matching.
   /// These words appear across unrelated product categories and inflate
   /// name similarity when they're the only overlap.
@@ -484,13 +501,15 @@ class ProductNameParser {
       // Soft gate when: brands are different AND at least one fallback brand
       // appears in the other product's name (indicating a produce/generic product
       // sold under different retailer labels at different sizes).
-      final srcBrand = source.brand?.toLowerCase().replaceAll('-', '') ?? '';
-      final candBrand = candidate.brand?.toLowerCase().replaceAll('-', '') ?? '';
+      final srcBrand = _normalizeBrand(source.brand ?? '');
+      final candBrand = _normalizeBrand(candidate.brand ?? '');
       final brandsAreDifferent = srcBrand != candBrand;
-      final fallbackInOtherName = (!_brandPatterns.contains(srcBrand) &&
-              candidate.originalName.toLowerCase().contains(srcBrand)) ||
-          (!_brandPatterns.contains(candBrand) &&
-              source.originalName.toLowerCase().contains(candBrand));
+      final srcKnown = _brandPatterns.any((p) => _normalizeBrand(p) == srcBrand);
+      final candKnown = _brandPatterns.any((p) => _normalizeBrand(p) == candBrand);
+      final fallbackInOtherName = (!srcKnown &&
+              candidate.originalName.toLowerCase().contains(source.brand?.toLowerCase() ?? '')) ||
+          (!candKnown &&
+              source.originalName.toLowerCase().contains(candidate.brand?.toLowerCase() ?? ''));
 
       if (brandsAreDifferent && fallbackInOtherName && size > 0.05) {
         // Cross-retailer produce — soft gate, allow similar matches
@@ -521,23 +540,28 @@ class ProductNameParser {
     return score;
   }
 
+  /// Normalize a brand string for comparison — strip hyphens, spaces, and
+  /// lowercase so "coca-cola", "coca cola", and "cocacola" all become "cocacola".
+  static String _normalizeBrand(String brand) =>
+      brand.toLowerCase().replaceAll(RegExp(r'[\s\-]+'), '');
+
   /// Brand similarity (0.0–1.0).
   static double _brandScore(ParsedProductName a, ParsedProductName b) {
     if (a.brand == null || b.brand == null) return 0.3;
 
-    final brandA = a.brand!.toLowerCase().replaceAll('-', '');
-    final brandB = b.brand!.toLowerCase().replaceAll('-', '');
+    final brandA = _normalizeBrand(a.brand!);
+    final brandB = _normalizeBrand(b.brand!);
 
     if (brandA == brandB) return 1.0;
 
-    final aIsStore = _storeBrands.contains(brandA);
-    final bIsStore = _storeBrands.contains(brandB);
+    final aIsStore = _storeBrands.any((s) => _normalizeBrand(s) == brandA);
+    final bIsStore = _storeBrands.any((s) => _normalizeBrand(s) == brandB);
 
     // Both store brands — similar tier products
     if (aIsStore && bIsStore) return 0.7;
 
-    final aKnown = _brandPatterns.contains(brandA);
-    final bKnown = _brandPatterns.contains(brandB);
+    final aKnown = _brandPatterns.any((p) => _normalizeBrand(p) == brandA);
+    final bKnown = _brandPatterns.any((p) => _normalizeBrand(p) == brandB);
 
     // When one brand is a fallback (first word, not a known brand) and
     // it appears in the other product's original name, the "brand" is
@@ -545,6 +569,11 @@ class ProductNameParser {
     // appearing in "PnP Strawberries 250g"). Treat as compatible.
     if (!aKnown && b.originalName.toLowerCase().contains(brandA)) return 0.7;
     if (!bKnown && a.originalName.toLowerCase().contains(brandB)) return 0.7;
+
+    // Store brand vs unknown brand — these commonly compete on the same
+    // commodity products (e.g. "PnP Large Eggs" vs "Eggbert Large Eggs").
+    // Score higher than two unrelated unknowns.
+    if ((aIsStore && !bKnown) || (bIsStore && !aKnown)) return 0.5;
 
     if (!aKnown || !bKnown) return 0.3;
 
@@ -562,8 +591,9 @@ class ProductNameParser {
       if (a.packCount == b.packCount) return 1.0;
       final ratio = a.packCount! / b.packCount!;
       final diff = (ratio - 1.0).abs();
+      if (diff < 0.10) return 0.8; // Very close counts (e.g. 30 vs 28)
       if (diff < 0.20) return 0.5; // Close counts (e.g. 6 vs 5)
-      return 0.1; // Very different counts (e.g. 30 vs 6)
+      return 0.05; // Very different counts (e.g. 30 vs 18, 30 vs 6)
     }
 
     // Neither has size or pack count — can't compare
@@ -697,7 +727,15 @@ class ProductNameParser {
     final candidateCategory = meaningfulB.intersection(_categoryMismatchWords);
     final sourceCategory = meaningfulA.intersection(_categoryMismatchWords);
     final mismatch = candidateCategory.difference(sourceCategory);
-    if (mismatch.isNotEmpty) return 0;
+    if (mismatch.isNotEmpty) {
+      // Skip beverage-word mismatches when source is a known beverage brand
+      // ("Coca-Cola Plastic 2L" vs "Coca Cola Soft Drink 2L" — both are drinks)
+      final onlyBeverageWords = mismatch.difference(_beverageCategoryWords).isEmpty;
+      final sourceBrand = _extractBrandFromName(a);
+      if (!(onlyBeverageWords && sourceBrand != null && _beverageBrands.contains(sourceBrand))) {
+        return 0;
+      }
+    }
 
     final overlap = meaningfulA.intersection(meaningfulB).length;
     if (overlap == 0) return 0;
@@ -750,8 +788,30 @@ class ProductNameParser {
 
     final candidateCategory = candidateWords.intersection(_categoryMismatchWords);
     final sourceCategory = sourceWords.intersection(_categoryMismatchWords);
-    final mismatch = candidateCategory.difference(sourceCategory);
+    var mismatch = candidateCategory.difference(sourceCategory);
+
+    // If the only mismatched words are beverage-related ("drink", "soda", etc.)
+    // and the source product is a known beverage brand, skip the mismatch —
+    // both products are drinks, one retailer just includes "Soft Drink" in the name.
+    if (mismatch.isNotEmpty && mismatch.difference(_beverageCategoryWords).isEmpty) {
+      final sourceBrand = _extractBrandFromName(sourceLower);
+      if (sourceBrand != null && _beverageBrands.contains(sourceBrand)) {
+        return false;
+      }
+    }
+
     return mismatch.isNotEmpty;
+  }
+
+  /// Extract the brand from a lowercased product name (quick check for
+  /// beverage brand detection — not full parsing).
+  static String? _extractBrandFromName(String lowerName) {
+    for (final brand in _brandPatterns) {
+      if (lowerName.startsWith('$brand ') || lowerName.startsWith("$brand'")) {
+        return brand;
+      }
+    }
+    return null;
   }
 
   /// Map confidence score to MatchType for backward compatibility.

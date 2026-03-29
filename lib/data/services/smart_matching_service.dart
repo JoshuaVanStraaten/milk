@@ -97,12 +97,12 @@ class SmartMatchingService {
           retailer: retailer,
           name: candidate.name,
           price: candidate.price,
-          priceNumeric: candidate.priceNumeric,
+          priceNumeric: candidate.effectivePrice,
           promotionPrice:
               candidate.hasPromo ? candidate.promotionPrice : null,
           hasPromo: candidate.hasPromo,
           imageUrl: candidate.imageUrl,
-          sourcePrice: sourceProduct.priceNumeric,
+          sourcePrice: sourceProduct.effectivePrice,
         );
         if (match != null) matches.add(match);
       }

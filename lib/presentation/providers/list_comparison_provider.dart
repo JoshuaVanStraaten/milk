@@ -127,7 +127,7 @@ class ListComparisonNotifier extends StateNotifier<ListComparisonState> {
               retailer: retailerName,
               name: candidate.name,
               price: candidate.price,
-              priceNumeric: candidate.priceNumeric,
+              priceNumeric: candidate.effectivePrice,
               promotionPrice:
                   candidate.hasPromo ? candidate.promotionPrice : null,
               hasPromo: candidate.hasPromo,
