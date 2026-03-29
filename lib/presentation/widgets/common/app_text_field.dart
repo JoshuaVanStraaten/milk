@@ -71,7 +71,7 @@ class _AppTextFieldState extends State<AppTextField> {
                   : AppColors.textSecondary,
             ),
             filled: true,
-            fillColor: isDark ? AppColors.surfaceDarkMode : AppColors.surface,
+            fillColor: isDark ? AppColors.surfaceDarkMode : AppColors.inputFill,
 
             // Prefix icon (e.g., email icon)
             prefixIcon: widget.prefixIcon != null

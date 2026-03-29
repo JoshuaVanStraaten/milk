@@ -486,7 +486,7 @@ void main() {
 
     setUp(() {
       matcher = SmartMatchingService(
-        gemini: GeminiService(apiKey: 'test-key'),
+        gemini: GeminiService(),
       );
     });
 
@@ -946,7 +946,7 @@ void main() {
   group('hint-assisted ingredient matching', () {
     late SmartMatchingService matcher;
     setUp(() {
-      matcher = SmartMatchingService(gemini: GeminiService(apiKey: 'test-key'));
+      matcher = SmartMatchingService(gemini: GeminiService());
     });
 
     test('butter with hint excludes Butter Chicken', () async {

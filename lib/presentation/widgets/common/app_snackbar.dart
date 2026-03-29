@@ -163,19 +163,19 @@ class AppSnackbar {
         return _SnackbarConfig(
           icon: Icons.check_circle_outline,
           color: AppColors.success,
-          darkColor: const Color(0xFF2E7D32), // Slightly darker for dark mode
+          darkColor: AppColors.snackbarSuccess,
         );
       case SnackbarType.error:
         return _SnackbarConfig(
           icon: Icons.error_outline,
           color: AppColors.error,
-          darkColor: const Color(0xFFC62828),
+          darkColor: AppColors.snackbarError,
         );
       case SnackbarType.warning:
         return _SnackbarConfig(
           icon: Icons.warning_amber_outlined,
           color: AppColors.warning,
-          darkColor: const Color(0xFFE65100),
+          darkColor: AppColors.snackbarWarning,
         );
       case SnackbarType.info:
         return _SnackbarConfig(

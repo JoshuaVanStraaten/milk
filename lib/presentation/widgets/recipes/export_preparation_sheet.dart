@@ -164,7 +164,7 @@ class _ExportPreparationSheetState
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: isDark ? Colors.white24 : Colors.black12,
+                      color: isDark ? Colors.white.withValues(alpha: 0.12) : Colors.black.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -211,7 +211,7 @@ class _ExportPreparationSheetState
 
               Divider(
                 height: 1,
-                color: isDark ? Colors.white12 : Colors.black12,
+                color: isDark ? Colors.white.withValues(alpha: 0.12) : Colors.black.withValues(alpha: 0.12),
               ),
 
               // Section header
@@ -230,7 +230,7 @@ class _ExportPreparationSheetState
                     Text(
                       '$_selectedCount of ${ingredients.where((i) => i.isMatched).length} matched',
                       style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: isDark ? Colors.white38 : Colors.black38,
+                            color: isDark ? Colors.white.withValues(alpha: 0.38) : Colors.black.withValues(alpha: 0.38),
                           ),
                     ),
                   ],
@@ -261,7 +261,7 @@ class _ExportPreparationSheetState
                           fontSize: 13,
                           color: isMatched
                               ? null
-                              : (isDark ? Colors.white38 : Colors.black38),
+                              : (isDark ? Colors.white.withValues(alpha: 0.38) : Colors.black.withValues(alpha: 0.38)),
                           decoration: isMatched ? null : TextDecoration.none,
                         ),
                         maxLines: 1,
@@ -293,14 +293,14 @@ class _ExportPreparationSheetState
                                 vertical: 3,
                               ),
                               decoration: BoxDecoration(
-                                color: isDark ? Colors.white12 : Colors.black.withValues(alpha: 0.08),
+                                color: isDark ? Colors.white.withValues(alpha: 0.12) : Colors.black.withValues(alpha: 0.08),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
                                 'Not found',
                                 style: TextStyle(
                                   fontSize: 10,
-                                  color: isDark ? Colors.white38 : Colors.black38,
+                                  color: isDark ? Colors.white.withValues(alpha: 0.38) : Colors.black.withValues(alpha: 0.38),
                                 ),
                               ),
                             ),
@@ -311,7 +311,7 @@ class _ExportPreparationSheetState
 
               Divider(
                 height: 1,
-                color: isDark ? Colors.white12 : Colors.black12,
+                color: isDark ? Colors.white.withValues(alpha: 0.12) : Colors.black.withValues(alpha: 0.12),
               ),
 
               // Save recipe toggle

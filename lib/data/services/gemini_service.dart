@@ -1,15 +1,16 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import '../../core/constants/live_api_config.dart';
 import '../models/recipe.dart';
 
-/// Service for interacting with Google's Gemini AI API
+/// Service for interacting with Google's Gemini AI via Edge Function proxy.
+///
+/// The Gemini API key is stored server-side as a Supabase Edge Function secret.
+/// This service sends prompts to the `gemini-proxy` Edge Function, which
+/// forwards them to the Gemini API.
 class GeminiService {
-  final String apiKey;
-  final String _baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
-  final String _model = 'gemini-2.5-flash';
-
-  GeminiService({required this.apiKey});
+  GeminiService();
 
   /// Generate a recipe from a user's request
   ///
@@ -168,14 +169,14 @@ Suggest recipes that:
 ''';
   }
 
-  /// Call the Gemini API
+  /// Call Gemini via the gemini-proxy Edge Function
   Future<String> _callGemini(
     String prompt, {
     double temperature = 0.7,
     int maxOutputTokens = 8192,
   }) async {
     final url = Uri.parse(
-      '$_baseUrl/models/$_model:generateContent?key=$apiKey',
+      LiveApiConfig.edgeFunctionUrl('gemini-proxy'),
     );
 
     final body = jsonEncode({
@@ -196,9 +197,9 @@ Suggest recipes that:
 
     try {
       final response = await http
-          .post(url, headers: {'Content-Type': 'application/json'}, body: body)
+          .post(url, headers: LiveApiConfig.headers, body: body)
           .timeout(
-            const Duration(seconds: 60),
+            const Duration(seconds: 90), // 60s Gemini + 30s Edge Function buffer
             onTimeout: () {
               throw GeminiException(
                 'Request timed out',
@@ -210,17 +211,31 @@ Suggest recipes that:
 
       if (response.statusCode != 200) {
         debugPrint(
-          'Gemini API error: ${response.statusCode} - ${response.body}',
+          'Gemini proxy error: ${response.statusCode} - ${response.body}',
         );
 
         // Parse the error response to get details
         try {
           final errorBody = jsonDecode(response.body) as Map<String, dynamic>;
-          final error = errorBody['error'] as Map<String, dynamic>?;
-          final status = error?['status'] as String?;
+          final error = errorBody['error'];
+
+          // Edge Function proxy returns { error: "message" } as a string
+          // Gemini API returns { error: { message, status } } as an object
+          if (error is String) {
+            throw GeminiException(
+              error,
+              statusCode: response.statusCode,
+              isRetryable: response.statusCode >= 500 ||
+                  response.statusCode == 429 ||
+                  response.statusCode == 504,
+            );
+          }
+
+          final errorMap = error as Map<String, dynamic>?;
+          final status = errorMap?['status'] as String?;
 
           throw GeminiException(
-            error?['message'] as String? ?? 'API request failed',
+            errorMap?['message'] as String? ?? 'API request failed',
             statusCode: response.statusCode,
             status: status,
             isRetryable:
@@ -275,7 +290,7 @@ Suggest recipes that:
       throw GeminiException('Network error: ${e.message}', isRetryable: true);
     } catch (e) {
       if (e is GeminiException) rethrow;
-      debugPrint('Gemini API error: $e');
+      debugPrint('Gemini proxy error: $e');
       throw GeminiException('Failed to connect to AI service: $e');
     }
   }

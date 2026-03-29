@@ -254,10 +254,10 @@ class PremiumScreen extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: const Color(0xFFFFD700).withValues(alpha: 0.1),
+                color: AppColors.primary.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: const Color(0xFFFFD700).withValues(alpha: 0.3),
+                  color: AppColors.primary.withValues(alpha: 0.2),
                 ),
               ),
               child: Row(
@@ -349,7 +349,7 @@ class _FeatureRow extends StatelessWidget {
                         decoration: BoxDecoration(
                           color: badge == 'FREE'
                               ? AppColors.primary.withValues(alpha: 0.15)
-                              : const Color(0xFFFFD700).withValues(alpha: 0.15),
+                              : AppColors.primary.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
@@ -357,9 +357,7 @@ class _FeatureRow extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
-                            color: badge == 'FREE'
-                                ? AppColors.primary
-                                : const Color(0xFFFFD700),
+                            color: AppColors.primary,
                           ),
                         ),
                       ),

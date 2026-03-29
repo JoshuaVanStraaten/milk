@@ -47,7 +47,7 @@ class PremiumPaywallSheet extends StatelessWidget {
             height: 72,
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFFFFD700), Color(0xFFFFA500)],
+                colors: [AppColors.premium, Color(0xFFFFA500)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -140,7 +140,7 @@ class PremiumPaywallSheet extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFFFFD700),
+                          color: AppColors.premium,
                         ),
                       ),
                       SizedBox(height: 4),
@@ -149,7 +149,7 @@ class PremiumPaywallSheet extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: Color(0xFFFFD700),
+                          color: AppColors.premium,
                         ),
                       ),
                     ],
@@ -171,7 +171,7 @@ class PremiumPaywallSheet extends StatelessWidget {
               },
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                backgroundColor: const Color(0xFFFFD700),
+                backgroundColor: AppColors.premium,
                 foregroundColor: Colors.black,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),

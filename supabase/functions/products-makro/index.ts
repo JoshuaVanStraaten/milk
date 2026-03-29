@@ -10,6 +10,7 @@
 // }
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { checkRateLimit } from "../_shared/rate_limiter.ts";
 
 const MAKRO_API = "https://www.makro.co.za/fccng/api/4/page/fetch";
 
@@ -34,6 +35,9 @@ serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
+
+  const rateLimited = checkRateLimit(req, corsHeaders);
+  if (rateLimited) return rateLimited;
 
   try {
     const {

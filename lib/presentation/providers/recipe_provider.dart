@@ -6,7 +6,6 @@
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../data/models/recipe.dart';
 import '../../data/models/live_product.dart';
@@ -22,16 +21,9 @@ import 'subscription_provider.dart';
 // SERVICE PROVIDERS
 // =============================================================================
 
-/// Gemini service provider
+/// Gemini service provider — API key is now server-side (gemini-proxy Edge Function)
 final geminiServiceProvider = Provider<GeminiService>((ref) {
-  final apiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
-  if (apiKey.isEmpty) {
-    throw Exception(
-      'GEMINI_API_KEY not configured. Add it to your .env file:\n'
-      'GEMINI_API_KEY=your_api_key_here',
-    );
-  }
-  return GeminiService(apiKey: apiKey);
+  return GeminiService();
 });
 
 /// Recipe repository provider

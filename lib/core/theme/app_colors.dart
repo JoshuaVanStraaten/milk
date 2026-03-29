@@ -19,9 +19,18 @@ class AppColors {
   static const Color secondaryLight = Color(0xFFFBBF24);
 
   // Background Colors (Light)
-  static const Color background = Color(0xFFFFFFFF); // Pure white
-  static const Color surface = Color(0xFFF3F4F6); // Light gray
+  static const Color background = Color(0xFFF5F6FA); // Cool light gray (cards pop on this)
+  static const Color surface = Color(0xFFFFFFFF); // White — card/container backgrounds pop against gray scaffold
+  static const Color inputFill = Color(0xFFF0F1F5); // Subtle gray for input field backgrounds
   static const Color surfaceDark = Color(0xFFE5E7EB);
+
+  // Premium / Accent Colors
+  static const Color premium = Color(0xFFFFD700); // Gold (premium features)
+
+  // Snackbar Status Colors
+  static const Color snackbarSuccess = Color(0xFF2E7D32); // Dark green
+  static const Color snackbarError = Color(0xFFC62828); // Dark red
+  static const Color snackbarWarning = Color(0xFFE65100); // Dark orange
 
   // Text Colors (Light)
   static const Color textPrimary = Color(0xFF1F2937); // Dark gray

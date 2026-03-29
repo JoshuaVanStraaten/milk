@@ -13,6 +13,7 @@
 //   7. Return normalized product JSON
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { checkRateLimit } from "../_shared/rate_limiter.ts";
 
 const BASE_URL = "https://www.shoprite.co.za";
 const IMAGE_PROXY_BASE = "https://pjqbvrluyvqvpegxumsd.supabase.co/functions/v1/image-proxy";
@@ -367,6 +368,9 @@ function buildProductUrl(
 serve(async (req: Request) => {
   if (req.method === "OPTIONS")
    return new Response(null, { status: 204, headers: CORS_HEADERS });
+
+  const rateLimited = checkRateLimit(req, CORS_HEADERS);
+  if (rateLimited) return rateLimited;
 
   try {
     const body = await req.json();

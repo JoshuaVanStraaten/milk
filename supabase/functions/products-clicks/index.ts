@@ -10,6 +10,7 @@
 // }
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { checkRateLimit } from "../_shared/rate_limiter.ts";
 
 const ALGOLIA_APP_ID = Deno.env.get("ALGOLIA_APP_ID") || "";
 const ALGOLIA_API_KEY = Deno.env.get("ALGOLIA_API_KEY") || "";
@@ -38,6 +39,9 @@ serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
+
+  const rateLimited = checkRateLimit(req, corsHeaders);
+  if (rateLimited) return rateLimited;
 
   try {
     const {

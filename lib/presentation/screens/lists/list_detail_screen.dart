@@ -10,6 +10,7 @@ import '../../../data/models/list_item.dart';
 import '../../../data/models/live_product.dart';
 import '../../providers/list_provider.dart';
 import '../../providers/store_provider.dart';
+import '../../providers/theme_provider.dart'; // for sharedPreferencesProvider
 import '../../widgets/skeleton_loaders.dart';
 import '../../widgets/animations.dart';
 import '../../widgets/common/app_snackbar.dart';
@@ -35,6 +36,7 @@ class ListDetailScreen extends ConsumerStatefulWidget {
 class _ListDetailScreenState extends ConsumerState<ListDetailScreen> {
   final Set<String> _selectedIds = {};
   bool get _isSelectionMode => _selectedIds.isNotEmpty;
+  bool _isRefreshing = false;
 
   // Tutorial
   TutorialCoachMark? _tutorialCoachMark;
@@ -45,6 +47,117 @@ class _ListDetailScreenState extends ConsumerState<ListDetailScreen> {
 
   void _exitSelectionMode() {
     setState(() => _selectedIds.clear());
+  }
+
+  Future<void> _refreshPrices() async {
+    final storeSelection = ref.read(storeSelectionProvider);
+    final stores = storeSelection.valueOrNull?.stores;
+    if (stores == null || stores.isEmpty) {
+      if (mounted) {
+        AppSnackbar.error(context, message: 'No stores available. Check your location.');
+      }
+      return;
+    }
+
+    setState(() => _isRefreshing = true);
+
+    try {
+      final api = ref.read(liveApiServiceProvider);
+      final notifier = ref.read(realtimeListItemsProvider(widget.listId).notifier);
+      final result = await notifier.refreshPrices(api, stores);
+
+      if (mounted) {
+        ref.read(sharedPreferencesProvider).setInt(
+          _prefsKey(),
+          DateTime.now().millisecondsSinceEpoch,
+        );
+        setState(() {}); // Rebuild to hide staleness banner
+        if (result.updated > 0) {
+          AppSnackbar.success(
+            context,
+            message: 'Prices updated — ${result.updated} item${result.updated == 1 ? '' : 's'} refreshed',
+          );
+        } else {
+          AppSnackbar.info(
+            context,
+            message: 'All prices are up to date',
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        AppSnackbar.error(context, message: 'Failed to refresh prices');
+      }
+    } finally {
+      if (mounted) setState(() => _isRefreshing = false);
+    }
+  }
+
+  String _prefsKey() => 'list_last_refreshed_${widget.listId}';
+
+  Widget _buildStalenessIndicator(List<ListItem> items, bool isDark) {
+    // Only consider items with a retailer (i.e., have prices to refresh)
+    final pricedItems = items.where((i) => i.itemRetailer != null && i.itemRetailer!.isNotEmpty).toList();
+    if (pricedItems.isEmpty) return const SizedBox.shrink();
+
+    // Check persisted last refresh time
+    final prefs = ref.read(sharedPreferencesProvider);
+    final lastRefreshedMs = prefs.getInt(_prefsKey());
+    if (lastRefreshedMs != null) {
+      final sinceRefresh = DateTime.now().difference(DateTime.fromMillisecondsSinceEpoch(lastRefreshedMs));
+      if (sinceRefresh.inHours < 24) return const SizedBox.shrink();
+    }
+
+    // Use the oldest item's createdAt as a proxy for price age
+    final oldest = pricedItems.reduce((a, b) => a.createdAt.isBefore(b.createdAt) ? a : b);
+    final age = DateTime.now().difference(oldest.createdAt);
+
+    if (age.inHours < 24) return const SizedBox.shrink();
+
+    final String ageText;
+    if (age.inDays == 1) {
+      ageText = 'yesterday';
+    } else if (age.inDays < 7) {
+      ageText = '${age.inDays} days ago';
+    } else {
+      ageText = '${(age.inDays / 7).floor()} week${age.inDays >= 14 ? 's' : ''} ago';
+    }
+
+    return GestureDetector(
+      onTap: _isRefreshing ? null : () => _refreshPrices(),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        color: isDark
+            ? AppColors.secondaryDark.withValues(alpha: 0.15)
+            : AppColors.secondary.withValues(alpha: 0.08),
+        child: Row(
+          children: [
+            Icon(Icons.schedule, size: 16, color: AppColors.secondaryDark),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Prices from $ageText',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: isDark ? AppColors.secondaryLight : AppColors.secondaryDark,
+                ),
+              ),
+            ),
+            if (_isRefreshing)
+              const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+            else
+              Text(
+                'Refresh',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.primary,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _toggleSelection(String itemId) {
@@ -186,6 +299,17 @@ class _ListDetailScreenState extends ConsumerState<ListDetailScreen> {
                     ),
                   ),
                 IconButton(
+                  icon: _isRefreshing
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.refresh),
+                  tooltip: 'Refresh prices',
+                  onPressed: _isRefreshing ? null : () => _refreshPrices(),
+                ),
+                IconButton(
                   key: _addItemKey,
                   icon: const Icon(Icons.add),
                   onPressed: () {
@@ -225,6 +349,9 @@ class _ListDetailScreenState extends ConsumerState<ListDetailScreen> {
               ),
 
               const Divider(height: 1),
+
+              // Staleness indicator — shows when priced items are >24h old
+              _buildStalenessIndicator(itemsState.items, isDark),
 
               // Trip Cost breakdown (collapsible) — hide when list is empty
               if (itemsState.items.isNotEmpty)

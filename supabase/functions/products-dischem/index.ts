@@ -10,6 +10,7 @@
 // }
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { checkRateLimit } from "../_shared/rate_limiter.ts";
 
 const KLEVU_ENDPOINT =
   "https://eucs7.ksearchnet.com/cloud-search/n-search/search";
@@ -37,6 +38,9 @@ serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
+
+  const rateLimited = checkRateLimit(req, corsHeaders);
+  if (rateLimited) return rateLimited;
 
   try {
     const {

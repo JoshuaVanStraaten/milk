@@ -44,11 +44,11 @@ class AppTheme {
         ),
       ),
 
-      // Cards
+      // Cards — white cards pop against the #F5F6FA scaffold background
       cardTheme: CardThemeData(
         color: Colors.white,
-        elevation: 2,
-        shadowColor: AppColors.shadow,
+        elevation: 1,
+        shadowColor: const Color(0x1A000000), // 10% black, subtle
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
 
@@ -78,7 +78,7 @@ class AppTheme {
       // Input Fields
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: AppColors.surface,
+        fillColor: AppColors.inputFill,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide.none,

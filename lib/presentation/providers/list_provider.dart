@@ -4,7 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../../data/models/shopping_list.dart';
 import '../../data/models/list_item.dart';
+import '../../data/models/nearby_store.dart';
 import '../../data/repositories/list_repository.dart';
+import '../../data/services/live_api_service.dart';
+import '../../data/services/product_name_parser.dart';
 import '../../data/services/realtime_service.dart';
 import '../../data/local/cached_list_repository.dart';
 import '../../data/local/hive_database.dart';
@@ -510,6 +513,90 @@ class RealtimeListItemsNotifier extends StateNotifier<RealtimeListItemsState> {
     }
 
     return true;
+  }
+
+  /// Re-fetch current prices for all items that have a retailer assigned.
+  /// Returns (updated, skipped, failed) counts.
+  Future<({int updated, int skipped, int failed})> refreshPrices(
+    LiveApiService api,
+    Map<String, NearbyStore> stores,
+  ) async {
+    final items = state.items.where((i) => i.itemRetailer != null && i.itemRetailer!.isNotEmpty).toList();
+    if (items.isEmpty) return (updated: 0, skipped: state.items.length, failed: 0);
+
+    int updated = 0;
+    int failed = 0;
+
+    for (final item in items) {
+      final store = stores[item.itemRetailer!];
+      if (store == null) {
+        failed++;
+        continue;
+      }
+
+      try {
+        final parsed = ProductNameParser.parse(item.itemName);
+        final query = parsed.searchQuery;
+
+        final response = await api
+            .searchProducts(
+              query: query,
+              store: store,
+              retailer: item.itemRetailer!,
+              pageSize: 10,
+            )
+            .timeout(const Duration(seconds: 12));
+
+        ComparisonMatch? bestMatch;
+        for (final candidate in response.products) {
+          final candidateParsed = ProductNameParser.parse(candidate.name);
+          final match = ProductNameParser.classify(
+            source: parsed,
+            candidate: candidateParsed,
+            retailer: item.itemRetailer!,
+            name: candidate.name,
+            price: candidate.price,
+            priceNumeric: candidate.effectivePrice,
+            promotionPrice: candidate.hasPromo ? candidate.promotionPrice : null,
+            hasPromo: candidate.hasPromo,
+            imageUrl: candidate.imageUrl,
+            sourcePrice: item.effectivePrice,
+          );
+          if (match != null &&
+              (bestMatch == null || match.confidenceScore > bestMatch.confidenceScore)) {
+            bestMatch = match;
+          }
+        }
+
+        if (bestMatch != null && bestMatch.matchType != MatchType.fallback) {
+          final newPrice = bestMatch.priceNumeric;
+          final newSpecialPrice = bestMatch.hasPromo ? bestMatch.priceNumeric : null;
+          final basePrice = bestMatch.hasPromo
+              ? double.tryParse(bestMatch.price.replaceAll(RegExp(r'[^0-9.]'), '')) ?? newPrice
+              : newPrice;
+
+          if ((newPrice - item.effectivePrice).abs() > 0.01) {
+            final updatedItem = item.copyWith(
+              itemPrice: basePrice,
+              itemSpecialPrice: newSpecialPrice,
+              itemTotalPrice: newPrice * item.itemQuantity,
+            );
+            await updateItem(updatedItem);
+            updated++;
+          } else {
+            // Price unchanged — no update needed
+          }
+        } else {
+          failed++;
+        }
+      } catch (e) {
+        debugPrint('refreshPrices: failed for "${item.itemName}": $e');
+        failed++;
+      }
+    }
+
+    final skipped = state.items.length - items.length;
+    return (updated: updated, skipped: skipped, failed: failed);
   }
 
   /// Delete item with optimistic update

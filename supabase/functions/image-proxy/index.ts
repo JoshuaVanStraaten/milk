@@ -11,6 +11,7 @@
 // Usage: GET /image-proxy?url=<encoded_retailer_image_url>
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { checkRateLimit } from "../_shared/rate_limiter.ts";
 
 const STORAGE_PROJECT = "sfnavipqilqgzmtedfuh";
 const STORAGE_BUCKET = "product_images";
@@ -213,6 +214,9 @@ serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: CORS_HEADERS });
   }
+
+  const rateLimited = checkRateLimit(req, CORS_HEADERS);
+  if (rateLimited) return rateLimited;
 
   const reqUrl = new URL(req.url);
   const imageUrl = reqUrl.searchParams.get("url");

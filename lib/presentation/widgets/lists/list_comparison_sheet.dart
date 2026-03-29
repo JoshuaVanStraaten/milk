@@ -160,7 +160,7 @@ class _ListComparisonSheetState extends ConsumerState<_ListComparisonSheet>
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: isDark ? Colors.white24 : Colors.black12,
+                      color: isDark ? Colors.white.withValues(alpha: 0.12) : Colors.black.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -541,7 +541,7 @@ class _ProgressIndicator extends StatelessWidget {
                         height: 12,
                         child: CircularProgressIndicator(
                           strokeWidth: 1.5,
-                          color: isDark ? Colors.white38 : Colors.black38,
+                          color: isDark ? Colors.white.withValues(alpha: 0.38) : Colors.black.withValues(alpha: 0.38),
                         ),
                       ),
                     const SizedBox(width: 6),
@@ -603,7 +603,7 @@ class _RetailerTab extends StatelessWidget {
             height: 10,
             child: CircularProgressIndicator(
               strokeWidth: 1.5,
-              color: isDark ? Colors.white38 : Colors.black38,
+              color: isDark ? Colors.white.withValues(alpha: 0.38) : Colors.black.withValues(alpha: 0.38),
             ),
           )
         : Text(
@@ -611,7 +611,7 @@ class _RetailerTab extends StatelessWidget {
             style: TextStyle(
               fontSize: 10,
               color: hasError
-                  ? (isDark ? Colors.white38 : Colors.black38)
+                  ? (isDark ? Colors.white.withValues(alpha: 0.38) : Colors.black.withValues(alpha: 0.38))
                   : isCheapest
                       ? color
                       : (isDark ? Colors.white54 : Colors.black54),
@@ -721,7 +721,7 @@ class _RetailerTabContent extends ConsumerWidget {
             children: [
               Icon(Icons.location_off_outlined,
                   size: 40,
-                  color: isDark ? Colors.white38 : Colors.black38),
+                  color: isDark ? Colors.white.withValues(alpha: 0.38) : Colors.black.withValues(alpha: 0.38)),
               const SizedBox(height: 12),
               Text(
                 basket.error!,
@@ -869,7 +869,7 @@ class _RetailerTabContent extends ConsumerWidget {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: isDark ? Colors.white38 : Colors.black38,
+                      color: isDark ? Colors.white.withValues(alpha: 0.38) : Colors.black.withValues(alpha: 0.38),
                     ),
                   ),
                 ),
@@ -916,7 +916,7 @@ class _ItemRow extends StatelessWidget {
     Widget confidenceIcon;
     if (!isMatched) {
       confidenceIcon = Icon(Icons.cancel_outlined,
-          size: 18, color: isDark ? Colors.white24 : Colors.black26);
+          size: 18, color: isDark ? Colors.white.withValues(alpha: 0.12) : Colors.black.withValues(alpha: 0.12));
     } else if (match!.matchType == MatchType.exact) {
       confidenceIcon =
           const Icon(Icons.check_circle, size: 18, color: AppColors.success);
@@ -931,7 +931,7 @@ class _ItemRow extends StatelessWidget {
     // Price color
     Color priceColor;
     if (!isMatched) {
-      priceColor = isDark ? Colors.white38 : Colors.black38;
+      priceColor = isDark ? Colors.white.withValues(alpha: 0.38) : Colors.black.withValues(alpha: 0.38);
     } else if (isCheapest) {
       priceColor = AppColors.success;
     } else {
@@ -955,7 +955,7 @@ class _ItemRow extends StatelessWidget {
                     fontWeight: FontWeight.w500,
                     color: isMatched
                         ? null
-                        : (isDark ? Colors.white38 : Colors.black38),
+                        : (isDark ? Colors.white.withValues(alpha: 0.38) : Colors.black.withValues(alpha: 0.38)),
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -1017,7 +1017,7 @@ class _ItemRow extends StatelessWidget {
               style: TextStyle(
                 fontSize: 12,
                 fontStyle: FontStyle.italic,
-                color: isDark ? Colors.white38 : Colors.black38,
+                color: isDark ? Colors.white.withValues(alpha: 0.38) : Colors.black.withValues(alpha: 0.38),
               ),
             ),
         ],
