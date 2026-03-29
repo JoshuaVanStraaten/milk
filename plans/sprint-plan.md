@@ -1036,6 +1036,30 @@ Keep animations subtle — they accent the data, not distract from it. `prefers-
 
 ---
 
+### Sprint 17c: Product Matching Improvements ✅
+
+**Model:** Opus 4.6
+**Status:** COMPLETED — `84d1475`
+**Goal:** Fix cross-retailer product matching failures for beverages, packaging word products, and count-based products (eggs).
+
+**Completed:**
+
+- **Brand normalization fix** — `_brandScore()` only stripped hyphens, not spaces, so "coca-cola" ≠ "coca cola" (brand score 0.3 instead of 1.0). Added `_normalizeBrand()` helper that strips both hyphens and spaces. Updated all brand comparison points.
+- **Beverage category mismatch fix** — "drink" in `_categoryMismatchWords` caused valid cross-retailer drink matches to be rejected (e.g. "Coca-Cola Plastic 2L" vs "Coca Cola Soft Drink 2L"). Added `_beverageBrands` set (25 SA drink brands) and `_beverageCategoryWords` set. Fixed both `_hasCategoryMismatch()` and `_nameScore()` to skip beverage-word mismatches for known beverage brands. "Strawberries" vs "Strawberry Drink" still correctly rejected.
+- **Store brand vs unknown brand scoring** — Previously scored 0.3 for unknown brands vs store brands. Now scores 0.5 when one is a store brand (PnP, Checkers, etc.) and the other is unknown — pushes identical commodity products like "PnP Large Eggs 30 Pack" vs "Eggbert Large Eggs 30 Pack" into "Best Matches" (exact, ≥0.80).
+- **Pack count scoring tightened** — Large count differences (30 vs 18 = 67% diff) now score 0.05 instead of 0.1, capped as fallback/Alternatives. Added new tier: very close counts (30 vs 28 = <10% diff) score 0.8.
+- **Price difference badges fix** — Used `effectivePrice` (promo-aware) instead of `priceNumeric` (original price) in both `SmartMatchingService` and `ListComparisonNotifier`. Fixes inaccurate +R20/+R40 badges when products are on promotion.
+- **24 new tests** (105 → 129): packaging words (8), brand normalization (3), beverage mismatch (7), pack count matching (6)
+
+**Files changed:**
+
+- `lib/data/services/product_name_parser.dart` — `_normalizeBrand()`, `_beverageBrands`, `_beverageCategoryWords`, `_extractBrandFromName()`, `_brandScore()`, `_nameScore()`, `_hasCategoryMismatch()`, `_sizeScore()`
+- `lib/data/services/smart_matching_service.dart` — `effectivePrice` for price diff
+- `lib/presentation/providers/list_comparison_provider.dart` — `effectivePrice` for price diff
+- `test/product_matching_test.dart` — 24 new tests in sections 3–6
+
+---
+
 ### Sprint 18: List Price Refresh
 
 **Model:** Sonnet 4.6
@@ -1159,7 +1183,7 @@ All soft-launch code is marked with `// TODO: Uncomment when ready to enforce re
 - Diet plan curation and calorie tracking
 - Store price history trends
 - **Barcode scanner** — scan products in-store, compare prices (needs barcode data in DB first)
-- **SPAR integration** — franchise model with no centralized API; revisit if they launch e-commerce or if SPAR2U app traffic is captured via mitmproxy
+- **SPAR integration** — Extensively researched (2026-03-28). SPAR2U APK fully reverse-engineered. POC Edge Function (`products-spar`) deployed to Supabase using KwikSPAR API for live product search with ZAR prices. **Not integrated into app yet** — missing product images (KwikSPAR has none, `products.spar.net` needs signed URLs) and no promo data. Commerce API (`api.spar.co.za`) cracked for product master data (names, GTINs, brands, nutrition, allergens) but prices are behind store-session endpoints still locked. Contentful CMS publicly accessible (118 product lists, GTINs). Full research in `memory/project_spar_research.md`. To proceed: need to solve images (either crack signed URLs from Commerce API, or build a GTIN→image lookup), then wire into app.
 - **More retailers** — Game, Food Lover's Market if demand warrants
 - **Lottie animation for AI error messages** — animated error state when Gemini recipe generation fails or AI matching encounters errors (currently shows plain text/icon)
 - **Mailing list** — Backend `mailing_list` column exists on `user_profiles` but no subscription flow or email service configured. Hidden from Profile UI until ready. Need to set up email service (Resend/SendGrid), opt-in toggle, and preference management.
