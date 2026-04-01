@@ -228,7 +228,7 @@ class ProductNameParser {
   /// Store brand patterns — used to detect store-own products.
   static const _storeBrands = {
     'pnp', 'pick n pay', 'checkers', 'shoprite', 'woolworths',
-    'no name', 'housebrand', 'ritebrand',
+    'no name', 'housebrand', 'ritebrand', 'simple truth',
   };
 
   /// Known beverage brands — when the source product is one of these, category
@@ -349,9 +349,22 @@ class ProductNameParser {
     if (RegExp(r'\bdozen\b', caseSensitive: false).hasMatch(lower)) {
       packCount = 12;
     }
-    // "6 pack", "6pk", "6s", "6 units", "6ea"
+    // Multi-pack count: "2 x 18 pk", "3 x 6 pack", "2 x 18-pack", "2 x 18 units"
+    // Must require a count-unit suffix to avoid matching "6 x 330ml"
+    final multiPackCountMatch = RegExp(
+      r'(\d+)\s*x\s*(\d+)[\s-]*(?:pack|pk|units?|ea)\b',
+      caseSensitive: false,
+    ).firstMatch(lower);
+    if (multiPackCountMatch != null && packCount == null) {
+      final multiplier = int.tryParse(multiPackCountMatch.group(1)!);
+      final count = int.tryParse(multiPackCountMatch.group(2)!);
+      if (multiplier != null && count != null) {
+        packCount = multiplier * count;
+      }
+    }
+    // "6 pack", "6pk", "6-pack", "6s", "6 units", "6ea"
     final packMatch = RegExp(
-      r'(\d+)\s*(?:pack|pk|s|units?|ea)\b',
+      r'(\d+)[\s-]*(?:pack|pk|s|units?|ea)\b',
       caseSensitive: false,
     ).firstMatch(lower);
     if (packMatch != null && packCount == null) {
@@ -396,7 +409,7 @@ class ProductNameParser {
 
     // -- Normalize name --
     var normalized = lower;
-    // Remove multi-pack patterns
+    // Remove multi-pack patterns (weight/volume: "6 x 330ml")
     normalized = normalized.replaceAll(
       RegExp(
         r'\d+\s*x\s*\d+\.?\d*\s*(g|kg|ml|l|litre|liter)s?',
@@ -404,8 +417,13 @@ class ProductNameParser {
       ),
       '',
     );
+    // Remove multi-pack count patterns ("2 x 18 pk", "3 x 6 pack")
     normalized = normalized.replaceAll(
-      RegExp(r'\d+\s*(pack|pk|ea)\b', caseSensitive: false),
+      RegExp(r'\d+\s*x\s*\d+\s*(?:pack|pk|units?|ea)\b', caseSensitive: false),
+      '',
+    );
+    normalized = normalized.replaceAll(
+      RegExp(r'\d+[\s-]*(pack|pk|ea)\b', caseSensitive: false),
       '',
     );
     // Remove "dozen"
@@ -494,6 +512,17 @@ class ProductNameParser {
     final score =
         (brand * 0.30) + (size * 0.25) + (variant * 0.20) + (name * 0.25);
 
+    // Pack count hard gate: if both products have pack counts and they differ
+    // by more than 50%, this is a different quantity product (e.g. 36 vs 18 eggs).
+    // Cap below "similar" regardless of other scoring.
+    if (source.packCount != null && candidate.packCount != null) {
+      final packRatio = source.packCount! / candidate.packCount!;
+      final packDiff = (packRatio - 1.0).abs();
+      if (packDiff > 0.50) {
+        return score.clamp(0.0, 0.54);
+      }
+    }
+
     // Size gate: if sizes differ drastically (e.g. 6x1L vs 1L), cap confidence
     // below "similar" threshold. Relax for cross-retailer produce comparisons
     // where brands differ (e.g. "Strawberries 400g" vs "PnP Strawberries 250g").
@@ -511,8 +540,10 @@ class ProductNameParser {
           (!candKnown &&
               source.originalName.toLowerCase().contains(candidate.brand?.toLowerCase() ?? ''));
 
-      if (brandsAreDifferent && fallbackInOtherName && size > 0.05) {
-        // Cross-retailer produce — soft gate, allow similar matches
+      if (brandsAreDifferent && fallbackInOtherName && size >= 0.1) {
+        // Cross-retailer produce with modest size difference — soft gate,
+        // allow similar matches. Don't apply for very different counts
+        // (e.g. 36 vs 18 eggs, size=0.05) which should stay hard-capped.
         return score.clamp(0.0, 0.64);
       }
       return score.clamp(0.0, 0.54);

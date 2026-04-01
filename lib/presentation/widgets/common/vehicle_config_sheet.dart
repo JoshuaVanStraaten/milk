@@ -80,7 +80,9 @@ class _VehicleConfigSheetState extends ConsumerState<_VehicleConfigSheet> {
         left: 20,
         right: 20,
         top: 16,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+        bottom: (MediaQuery.of(context).viewInsets.bottom > 0
+            ? MediaQuery.of(context).viewInsets.bottom
+            : MediaQuery.of(context).padding.bottom) + 24,
       ),
       child: SingleChildScrollView(
         child: Column(

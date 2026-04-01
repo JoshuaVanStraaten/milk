@@ -181,6 +181,23 @@ class LiveProductCard extends StatelessWidget {
             ),
           ),
 
+          // Size + unit price subtitle
+          if (product.sizeDisplay != null) ...[
+            const SizedBox(height: 2),
+            Text(
+              product.pricePerUnitDisplay != null
+                  ? '${product.sizeDisplay} · ${product.pricePerUnitDisplay}'
+                  : product.sizeDisplay!,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w400,
+                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+              ),
+            ),
+          ],
+
           const SizedBox(height: 4),
 
           // Price row with buttons

@@ -402,7 +402,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     _tutorialCoachMark = TutorialCoachMark(
       targets: targets,
       colorShadow: Colors.black,
-      opacityShadow: 0.8,
+      opacityShadow: 0.87,
       hideSkip: true,
       paddingFocus: 10,
       focusAnimationDuration: const Duration(milliseconds: 300),
@@ -1543,7 +1543,7 @@ class _WelcomeDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      backgroundColor: Theme.of(context).dialogTheme.backgroundColor,
+      backgroundColor: Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: Padding(
         padding: const EdgeInsets.all(28),

@@ -12,6 +12,7 @@ class TutorialTooltip extends StatelessWidget {
   final int stepIndex;
   final int totalSteps;
   final VoidCallback? onTap;
+  final VoidCallback? onBack;
   final VoidCallback? onSkip;
 
   const TutorialTooltip({
@@ -21,18 +22,24 @@ class TutorialTooltip extends StatelessWidget {
     required this.stepIndex,
     required this.totalSteps,
     this.onTap,
+    this.onBack,
     this.onSkip,
   });
 
+  bool get _isFirst => stepIndex == 0;
+  bool get _isLast => stepIndex == totalSteps - 1;
+
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
+    return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: AppColors.primary.withValues(alpha: 0.2),
+          width: 1.5,
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.15),
@@ -93,36 +100,72 @@ class TutorialTooltip extends StatelessWidget {
               height: 1.4,
             ),
           ),
-          const SizedBox(height: 10),
-          // Bottom row: tap hint + skip button
+          const SizedBox(height: 12),
+          // Bottom row: Back / Skip / Next
           Row(
             children: [
-              Text(
-                'Tap anywhere to continue',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.primary,
-                ),
-              ),
+              // Back button (hidden on first step)
+              if (!_isFirst && onBack != null)
+                GestureDetector(
+                  onTap: onBack,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.chevron_left, size: 16, color: AppColors.textSecondary),
+                      Text(
+                        'Back',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                const SizedBox(width: 48), // placeholder for alignment
               const Spacer(),
+              // Skip button
               if (onSkip != null)
                 GestureDetector(
                   onTap: onSkip,
-                  child: Text(
-                    'SKIP',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textSecondary,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: Text(
+                      'SKIP',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                   ),
                 ),
+              const Spacer(),
+              // Next / Done button
+              GestureDetector(
+                onTap: onTap,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _isLast ? 'Done' : 'Next',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                    if (!_isLast)
+                      Icon(Icons.chevron_right, size: 16, color: AppColors.primary),
+                  ],
+                ),
+              ),
             ],
           ),
         ],
       ),
-    ),
     );
   }
 }
@@ -159,6 +202,7 @@ List<TargetFocus> buildHomeTutorialTargets({
               stepIndex: 0,
               totalSteps: total,
               onTap: controller.next,
+              onBack: controller.previous,
               onSkip: controller.skip,
             );
           },
@@ -185,6 +229,7 @@ List<TargetFocus> buildHomeTutorialTargets({
               stepIndex: 1,
               totalSteps: total,
               onTap: controller.next,
+              onBack: controller.previous,
               onSkip: controller.skip,
             );
           },
@@ -205,7 +250,7 @@ List<TargetFocus> buildHomeTutorialTargets({
         TargetContent(
           align: ContentAlign.custom,
           customPosition: CustomTargetContentPosition(
-            bottom: 80,
+            bottom: 160,
           ),
           padding: const EdgeInsets.symmetric(horizontal: 20),
           builder: (context, controller) {
@@ -216,6 +261,7 @@ List<TargetFocus> buildHomeTutorialTargets({
               stepIndex: 2,
               totalSteps: total,
               onTap: controller.next,
+              onBack: controller.previous,
               onSkip: controller.skip,
             );
           },
@@ -269,6 +315,7 @@ List<TargetFocus> buildBrowseTutorialTargets({
               stepIndex: 0,
               totalSteps: total,
               onTap: controller.next,
+              onBack: controller.previous,
               onSkip: controller.skip,
             );
           },
@@ -295,6 +342,7 @@ List<TargetFocus> buildBrowseTutorialTargets({
               stepIndex: 1,
               totalSteps: total,
               onTap: controller.next,
+              onBack: controller.previous,
               onSkip: controller.skip,
             );
           },
@@ -321,6 +369,7 @@ List<TargetFocus> buildBrowseTutorialTargets({
               stepIndex: 2,
               totalSteps: total,
               onTap: controller.next,
+              onBack: controller.previous,
               onSkip: controller.skip,
             );
           },
@@ -346,6 +395,7 @@ List<TargetFocus> buildBrowseTutorialTargets({
               stepIndex: 3,
               totalSteps: total,
               onTap: controller.next,
+              onBack: controller.previous,
               onSkip: controller.skip,
             );
           },
@@ -372,6 +422,7 @@ List<TargetFocus> buildBrowseTutorialTargets({
                 stepIndex: 4,
                 totalSteps: total,
                 onTap: controller.next,
+                onBack: controller.previous,
                 onSkip: controller.skip,
               );
             },
@@ -407,6 +458,7 @@ List<TargetFocus> buildRecipesTutorialTargets({
               stepIndex: 0,
               totalSteps: 1,
               onTap: controller.next,
+              onBack: controller.previous,
               onSkip: controller.skip,
             );
           },
@@ -450,6 +502,7 @@ List<TargetFocus> buildRecipeResultTutorialTargets({
               stepIndex: step,
               totalSteps: total,
               onTap: controller.next,
+              onBack: controller.previous,
               onSkip: controller.skip,
             );
           },
@@ -479,6 +532,7 @@ List<TargetFocus> buildRecipeResultTutorialTargets({
               stepIndex: step,
               totalSteps: total,
               onTap: controller.next,
+              onBack: controller.previous,
               onSkip: controller.skip,
             );
           },
@@ -521,6 +575,7 @@ List<TargetFocus> buildListsTutorialTargets({
               stepIndex: 0,
               totalSteps: total,
               onTap: controller.next,
+              onBack: controller.previous,
               onSkip: controller.skip,
             );
           },
@@ -548,6 +603,7 @@ List<TargetFocus> buildListsTutorialTargets({
                 stepIndex: 1,
                 totalSteps: total,
                 onTap: controller.next,
+                onBack: controller.previous,
                 onSkip: controller.skip,
               );
             },
@@ -592,6 +648,7 @@ List<TargetFocus> buildListDetailTutorialTargets({
             stepIndex: step0,
             totalSteps: total,
             onTap: controller.next,
+            onBack: controller.previous,
             onSkip: controller.skip,
           );
         },
@@ -620,6 +677,7 @@ List<TargetFocus> buildListDetailTutorialTargets({
               stepIndex: stepN,
               totalSteps: total,
               onTap: controller.next,
+              onBack: controller.previous,
               onSkip: controller.skip,
             );
           },
@@ -648,6 +706,7 @@ List<TargetFocus> buildListDetailTutorialTargets({
               stepIndex: stepN,
               totalSteps: total,
               onTap: controller.next,
+              onBack: controller.previous,
               onSkip: controller.skip,
             );
           },
@@ -678,6 +737,7 @@ List<TargetFocus> buildListDetailTutorialTargets({
             stepIndex: stepLast,
             totalSteps: total,
             onTap: controller.next,
+            onBack: controller.previous,
             onSkip: controller.skip,
           );
         },
@@ -714,6 +774,7 @@ List<TargetFocus> buildProfileTutorialTargets({
               stepIndex: 0,
               totalSteps: 1,
               onTap: controller.next,
+              onBack: controller.previous,
               onSkip: controller.skip,
             );
           },

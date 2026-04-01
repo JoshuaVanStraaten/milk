@@ -411,7 +411,7 @@ class _AddToListSheetState extends ConsumerState<_AddToListSheet> {
           // Sticky add button
           const Divider(height: 1),
           Padding(
-            padding: EdgeInsets.fromLTRB(16, 12, 16, 12 + viewInsets.bottom),
+            padding: EdgeInsets.fromLTRB(16, 12, 16, 12 + (keyboardOpen ? viewInsets.bottom : MediaQuery.of(context).padding.bottom)),
             child: SizedBox(
               width: double.infinity,
               child: FilledButton(

@@ -67,7 +67,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       _tutorialCoachMark = TutorialCoachMark(
         targets: targets,
         colorShadow: Colors.black,
-        opacityShadow: 0.8,
+        opacityShadow: 0.87,
         hideSkip: true,
         paddingFocus: 10,
         focusAnimationDuration: const Duration(milliseconds: 300),

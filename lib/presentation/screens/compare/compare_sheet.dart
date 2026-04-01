@@ -235,6 +235,18 @@ class _CompareSheetState extends ConsumerState<CompareSheet> {
                     ),
                   ],
                 ),
+                if (widget.product.sizeDisplay != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    widget.product.pricePerUnitDisplay != null
+                        ? '${widget.product.sizeDisplay} · ${widget.product.pricePerUnitDisplay}'
+                        : widget.product.sizeDisplay!,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: subtitleColor,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -390,9 +402,10 @@ class _CompareSheetState extends ConsumerState<CompareSheet> {
       );
     }
 
+    final bottomSafe = MediaQuery.of(context).padding.bottom;
     return ListView(
       shrinkWrap: true,
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      padding: EdgeInsets.fromLTRB(16, 8, 16, 24 + bottomSafe),
       children: [
         // Exact matches section — always prominent
         if (hasExact) ...[
@@ -664,6 +677,57 @@ class _CompareSheetState extends ConsumerState<CompareSheet> {
 }
 
 /// Animated match card — scales down on tap before calling onTap.
+/// Compute a formatted unit price string from a ComparisonMatch.
+String? _computeUnitPrice(ComparisonMatch match) {
+  final p = match.parsed;
+  // Determine effective price (promo-aware)
+  double price = match.priceNumeric;
+  if (match.hasPromo && match.promotionPrice != null) {
+    final promoNum = double.tryParse(
+      match.promotionPrice!
+          .replaceAll('R', '')
+          .replaceAll(',', '')
+          .replaceAll(' ', '')
+          .trim(),
+    );
+    if (promoNum != null && promoNum > 0) price = promoNum;
+  }
+  if (price <= 0) return null;
+
+  // Weight/volume products
+  if (p.sizeValue != null && p.sizeUnit != null) {
+    final totalSize = p.totalSize ?? p.sizeValue!;
+    if (totalSize <= 0) return null;
+    final unit = p.sizeUnit!;
+    double ppu;
+    String displayUnit;
+    if (unit == 'kg') {
+      ppu = price / totalSize;
+      displayUnit = 'kg';
+    } else if (unit == 'g') {
+      ppu = (price / totalSize) * 1000;
+      displayUnit = 'kg';
+    } else if (unit == 'l') {
+      ppu = price / totalSize;
+      displayUnit = 'L';
+    } else if (unit == 'ml') {
+      ppu = (price / totalSize) * 1000;
+      displayUnit = 'L';
+    } else {
+      return null;
+    }
+    return 'R${ppu.toStringAsFixed(2)}/$displayUnit';
+  }
+
+  // Count-based products
+  if (p.packCount != null && p.packCount! > 0) {
+    final ppu = price / p.packCount!;
+    return 'R${ppu.toStringAsFixed(2)}/ea';
+  }
+
+  return null;
+}
+
 class _MatchCardTile extends StatefulWidget {
   final ComparisonMatch match;
   final bool isDark;
@@ -875,6 +939,18 @@ class _MatchCardTileState extends State<_MatchCardTile>
                         color: AppColors.error.withValues(alpha: 0.8),
                       ),
                     ),
+                  // Unit price (R/kg, R/L, R/ea)
+                  Builder(builder: (_) {
+                    final unitPrice = _computeUnitPrice(match);
+                    if (unitPrice == null) return const SizedBox.shrink();
+                    return Text(
+                      unitPrice,
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: widget.subtitleColor,
+                      ),
+                    );
+                  }),
                 ],
               ),
             ],

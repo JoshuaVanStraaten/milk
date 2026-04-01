@@ -1,5 +1,7 @@
 // lib/data/models/live_product.dart
 
+import '../services/product_name_parser.dart';
+
 /// A product returned by the live retailer API (via Edge Functions).
 ///
 /// This is intentionally separate from [Product] (which represents
@@ -153,6 +155,76 @@ class LiveProduct {
   String get displayPrice {
     if (hasPromo) return promotionPrice;
     return price;
+  }
+
+  /// Parse product name for size/unit extraction.
+  ParsedProductName get _parsedName => ProductNameParser.parse(name);
+
+  /// Size display string (e.g. "750g", "2L", "36 pk"), or null if not parseable.
+  String? get sizeDisplay {
+    final p = _parsedName;
+    if (p.packCount != null && p.sizeValue != null && p.sizeUnit != null) {
+      // Multi-pack with size: "6 x 330ml"
+      return '${p.packCount} x ${p.sizeValue!.toInt() == p.sizeValue ? p.sizeValue!.toInt() : p.sizeValue}${p.sizeUnit}';
+    }
+    if (p.sizeValue != null && p.sizeUnit != null) {
+      final sv = p.sizeValue!;
+      return '${sv.toInt() == sv ? sv.toInt() : sv}${p.sizeUnit}';
+    }
+    if (p.packCount != null) {
+      return '${p.packCount} pk';
+    }
+    return null;
+  }
+
+  /// Price per base unit (R/kg or R/L or R/ea), or null if not calculable.
+  double? get pricePerUnit {
+    final price = effectivePrice;
+    if (price <= 0) return null;
+    final p = _parsedName;
+
+    // Weight/volume products — normalize to base unit (kg or L)
+    if (p.sizeValue != null && p.sizeUnit != null) {
+      final totalSize = p.totalSize ?? p.sizeValue!;
+      if (totalSize <= 0) return null;
+      final unit = p.sizeUnit!;
+      if (unit == 'kg') return price / totalSize;
+      if (unit == 'g') return (price / totalSize) * 1000; // R/kg
+      if (unit == 'l') return price / totalSize;
+      if (unit == 'ml') return (price / totalSize) * 1000; // R/L
+    }
+
+    // Count-based products — R per each
+    if (p.packCount != null && p.packCount! > 0) {
+      return price / p.packCount!;
+    }
+
+    return null;
+  }
+
+  /// Formatted unit price string (e.g. "R119.99/kg", "R4.86/ea"), or null.
+  String? get pricePerUnitDisplay {
+    final ppu = pricePerUnit;
+    if (ppu == null) return null;
+    final p = _parsedName;
+
+    String unit;
+    if (p.sizeValue != null && p.sizeUnit != null) {
+      final u = p.sizeUnit!;
+      if (u == 'g' || u == 'kg') {
+        unit = 'kg';
+      } else if (u == 'ml' || u == 'l') {
+        unit = 'L';
+      } else {
+        return null;
+      }
+    } else if (p.packCount != null) {
+      unit = 'ea';
+    } else {
+      return null;
+    }
+
+    return 'R${ppu.toStringAsFixed(2)}/$unit';
   }
 
   /// Create a copy with updated fields

@@ -110,12 +110,19 @@ class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
   final GeminiService _geminiService;
   final RecipeRepository _repository;
   final Ref _ref;
+  bool _isCancelled = false;
 
   RecipeGenerationNotifier(this._geminiService, this._repository, this._ref)
     : super(const RecipeGenerationState());
 
   void clearError() {
     state = state.copyWith(clearError: true);
+  }
+
+  /// Cancel an in-progress recipe generation or ingredient matching.
+  void cancelGeneration() {
+    _isCancelled = true;
+    state = const RecipeGenerationState(); // Reset to clean initial state
   }
 
   /// Check if the user can generate a recipe (premium or under free limit).
@@ -156,6 +163,7 @@ class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
     //   return;
     // }
 
+    _isCancelled = false;
     state = state.copyWith(
       isLoading: true,
       clearError: true,
@@ -169,6 +177,8 @@ class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
         dietaryRestrictions: dietaryRestrictions,
       );
 
+      if (_isCancelled) return;
+
       state = state.copyWith(generatedRecipe: recipe);
 
       // Record usage for free tier tracking
@@ -178,6 +188,8 @@ class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
       if (autoMatch) {
         await _autoMatchIngredients(preferredRetailer: preferredRetailer);
       }
+
+      if (_isCancelled) return;
 
       state = state.copyWith(
         isLoading: false,
@@ -243,7 +255,12 @@ class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
       matchingProgressText: 'Starting ingredient matching...',
     );
 
+    int matchedCount = 0;
+    int apiFailCount = 0;
+
     for (int i = 0; i < ingredients.length; i++) {
+      if (_isCancelled) return;
+
       final ingredient = ingredients[i];
 
       // Clean the search query — strip quantities, units, prep instructions
@@ -274,6 +291,18 @@ class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
         );
         matches = response.products;
 
+        // Retry with original query if optimized hint query returned nothing
+        // (API may have hiccupped, or the hint query was too specific)
+        if (matches.isEmpty && apiQuery != searchQuery) {
+          final retryResponse = await api.searchProducts(
+            query: searchQuery,
+            store: store,
+            retailer: retailerName,
+            pageSize: 15,
+          );
+          matches = retryResponse.products;
+        }
+
         // Smart match — use enhanced scoring from SmartMatchingService
         final smartMatcher = _ref.read(smartMatchingServiceProvider);
         final best = await smartMatcher.matchIngredient(
@@ -285,6 +314,7 @@ class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
         );
 
         if (best != null) {
+          matchedCount++;
           ingredients[i] = ingredient.copyWith(
             matchedProductIndex: '${best.retailer}:${best.name}',
             matchedProductName: best.name,
@@ -303,6 +333,7 @@ class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
           );
         }
       } catch (e) {
+        apiFailCount++;
         debugPrint(
           'Failed to match ingredient "${ingredient.ingredientName}": $e',
         );
@@ -312,6 +343,8 @@ class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
       }
     }
 
+    if (_isCancelled) return;
+
     state = state.copyWith(
       generatedRecipe: state.generatedRecipe!.copyWith(
         ingredients: ingredients,
@@ -319,6 +352,17 @@ class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
       matchedRetailer: retailerName,
       clearProgress: true,
     );
+
+    // If most ingredients failed to match, surface a warning so the user
+    // knows it was likely a network/API issue, not bad ingredient names.
+    if (matchedCount == 0 && ingredients.isNotEmpty) {
+      state = state.copyWith(
+        error: apiFailCount > ingredients.length ~/ 2
+            ? 'The store\'s API seems to be temporarily unavailable. Try again or switch to a different retailer.'
+            : 'No matching products found at $retailerName. Try switching to a different retailer.',
+        errorTitle: 'Matching Issue',
+      );
+    }
   }
 
   /// Re-run auto-matching with a specific retailer

@@ -1570,5 +1570,123 @@ void main() {
       expect(match, isNotNull);
       expect(match!.confidenceScore, greaterThanOrEqualTo(0.55));
     });
+
+    // Multi-pack count parsing ("2 x 18 pk" = 36)
+    test('"2 x 18 pk" parses as packCount 36', () {
+      final parsed =
+          ProductNameParser.parse('Free Range Large Chilled Eggs 2 x 18 pk');
+      expect(parsed.packCount, equals(36));
+    });
+
+    test('"3 x 6 pack" parses as packCount 18', () {
+      final parsed = ProductNameParser.parse('Some Product 3 x 6 pack');
+      expect(parsed.packCount, equals(18));
+    });
+
+    test('"6 x 330ml" still parses as packCount 6, sizeValue 330 (regression)',
+        () {
+      final parsed = ProductNameParser.parse('Coca-Cola 6 x 330ml');
+      expect(parsed.packCount, equals(6));
+      expect(parsed.sizeValue, equals(330));
+      expect(parsed.sizeUnit, equals('ml'));
+    });
+
+    test(
+        '2 x 18 pk eggs vs 18 Pack eggs is low match (36 vs 18 = different qty)',
+        () {
+      final source = ProductNameParser.parse(
+          'Free Range Large Chilled Eggs 2 x 18 pk');
+      final candidate =
+          ProductNameParser.parse('Farmhouse Eggs Large Eggs 18 Pack');
+      final match = ProductNameParser.classify(
+        source: source,
+        candidate: candidate,
+        retailer: 'Shoprite',
+        name: 'Farmhouse Eggs Large Eggs 18 Pack',
+        price: 'R38.99',
+        priceNumeric: 38.99,
+        sourcePrice: 174.99,
+      );
+      // 36 vs 18 is a 2x difference — should be fallback at most
+      if (match != null) {
+        expect(match.confidenceScore, lessThan(0.55));
+      }
+    });
+
+    test(
+        '2 x 18 pk eggs vs other 2 x 18 pk eggs is exact match',
+        () {
+      final source = ProductNameParser.parse(
+          'Free Range Large Chilled Eggs 2 x 18 pk');
+      final candidate = ProductNameParser.parse(
+          'Eggbert Large Eggs 2 x 18 pk');
+      final match = ProductNameParser.classify(
+        source: source,
+        candidate: candidate,
+        retailer: 'Checkers',
+        name: 'Eggbert Large Eggs 2 x 18 pk',
+        price: 'R159.99',
+        priceNumeric: 159.99,
+        sourcePrice: 174.99,
+      );
+      expect(match, isNotNull);
+      expect(match!.confidenceScore, greaterThanOrEqualTo(0.55));
+    });
+
+    test(
+        'Woolworths "Free Range Large Chilled Eggs 2 x 18 pk" vs Checkers "Simple Truth Free-Range Large Eggs 18 Pack" is NOT similar',
+        () {
+      final source = ProductNameParser.parse(
+          'Free Range Large Chilled Eggs 2 x 18 pk');
+      final candidate = ProductNameParser.parse(
+          'Simple Truth Free-Range Large Eggs 18 Pack');
+      final match = ProductNameParser.classify(
+        source: source,
+        candidate: candidate,
+        retailer: 'Checkers',
+        name: 'Simple Truth Free-Range Large Eggs 18 Pack',
+        price: 'R84.99',
+        priceNumeric: 84.99,
+        sourcePrice: 174.99,
+      );
+      // 36 vs 18 pack — should NOT be similar (must be fallback or rejected)
+      if (match != null) {
+        expect(match.confidenceScore, lessThan(0.55));
+      }
+    });
+
+    test(
+        'Hyphenated "18-Pack" parses packCount correctly',
+        () {
+      final parsed = ProductNameParser.parse(
+          'Simple Truth Free-Range Large Eggs 18-Pack');
+      expect(parsed.packCount, equals(18));
+    });
+
+    test(
+        '2 x 18 pk (36) vs hyphenated "18-Pack" (18) is NOT similar',
+        () {
+      final source = ProductNameParser.parse(
+          'Free Range Large Chilled Eggs 2 x 18 pk');
+      final candidate = ProductNameParser.parse(
+          'Simple Truth Free-Range Large Eggs 18-Pack');
+      // Verify the candidate parses as 18
+      expect(candidate.packCount, equals(18));
+      // Verify the source parses as 36
+      expect(source.packCount, equals(36));
+      final match = ProductNameParser.classify(
+        source: source,
+        candidate: candidate,
+        retailer: 'Checkers',
+        name: 'Simple Truth Free-Range Large Eggs 18-Pack',
+        price: 'R84.99',
+        priceNumeric: 84.99,
+        sourcePrice: 174.99,
+      );
+      // 36 vs 18 pack — must be fallback, not similar
+      if (match != null) {
+        expect(match.confidenceScore, lessThan(0.55));
+      }
+    });
   });
 }

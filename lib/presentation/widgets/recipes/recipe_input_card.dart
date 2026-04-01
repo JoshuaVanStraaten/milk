@@ -119,6 +119,14 @@ class _RecipeInputCardState extends ConsumerState<RecipeInputCard> {
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.15)
+                      : Colors.grey.withValues(alpha: 0.3),
+                ),
+              ),
               filled: true,
               fillColor: isDark ? AppColors.backgroundDark : Colors.white,
             ),

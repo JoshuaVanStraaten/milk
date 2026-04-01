@@ -87,7 +87,7 @@ class FuelPriceService {
   static const _cacheKey = 'fuel_prices_cache';
   static const _lastFetchKey = 'fuel_prices_last_fetch';
   static const _cacheDuration = Duration(days: 7);
-  static const _refreshThreshold = Duration(days: 30);
+  static const _refreshThreshold = Duration(days: 7);
 
   /// Fetch fuel prices. Uses cache if fresh, otherwise fetches from network.
   /// Never throws — always returns data (possibly stale or empty).

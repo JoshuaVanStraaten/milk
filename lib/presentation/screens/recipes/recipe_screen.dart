@@ -104,7 +104,7 @@ class _GenerateRecipeTabState extends ConsumerState<_GenerateRecipeTab> {
           modeSelectorKey: _modeSelectorKey,
         ),
         colorShadow: Colors.black,
-        opacityShadow: 0.8,
+        opacityShadow: 0.87,
         hideSkip: true,
         paddingFocus: 10,
         focusAnimationDuration: const Duration(milliseconds: 300),
@@ -561,6 +561,44 @@ class _GenerateRecipeTabState extends ConsumerState<_GenerateRecipeTab> {
               ),
             ),
           ],
+
+          const SizedBox(height: 32),
+
+          // Cancel button — generous touch target (min 44px)
+          // Dark mode: filled with muted bg for visibility
+          // Light mode: outlined to stay subtle
+          SizedBox(
+            height: 44,
+            child: isDark
+                ? FilledButton.icon(
+                    onPressed: () => ref.read(recipeGenerationProvider.notifier).cancelGeneration(),
+                    icon: const Icon(Icons.close_rounded, size: 18),
+                    label: const Text('Cancel'),
+                    style: FilledButton.styleFrom(
+                      foregroundColor: AppColors.textSecondaryDark,
+                      backgroundColor: Colors.white.withValues(alpha: 0.1),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                    ),
+                  )
+                : OutlinedButton.icon(
+                    onPressed: () => ref.read(recipeGenerationProvider.notifier).cancelGeneration(),
+                    icon: const Icon(Icons.close_rounded, size: 18),
+                    label: const Text('Cancel'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.textSecondary,
+                      side: BorderSide(
+                        color: AppColors.textSecondary.withValues(alpha: 0.3),
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                    ),
+                  ),
+          ),
         ],
       ),
     );

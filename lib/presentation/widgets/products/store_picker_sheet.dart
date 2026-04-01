@@ -130,7 +130,7 @@ class _StorePickerSheetState extends ConsumerState<StorePickerSheet>
         physics: const ClampingScrollPhysics(),
         child: Padding(
           padding: EdgeInsets.only(
-            bottom: keyboardHeight > 0 ? keyboardHeight + 12 : (bottomPad > 0 ? bottomPad : 12),
+            bottom: keyboardHeight > 0 ? keyboardHeight + 12 : (bottomPad > 0 ? bottomPad + 12 : 20),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -267,6 +267,14 @@ class _StorePickerSheetState extends ConsumerState<StorePickerSheet>
                     child: Container(
                       width: double.infinity,
                       padding: const EdgeInsets.symmetric(vertical: 14),
+                      decoration: isDark
+                          ? null
+                          : BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: AppColors.primary.withValues(alpha: 0.3),
+                              ),
+                            ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [

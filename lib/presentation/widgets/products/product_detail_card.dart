@@ -110,24 +110,35 @@ class _ProductDetailCard extends ConsumerWidget {
                       _buildRetailerBadge(retailerColor),
                       const SizedBox(height: 10),
 
-                      // Product name
-                      Text(
-                        product.name,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          color: isDark
-                              ? AppColors.textPrimaryDark
-                              : AppColors.textPrimary,
-                          height: 1.2,
-                        ),
+                      // Name (left) + Price (right)
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Product name — left side
+                          Expanded(
+                            child: Text(
+                              product.name,
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: isDark
+                                    ? AppColors.textPrimaryDark
+                                    : AppColors.textPrimary,
+                                height: 1.3,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          // Price column — right side
+                          _buildPriceColumn(isDark),
+                        ],
                       ),
-                      const SizedBox(height: 14),
 
-                      // Price
-                      _buildPriceRow(isDark),
+                      // Unit price + validity below
+                      _buildPriceFooter(isDark),
+
                       const SizedBox(height: 20),
 
                       // Action buttons
@@ -224,77 +235,90 @@ class _ProductDetailCard extends ConsumerWidget {
     );
   }
 
-  Widget _buildPriceRow(bool isDark) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: isDark
-            ? Colors.white.withValues(alpha: 0.04)
-            : AppColors.surface,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                product.price,
-                style: TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.w800,
-                  color: isDark
-                      ? AppColors.textPrimaryDark
-                      : AppColors.textPrimary,
-                ),
-              ),
-              if (product.hasPromo) ...[
-                const SizedBox(width: 10),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: AppColors.error.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    'PROMO',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.error,
-                    ),
-                  ),
-                ),
-              ],
-            ],
+  /// Right-aligned price column (price, promo badge, promo price).
+  Widget _buildPriceColumn(bool isDark) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        // Main price
+        Text(
+          product.price,
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.w800,
+            color: product.hasPromo
+                ? (isDark ? AppColors.textSecondaryDark : AppColors.textSecondary)
+                : AppColors.primary,
+            decoration: product.hasPromo ? TextDecoration.lineThrough : null,
           ),
-          if (product.hasPromo) ...[
-            const SizedBox(height: 6),
-            Text(
-              product.promotionPrice,
+        ),
+        if (product.hasPromo) ...[
+          const SizedBox(height: 4),
+          Text(
+            product.promotionPrice,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: AppColors.error,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+            decoration: BoxDecoration(
+              color: AppColors.error.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              'PROMO',
               style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
                 color: AppColors.error,
               ),
             ),
-          ],
-          if (product.promotionValid.isNotEmpty &&
-              product.promotionValid != 'No promo') ...[
-            const SizedBox(height: 4),
-            Text(
-              product.promotionValid,
-              style: TextStyle(
-                fontSize: 12,
-                color: isDark
-                    ? AppColors.textSecondaryDark
-                    : AppColors.textSecondary,
-              ),
-            ),
-          ],
+          ),
         ],
+        // Unit price — right under the price for quick scanning
+        if (product.sizeDisplay != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            product.pricePerUnitDisplay != null
+                ? '${product.sizeDisplay} · ${product.pricePerUnitDisplay}'
+                : product.sizeDisplay!,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  /// Footer below the name+price row: promo validity.
+  Widget _buildPriceFooter(bool isDark) {
+    final hasValidity = product.promotionValid.isNotEmpty &&
+        product.promotionValid != 'No promo';
+
+    if (!hasValidity) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Align(
+        alignment: Alignment.centerRight,
+        child: Text(
+          product.promotionValid,
+          style: TextStyle(
+            fontSize: 11,
+            color: isDark
+                ? AppColors.textSecondaryDark
+                : AppColors.textSecondary,
+          ),
+        ),
       ),
     );
   }
