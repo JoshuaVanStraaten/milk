@@ -78,11 +78,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Future<void> _handleGoogleSignIn() async {
     final authNotifier = ref.read(authNotifierProvider.notifier);
 
-    // Initiate Google OAuth flow
     await authNotifier.signInWithGoogle();
 
-    // Note: The actual sign-in completion happens via deep link callback
-    // The router will handle navigation when auth state changes
+    // Check result and show error if needed
+    if (mounted) {
+      final authState = ref.read(authNotifierProvider);
+      authState.whenOrNull(
+        error: (error, _) {
+          // Don't show error for user cancellation
+          final message = error.toString();
+          if (!message.contains('cancelled')) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(message),
+                backgroundColor: AppColors.error,
+              ),
+            );
+          }
+        },
+      );
+    }
   }
 
   @override

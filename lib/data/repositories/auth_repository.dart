@@ -1,3 +1,5 @@
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:logger/logger.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/config/supabase_config.dart';
@@ -123,19 +125,88 @@ class AuthRepository {
     }
   }
 
-  /// Sign in with Google OAuth
-  /// This initiates the OAuth flow - the actual sign-in completes via deep link callback
-  Future<void> signInWithGoogle() async {
+  /// Sign in with native Google Sign-In, then authenticate with Supabase
+  /// Returns the user profile on success
+  Future<UserProfile> signInWithGoogle() async {
     try {
-      _logger.i('Initiating Google OAuth sign in');
+      _logger.i('Initiating native Google Sign-In');
 
-      await _supabase.auth.signInWithOAuth(
-        OAuthProvider.google,
-        redirectTo: 'com.ubicorp.milkza://login-callback',
-        authScreenLaunchMode: LaunchMode.externalApplication,
+      final webClientId = dotenv.env['GOOGLE_WEB_CLIENT_ID'];
+      if (webClientId == null || webClientId.isEmpty) {
+        throw Exception('GOOGLE_WEB_CLIENT_ID not found in .env');
+      }
+
+      final googleSignIn = GoogleSignIn(serverClientId: webClientId);
+      final googleUser = await googleSignIn.signIn();
+
+      if (googleUser == null) {
+        throw Exception('Google sign in was cancelled');
+      }
+
+      final googleAuth = await googleUser.authentication;
+      final idToken = googleAuth.idToken;
+      final accessToken = googleAuth.accessToken;
+
+      if (idToken == null) {
+        throw Exception('No ID token received from Google');
+      }
+
+      _logger.i('Google sign-in successful, authenticating with Supabase');
+
+      // Authenticate with Supabase using the Google ID token
+      final response = await _supabase.auth.signInWithIdToken(
+        provider: OAuthProvider.google,
+        idToken: idToken,
+        accessToken: accessToken,
       );
 
-      _logger.i('✅ Google OAuth flow initiated');
+      if (response.user == null) {
+        throw Exception('Supabase authentication failed: no user returned');
+      }
+
+      final user = response.user!;
+      _logger.i('✅ Supabase auth successful: ${user.id}');
+
+      // Extract display name from Google account or Supabase metadata
+      final oauthDisplayName =
+          googleUser.displayName ??
+          user.userMetadata?['full_name'] as String? ??
+          user.userMetadata?['name'] as String? ??
+          user.email?.split('@').first;
+
+      // Try to fetch existing profile
+      try {
+        final profile = await getUserProfile(user.id);
+        _logger.i('✅ Existing user profile found');
+
+        if (profile.displayName == null && oauthDisplayName != null) {
+          _logger.i('Updating missing display name from Google data');
+          final updated = profile.copyWith(displayName: oauthDisplayName);
+          return await updateUserProfile(updated);
+        }
+
+        return profile;
+      } catch (e) {
+        // Profile doesn't exist, create one
+        _logger.d('Profile not found, creating from Google data');
+
+        final newProfile = UserProfile(
+          id: user.id,
+          createdAt: DateTime.now(),
+          emailAddress: user.email ?? googleUser.email,
+          displayName: oauthDisplayName,
+          mailingList: false,
+        );
+
+        try {
+          await _supabase.from('user_profiles').insert(newProfile.toJson());
+          _logger.i('✅ User profile created from Google data');
+          return newProfile;
+        } catch (insertError) {
+          _logger.w('Insert failed (concurrent creation), fetching profile');
+          return await getUserProfile(user.id);
+        }
+      }
     } on AuthException catch (e) {
       _logger.e('Auth error during Google sign in: ${e.message}');
       throw Exception('Google sign in failed: ${e.message}');
@@ -149,74 +220,19 @@ class AuthRepository {
     }
   }
 
-  /// Handle the OAuth callback and ensure user profile exists
-  /// Call this after the OAuth redirect returns to the app
-  Future<UserProfile?> handleOAuthCallback() async {
-    try {
-      final user = _supabase.auth.currentUser;
-
-      if (user == null) {
-        _logger.w('No user found after OAuth callback');
-        return null;
-      }
-
-      _logger.i('✅ OAuth callback - user authenticated: ${user.id}');
-
-      // Extract display name from Google OAuth metadata
-      final oauthDisplayName =
-          user.userMetadata?['full_name'] as String? ??
-          user.userMetadata?['name'] as String? ??
-          user.email?.split('@').first;
-
-      // Try to fetch existing profile
-      try {
-        final profile = await getUserProfile(user.id);
-        _logger.i('✅ Existing user profile found');
-
-        // If profile exists but display name is missing, update it from OAuth data
-        if (profile.displayName == null && oauthDisplayName != null) {
-          _logger.i('Updating missing display name from OAuth data');
-          final updated = profile.copyWith(displayName: oauthDisplayName);
-          return await updateUserProfile(updated);
-        }
-
-        return profile;
-      } catch (e) {
-        // Profile doesn't exist, create one from OAuth data
-        _logger.d('Profile not found, creating from OAuth data');
-
-        final newProfile = UserProfile(
-          id: user.id,
-          createdAt: DateTime.now(),
-          emailAddress: user.email ?? '',
-          displayName: oauthDisplayName,
-          mailingList: false,
-        );
-
-        try {
-          await _supabase.from('user_profiles').insert(newProfile.toJson());
-          _logger.i('✅ User profile created from OAuth data');
-          return newProfile;
-        } catch (insertError) {
-          // Race condition - try fetching again
-          _logger.w('Insert failed, fetching profile');
-          return await getUserProfile(user.id);
-        }
-      }
-    } catch (e, stackTrace) {
-      _logger.e(
-        'Error handling OAuth callback',
-        error: e,
-        stackTrace: stackTrace,
-      );
-      return null;
-    }
-  }
-
   /// Sign out the current user
   Future<void> signOut() async {
     try {
       _logger.i('Signing out user');
+
+      // Sign out of Google to clear cached account selection
+      try {
+        final googleSignIn = GoogleSignIn();
+        await googleSignIn.signOut();
+      } catch (e) {
+        _logger.w('Google sign out failed (non-critical): $e');
+      }
+
       await _supabase.auth.signOut();
       _logger.i('✅ User signed out');
     } catch (e, stackTrace) {

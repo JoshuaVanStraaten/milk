@@ -116,35 +116,15 @@ class AuthNotifier extends StateNotifier<AsyncValue<UserProfile?>> {
     }
   }
 
-  /// Sign in with Google OAuth
-  /// Note: This initiates the OAuth flow. The actual completion happens
-  /// via deep link callback, which triggers handleOAuthCallback()
+  /// Sign in with Google (native)
+  /// Completes entirely in-app — no redirect needed
   Future<void> signInWithGoogle() async {
     state = const AsyncValue.loading();
 
     try {
-      await _authRepository.signInWithGoogle();
-      // Don't set state here - the OAuth redirect will handle it
-      // The auth state stream will update when the user returns
-    } catch (e, stackTrace) {
-      state = AsyncValue.error(e, stackTrace);
-    }
-  }
-
-  /// Handle OAuth callback after redirect
-  /// Call this when the app receives the OAuth deep link callback
-  Future<void> handleOAuthCallback() async {
-    state = const AsyncValue.loading();
-
-    try {
-      final profile = await _authRepository.handleOAuthCallback();
-
-      if (profile != null) {
-        state = AsyncValue.data(profile);
-        _ref.read(vehicleConfigProvider.notifier).reload();
-      } else {
-        state = const AsyncValue.data(null);
-      }
+      final profile = await _authRepository.signInWithGoogle();
+      state = AsyncValue.data(profile);
+      _ref.read(vehicleConfigProvider.notifier).reload();
     } catch (e, stackTrace) {
       state = AsyncValue.error(e, stackTrace);
     }
