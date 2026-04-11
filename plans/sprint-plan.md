@@ -1179,6 +1179,106 @@ All soft-launch code is marked with `// TODO: Uncomment when ready to enforce re
 
 ---
 
+### Sprint 21: User Feedback Bug Fixes & Polish ✅ COMPLETE
+
+**Model:** Sonnet 4.6
+**Goal:** Address closed beta user feedback — tutorial UX, price/unit display, product matching edge cases, recipe generation robustness, safe area issues.
+**Status:** COMPLETED — `9ae4fc4` | Version bump: `1.3.1+7`
+
+**Tutorial improvements:**
+- Added back/next navigation to all tutorial tooltips (18 callsites)
+- Fixed misleading "Tap anywhere" → "Tap to continue"
+- Fixed "Explore the App" tile overlapping nav bar
+- Increased overlay contrast (0.8 → 0.87)
+- Forced white background on welcome dialog in dark mode
+
+**Price per unit display:**
+- Added R/kg, R/L, R/ea computed getters on `LiveProduct`
+- Size + unit price subtitle shown on product cards, compare sheet, match cards
+- Redesigned product detail popup with split name/price layout + unit price under price (Gestalt proximity)
+
+**Product matching fixes:**
+- Fixed "2 x 18 pk" multi-pack count parsing (packCount=36)
+- Fixed hyphenated "18-Pack" regex parsing
+- Added pack count hard gate (>50% diff capped below similar)
+- Tightened cross-retailer produce soft gate
+- Added "Simple Truth" to store brands
+- 137 tests passing (up from 129)
+
+**Recipe generation robustness:**
+- Added cancel button with proper state reset
+- Fixed blank screen after cancel during matching
+- Retry with original query when hint query empty
+- Total failure detection with user-facing error
+
+**Safe area fixes:** compare sheet, add-to-list sheet, vehicle config sheet, store picker
+
+**Other:** Fuel prices refreshed to April 2026, pg_cron automation, 30→7 day client refresh threshold, border fixes in light mode
+
+---
+
+### Sprint 22: Native Google Sign-In ✅ COMPLETE
+
+**Model:** Sonnet 4.6
+**Goal:** Replace browser-based OAuth (which exposed raw Supabase URL on consent screen) with native `google_sign_in` package.
+**Status:** COMPLETED — `2cb5ef4` | Version bump: `1.3.2+8`
+
+- Users now see Google's native account picker instead of a browser redirect
+- Supabase still manages sessions via `signInWithIdToken()`
+- Added `google_sign_in` dependency
+- Rewrote `signInWithGoogle()` in `auth_repository.dart`
+- Removed `handleOAuthCallback()` and deep link intent filter from `AndroidManifest.xml`
+- Google sign-out on logout to clear cached account
+
+---
+
+### Sprint 23: Product Card Layout Polish & Price Normalization ✅ COMPLETE
+
+**Model:** Opus 4.6 (UI design)
+**Goal:** Tighten product card layouts based on visual review; normalize price display.
+**Status:** COMPLETED — `8cf1784` | Date: 2026-04-11
+
+**Price normalization** (`lib/data/models/live_product.dart`):
+- Always format prices with 2 decimals (R5.0 → R5.00) in `fromJson()`
+- Consistent display across all retailers
+
+**LiveProductCard redesign** (`lib/presentation/widgets/products/live_product_card.dart`):
+- Tighter image padding (12→10, 10→8, 8→6) for better use of space
+- Larger, bolder product name (12→13px, w500→w600)
+- Dynamic name line count — 1 line when promo present (need space), 2 lines otherwise
+- Promo text now displayed above price (was below)
+- Price row: regular price left, unit price right (inline, baseline-aligned)
+- Removed redundant unit price from size subtitle
+
+**ProductDetailCard redesign** (`lib/presentation/widgets/products/product_detail_card.dart`):
+- Full-width product name (16→18px, was cramped next to price column)
+- Price section moved below name as a proper row
+- Promo info (promo price + PROMO badge) left-aligned, price right-aligned
+- Cleaner vertical rhythm
+
+**Compare sheet fix** (`lib/presentation/screens/compare/compare_sheet.dart`):
+- Added `maxLines: 1` + ellipsis overflow to retailer name in match card tile
+
+---
+
+## Current State (2026-04-11)
+
+**Version:** `1.3.2+8`
+**Status:** Closed beta on Play Store, preparing for public launch
+**Recent focus:** User feedback polish, native auth, UI refinement
+
+**Shipped since v1.3.0:**
+- Sprint 21: Tutorial UX, unit price display, matching fixes, recipe cancel, safe areas
+- Sprint 22: Native Google Sign-In (no more raw Supabase URL on consent screen)
+- Sprint 23: Product card layout polish, price normalization
+
+**Known next priorities:**
+- Continue polish pass on remaining screens based on user feedback
+- Watch Sprint 20 Premium soft launch usage data to inform monetization timing
+- iOS build + TestFlight setup (still pending Mac access)
+
+---
+
 ## Future (Add to CLAUDE.md)
 
 - **FatSecret API** for nutritional information (fat, protein, carbs)
