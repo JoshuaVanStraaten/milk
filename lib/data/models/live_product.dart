@@ -65,9 +65,14 @@ class LiveProduct {
     final priceNum = _parsePrice(priceStr);
     final promo = json['promotion_price'] as String? ?? 'No promo';
 
+    // Normalize price to always show 2 decimal places (e.g. "R5.0" → "R5.00")
+    final normalizedPrice = priceNum > 0
+        ? 'R${priceNum.toStringAsFixed(2)}'
+        : priceStr;
+
     return LiveProduct(
       name: _decodeHtmlEntities(json['name'] as String? ?? 'Unknown'),
-      price: priceStr,
+      price: normalizedPrice,
       priceNumeric: priceNum,
       promotionPrice: _decodeHtmlEntities(promo),
       retailer: json['retailer'] as String? ?? '',

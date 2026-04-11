@@ -10,7 +10,7 @@ import 'quick_add_button.dart';
 ///
 /// Displays product image (padded, floating on white container), name, price,
 /// promotion badge, quick-add "+" button, and optional compare button.
-/// Designed for use in a 2-column grid with `childAspectRatio: 0.72`.
+/// Designed for use in a 2-column grid with `childAspectRatio: 0.72` or similar.
 class LiveProductCard extends StatelessWidget {
   final LiveProduct product;
   final VoidCallback? onTap;
@@ -75,7 +75,7 @@ class LiveProductCard extends StatelessWidget {
 
   Widget _buildImageArea(bool isDark) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 2),
       child: AspectRatio(
         aspectRatio: 1,
         child: Stack(
@@ -89,7 +89,7 @@ class LiveProductCard extends StatelessWidget {
               ),
               clipBehavior: Clip.antiAlias,
               child: Padding(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(6),
                 child: _buildImageContent(),
               ),
             ),
@@ -160,90 +160,89 @@ class LiveProductCard extends StatelessWidget {
   }
 
   Widget _buildInfoSection(bool isDark) {
+    final unitPrice = product.pricePerUnitDisplay;
+
     return Padding(
-      padding: const EdgeInsets.fromLTRB(10, 4, 10, 8),
+      padding: const EdgeInsets.fromLTRB(10, 2, 10, 6),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
         children: [
-          // Product name
-          Flexible(
-            child: Text(
-              product.name,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-                height: 1.2,
-              ),
+          // Product name — 1 line if promo (need space), 2 lines otherwise
+          Text(
+            product.name,
+            maxLines: product.hasPromo ? 1 : 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+              height: 1.2,
             ),
           ),
 
-          // Size + unit price subtitle
+          // Size display — helps distinguish same-name products
           if (product.sizeDisplay != null) ...[
-            const SizedBox(height: 2),
+            const SizedBox(height: 1),
             Text(
-              product.pricePerUnitDisplay != null
-                  ? '${product.sizeDisplay} · ${product.pricePerUnitDisplay}'
-                  : product.sizeDisplay!,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+              product.sizeDisplay!,
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.w400,
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondary,
               ),
             ),
           ],
 
-          const SizedBox(height: 4),
+          const Spacer(),
 
-          // Price row with buttons
-          _buildPriceRow(isDark),
+          // Promo text above price
+          if (product.hasPromo)
+            Text(
+              product.promotionPrice,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: AppColors.error,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+
+          // Price row: price left, unit price right
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                product.price,
+                style: TextStyle(
+                  fontSize: product.hasPromo ? 11 : 14,
+                  fontWeight: product.hasPromo ? FontWeight.w500 : FontWeight.w700,
+                  color: product.hasPromo
+                      ? (isDark ? AppColors.textSecondaryDark : AppColors.textSecondary)
+                      : AppColors.primary,
+                  decoration: product.hasPromo ? TextDecoration.lineThrough : null,
+                ),
+              ),
+              if (unitPrice != null) ...[
+                const Spacer(),
+                Text(
+                  unitPrice,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w400,
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ],
+          ),
         ],
       ),
-    );
-  }
-
-  Widget _buildPriceRow(bool isDark) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // Regular price (strikethrough if promo)
-        Text(
-          product.price,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: product.hasPromo
-                ? (isDark
-                    ? AppColors.textSecondaryDark
-                    : AppColors.textSecondary)
-                : AppColors.primary,
-            decoration: product.hasPromo ? TextDecoration.lineThrough : null,
-          ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-
-        // Promo price
-        if (product.hasPromo) ...[
-          const SizedBox(height: 1),
-          Text(
-            product.promotionPrice,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: AppColors.error,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      ],
     );
   }
 

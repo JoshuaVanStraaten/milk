@@ -856,6 +856,8 @@ class _MatchCardTileState extends State<_MatchCardTile>
                               fontWeight: FontWeight.w600,
                               color: widget.retailerColor,
                             ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                         if (isCheapest) ...[
