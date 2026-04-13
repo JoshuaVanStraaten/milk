@@ -100,6 +100,13 @@ class _AddToListSheetState extends ConsumerState<_AddToListSheet> {
   String? _selectedListId;
   bool _isAdding = false;
 
+  // Inline create-list state
+  bool _isCreatingList = false;
+  bool _isCreatingListInFlight = false;
+  final _newListController = TextEditingController();
+  final _newListFocusNode = FocusNode();
+  String? _createListError;
+
   @override
   void initState() {
     super.initState();
@@ -112,6 +119,8 @@ class _AddToListSheetState extends ConsumerState<_AddToListSheet> {
     _noteController.dispose();
     _scrollController.dispose();
     _noteFocusNode.dispose();
+    _newListController.dispose();
+    _newListFocusNode.dispose();
     super.dispose();
   }
 
@@ -150,6 +159,11 @@ class _AddToListSheetState extends ConsumerState<_AddToListSheet> {
   }
 
   Future<void> _handleAdd() async {
+    if (_isCreatingList) {
+      setState(() => _createListError = 'Finish creating your list first');
+      return;
+    }
+
     if (_selectedListId == null) {
       ScaffoldMessenger.of(
         context,
@@ -447,6 +461,184 @@ class _AddToListSheetState extends ConsumerState<_AddToListSheet> {
     );
   }
 
+  void _startCreateList() {
+    setState(() {
+      _isCreatingList = true;
+      _createListError = null;
+      _newListController.clear();
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _newListFocusNode.requestFocus();
+    });
+  }
+
+  void _cancelCreateList() {
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _isCreatingList = false;
+      _createListError = null;
+      _newListController.clear();
+    });
+  }
+
+  Future<void> _submitCreateList() async {
+    final name = _newListController.text.trim();
+    if (name.isEmpty) {
+      setState(() => _createListError = 'Please enter a list name');
+      return;
+    }
+    if (name.length > 40) {
+      setState(() => _createListError = 'Name is too long (max 40 characters)');
+      return;
+    }
+
+    setState(() {
+      _isCreatingListInFlight = true;
+      _createListError = null;
+    });
+
+    final storeName = widget.retailer.isNotEmpty
+        ? widget.retailer
+        : 'Pick n Pay';
+
+    final list = await ref
+        .read(listNotifierProvider.notifier)
+        .createList(listName: name, storeName: storeName, listColour: 'Green');
+
+    if (!mounted) return;
+
+    if (list != null) {
+      FocusScope.of(context).unfocus();
+      setState(() {
+        _isCreatingList = false;
+        _isCreatingListInFlight = false;
+        _selectedListId = list.shoppingListId;
+        _newListController.clear();
+      });
+    } else {
+      setState(() {
+        _isCreatingListInFlight = false;
+        _createListError = 'Could not create list. Try again.';
+      });
+    }
+  }
+
+  Widget _buildInlineCreateForm(bool isDark, Color textColor, Color subtitleColor) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.surfaceDarkModeLight : AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppColors.primary.withValues(alpha: 0.5),
+          width: 1.5,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextField(
+            controller: _newListController,
+            focusNode: _newListFocusNode,
+            maxLength: 40,
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) => _submitCreateList(),
+            enabled: !_isCreatingListInFlight,
+            decoration: InputDecoration(
+              hintText: 'My shopping list',
+              isDense: true,
+              counterText: '',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            style: TextStyle(color: textColor),
+          ),
+          if (_createListError != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              _createListError!,
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppColors.error,
+              ),
+            ),
+          ],
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              TextButton(
+                onPressed: _isCreatingListInFlight ? null : _cancelCreateList,
+                child: Text(
+                  'Cancel',
+                  style: TextStyle(color: subtitleColor),
+                ),
+              ),
+              const SizedBox(width: 4),
+              FilledButton(
+                onPressed: _isCreatingListInFlight ? null : _submitCreateList,
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                ),
+                child: _isCreatingListInFlight
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text('Create'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCreateListTile(bool isDark, Color subtitleColor) {
+    return InkWell(
+      onTap: _startCreateList,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.surfaceDarkModeLight : AppColors.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: AppColors.primary.withValues(alpha: 0.3),
+            width: 1,
+            style: BorderStyle.solid,
+          ),
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.add_circle_outline,
+              color: AppColors.primary,
+              size: 22,
+            ),
+            const SizedBox(width: 12),
+            Text(
+              'Create new list',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: AppColors.primary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildListSelector(bool isDark, Color textColor, Color subtitleColor) {
     final listsAsync = ref.watch(userListsProvider);
 
@@ -464,31 +656,30 @@ class _AddToListSheetState extends ConsumerState<_AddToListSheet> {
       ),
       data: (lists) {
         if (lists.isEmpty) {
-          return Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: isDark
-                  ? AppColors.surfaceDarkModeLight
-                  : AppColors.surface,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Column(
-              children: [
-                Icon(Icons.list_alt, size: 32, color: subtitleColor),
-                const SizedBox(height: 8),
-                Text('No lists yet', style: TextStyle(color: subtitleColor)),
-                const SizedBox(height: 4),
-                Text(
-                  'Create a list first from the Lists tab',
-                  style: TextStyle(fontSize: 12, color: subtitleColor),
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                child: Column(
+                  children: [
+                    Icon(Icons.list_alt, size: 32, color: subtitleColor),
+                    const SizedBox(height: 8),
+                    Text('No lists yet', style: TextStyle(color: subtitleColor)),
+                  ],
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(height: 8),
+              _isCreatingList
+                  ? _buildInlineCreateForm(isDark, textColor, subtitleColor)
+                  : _buildCreateListTile(isDark, subtitleColor),
+            ],
           );
         }
 
         return Column(
-          children: lists.map((list) {
+          children: [
+            ...lists.map((list) {
             final isSelected = _selectedListId == list.shoppingListId;
             return Padding(
               padding: const EdgeInsets.only(bottom: 8),
@@ -554,7 +745,11 @@ class _AddToListSheetState extends ConsumerState<_AddToListSheet> {
                 ),
               ),
             );
-          }).toList(),
+            }),
+            _isCreatingList
+                ? _buildInlineCreateForm(isDark, textColor, subtitleColor)
+                : _buildCreateListTile(isDark, subtitleColor),
+          ],
         );
       },
     );
