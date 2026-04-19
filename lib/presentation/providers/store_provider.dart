@@ -167,6 +167,25 @@ class StoreSelectionNotifier extends StateNotifier<AsyncValue<StoreSelection>> {
       return null;
     }
   }
+
+  /// Override the selected store for a single retailer and persist it.
+  ///
+  /// Used by the manual store picker when a user chooses a specific branch
+  /// (e.g. "Pick n Pay Irene Village") instead of the auto-nearest one.
+  Future<void> selectStoreForRetailer(NearbyStore store) async {
+    final current = state.value ?? const StoreSelection(stores: {});
+    final updated = Map<String, NearbyStore>.from(current.stores);
+    updated[store.retailer] = store;
+
+    final selection = StoreSelection(stores: updated);
+
+    await _prefs.setString(
+      _storeSelectionKey,
+      jsonEncode(selection.toJson()),
+    );
+
+    state = AsyncValue.data(selection);
+  }
 }
 
 final storeSelectionProvider =
@@ -177,6 +196,56 @@ final storeSelectionProvider =
       final prefs = ref.read(sharedPreferencesProvider);
       return StoreSelectionNotifier(api, prefs);
     });
+
+// =============================================================================
+// STORE SEARCH (per-retailer autocomplete + nearby listing)
+// =============================================================================
+
+/// Parameters for [storeSearchProvider] — identifies a unique search request.
+///
+/// The retailer slug + query + coords together form the cache key. When any
+/// one changes the provider re-fetches; identical parameters reuse cache.
+class StoreSearchParams {
+  final String retailerSlug;
+  final String query;
+  final double? latitude;
+  final double? longitude;
+
+  const StoreSearchParams({
+    required this.retailerSlug,
+    required this.query,
+    this.latitude,
+    this.longitude,
+  });
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is StoreSearchParams &&
+          retailerSlug == other.retailerSlug &&
+          query == other.query &&
+          latitude == other.latitude &&
+          longitude == other.longitude;
+
+  @override
+  int get hashCode => Object.hash(retailerSlug, query, latitude, longitude);
+}
+
+/// Search stores for a retailer. Empty query → nearest stores for that retailer.
+///
+/// Debounce is expected at the UI layer — change the [StoreSearchParams]
+/// value only after a typing pause. Coords come from [StoreSelectionNotifier.lastCoordinates]
+/// so searches rank nearby matches first.
+final storeSearchProvider = FutureProvider.autoDispose
+    .family<List<NearbyStore>, StoreSearchParams>((ref, params) async {
+  final api = ref.read(liveApiServiceProvider);
+  return api.searchStores(
+    retailer: params.retailerSlug,
+    query: params.query,
+    latitude: params.latitude,
+    longitude: params.longitude,
+  );
+});
 
 // =============================================================================
 // SELECTED RETAILER

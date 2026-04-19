@@ -12,7 +12,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../data/models/nearby_store.dart';
 import '../../../data/services/location_service.dart';
 import '../../providers/store_provider.dart';
-import '../../widgets/common/address_search_field.dart';
+import '../../widgets/common/google_places_search_field.dart';
 
 class StoreSelectionScreen extends ConsumerStatefulWidget {
   const StoreSelectionScreen({super.key});
@@ -321,7 +321,7 @@ class _StoreSelectionScreenState extends ConsumerState<StoreSelectionScreen> {
 
               if (_useAddressMode) ...[
                 const SizedBox(height: 12),
-                AddressSearchField(
+                GooglePlacesSearchField(
                   autofocus: true,
                   onSubmit: (result) => _fetchFromCoords(result.lat, result.lng),
                 ),

@@ -113,6 +113,70 @@ class LiveApiService {
     return stores;
   }
 
+  /// Search stores for a specific retailer by name/city/address,
+  /// or list nearest stores when [query] is null/empty.
+  ///
+  /// Calls the `stores-search` Edge Function. Rankings balance text
+  /// relevance and proximity to [latitude]/[longitude] when supplied.
+  ///
+  /// [retailer] must be the lowercase slug (e.g. "pnp", "woolworths").
+  Future<List<NearbyStore>> searchStores({
+    required String retailer,
+    String? query,
+    double? latitude,
+    double? longitude,
+    int limit = 20,
+  }) async {
+    final url = LiveApiConfig.edgeFunctionUrl('stores-search');
+    final trimmedQuery = query?.trim();
+
+    _logger.d('Searching $retailer stores '
+        '(query=${trimmedQuery ?? "<nearby>"}, coords=$latitude,$longitude)');
+
+    final response = await _retryWithBackoff(
+      () => _client
+          .post(
+            Uri.parse(url),
+            headers: LiveApiConfig.headers,
+            body: jsonEncode({
+              'retailer': retailer,
+              if (trimmedQuery != null && trimmedQuery.isNotEmpty)
+                'query': trimmedQuery,
+              if (latitude != null) 'latitude': latitude,
+              if (longitude != null) 'longitude': longitude,
+              'limit': limit,
+            }),
+          )
+          .timeout(LiveApiConfig.requestTimeout)
+          .then((r) {
+            if (r.statusCode != 200) {
+              throw LiveApiException(
+                'Failed to search stores',
+                statusCode: r.statusCode,
+                body: r.body,
+              );
+            }
+            return r;
+          }),
+      label: 'stores-search',
+    );
+
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    final rows = data['stores'] as List<dynamic>? ?? const [];
+
+    final stores = <NearbyStore>[];
+    for (final row in rows) {
+      try {
+        stores.add(NearbyStore.fromSearchJson(row as Map<String, dynamic>));
+      } catch (e) {
+        _logger.w('Failed to parse search result row: $e');
+      }
+    }
+
+    _logger.i('stores-search returned ${stores.length} result(s) for $retailer');
+    return stores;
+  }
+
   // ──────────────────────────────────────────────────────────────────────────
   // BROWSE PRODUCTS
   // ──────────────────────────────────────────────────────────────────────────
@@ -141,9 +205,19 @@ class LiveApiService {
 
     final body = <String, dynamic>{'page': page, 'page_size': pageSize};
 
-    // Woolworths browse needs a Google Place ID for confirmPlace
+    // Woolworths browse needs a real Google Place ID for confirmPlace.
+    // place_id is populated for all known Woolies stores via a one-off
+    // Places API backfill (retailer_stores.place_id). If we somehow hit
+    // a store without one, fail fast rather than sending a fake id.
     if (retailer == 'Woolworths') {
-      body['place_id'] = store.placeId ?? store.storeCode;
+      final placeId = store.placeId;
+      if (placeId == null || placeId.isEmpty) {
+        throw LiveApiException(
+          'Woolworths browse unavailable for this store. '
+          "We're missing location data for ${store.storeName}.",
+        );
+      }
+      body['place_id'] = placeId;
       body['place_nickname'] = store.placeNickname ?? store.storeName;
       if (category != null) body['category'] = category;
     } else {

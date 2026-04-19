@@ -10,7 +10,7 @@ import '../../../data/models/vehicle_config.dart';
 import '../../providers/auth_provider.dart';
 import '../../routes/app_router.dart';
 import '../../providers/vehicle_config_provider.dart';
-import '../../widgets/common/address_search_field.dart';
+import '../../widgets/common/google_places_search_field.dart';
 import '../../widgets/common/vehicle_config_sheet.dart';
 import '../../providers/saved_locations_provider.dart';
 import '../../providers/theme_provider.dart';
@@ -992,7 +992,7 @@ class _AddLocationSheetState extends State<_AddLocationSheet> {
             ),
           ],
           const SizedBox(height: 14),
-          AddressSearchField(
+          GooglePlacesSearchField(
             autofocus: !_isCustom,
             onSubmit: (result) => _save(
               address: result.address,

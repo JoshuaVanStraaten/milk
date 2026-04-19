@@ -67,6 +67,27 @@ class NearbyStore {
     );
   }
 
+  /// Parse from the `stores-search` response.
+  ///
+  /// Each row in the `stores` array already includes its own `retailer`
+  /// slug (unlike stores-nearby which keys stores by retailer):
+  /// ```json
+  /// { "retailer": "pnp", "store_name": "...", "store_code": "NC30", ... }
+  /// ```
+  /// `distance_km` may be null when no coords were supplied.
+  factory NearbyStore.fromSearchJson(Map<String, dynamic> json) {
+    return NearbyStore(
+      retailer: _retailerDisplayName(json['retailer'] as String? ?? ''),
+      storeName: json['store_name'] as String? ?? '',
+      storeCode: json['store_code']?.toString() ?? '',
+      distanceKm: (json['distance_km'] as num?)?.toDouble() ?? 0.0,
+      latitude: (json['latitude'] as num?)?.toDouble() ?? 0.0,
+      longitude: (json['longitude'] as num?)?.toDouble() ?? 0.0,
+      placeId: json['place_id'] as String?,
+      placeNickname: json['place_nickname'] as String?,
+    );
+  }
+
   /// Map API slug to display name.
   static String _retailerDisplayName(String slug) {
     return Retailers.fromSlug(slug)?.name ?? slug;
