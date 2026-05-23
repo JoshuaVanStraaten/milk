@@ -34,6 +34,11 @@ workflows:
       - name: Set build number
         script: |
           cd ios && agvtool new-version -all $BUILD_NUMBER
+      - name: Install signing certificate and profile
+        script: |
+          keychain initialize
+          keychain add-certificates
+          xcode-project use-profiles
       - name: Build iOS IPA
         script: |
           cat > /tmp/ExportOptions.plist << EOF
