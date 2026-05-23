@@ -9,33 +9,26 @@ workflows:
       ios_signing:
         distribution_type: app_store
         bundle_identifier: com.ubicorp.milkza
-      vars:
-        APP_STORE_APPLE_ID: 0000000000 # replace with numeric Apple ID from App Store Connect after first manual upload
-      groups:
-        - app_store_credentials # create in Codemagic UI: APP_STORE_CONNECT_ISSUER_ID, APP_STORE_CONNECT_KEY_IDENTIFIER, APP_STORE_CONNECT_PRIVATE_KEY
     integrations:
-      app_store_connect: codemagic # name of the App Store Connect integration set up in Codemagic UI
+      app_store_connect: codemagic
     scripts:
       - name: Get Flutter packages
         script: flutter pub get
       - name: Install CocoaPods dependencies
         script: |
-          cd ios
-          pod install
+          cd ios && pod install
       - name: Flutter analyze
         script: flutter analyze
-      - name: Set build number from Codemagic
+      - name: Set build number
         script: |
-          cd ios
-          agvtool new-version -all $(($BUILD_NUMBER + 10))
+          cd ios && agvtool new-version -all $BUILD_NUMBER
       - name: Build iOS IPA
         script: |
           flutter build ipa --release \
-            --export-options-plist=/Users/builder/export_options.plist
+            --export-method app-store
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
-      - flutter_drive.log
     publishing:
       app_store_connect:
         auth: integration
