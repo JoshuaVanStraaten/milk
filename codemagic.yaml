@@ -2,6 +2,8 @@ workflows:
   ios-testflight:
     name: iOS TestFlight Build
     max_build_duration: 60
+    integrations:
+      app_store_connect: codemagic
     environment:
       flutter: stable
       xcode: latest
@@ -9,8 +11,6 @@ workflows:
       ios_signing:
         distribution_type: app_store
         bundle_identifier: com.ubicorp.milkza
-    integrations:
-      app_store_connect: codemagic
     scripts:
       - name: Get Flutter packages
         script: flutter pub get
@@ -25,7 +25,7 @@ workflows:
       - name: Build iOS IPA
         script: |
           flutter build ipa --release \
-            --export-method app-store
+            --export-options-plist=$CM_EXPORT_OPTIONS_PATH
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
