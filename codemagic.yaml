@@ -18,6 +18,10 @@ workflows:
         script: |
           echo "SUPABASE_URL=$SUPABASE_URL" > .env
           echo "SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY" >> .env
+          echo "GOOGLE_WEB_CLIENT_ID=$GOOGLE_WEB_CLIENT_ID" >> .env
+          echo "POC_SUPABASE_URL=$POC_SUPABASE_URL" >> .env
+          echo "POC_SUPABASE_ANON_KEY=$POC_SUPABASE_ANON_KEY" >> .env
+          echo "GOOGLE_PLACES_API_KEY=$GOOGLE_PLACES_API_KEY" >> .env
       - name: Get Flutter packages
         script: flutter pub get
       - name: Install CocoaPods dependencies
