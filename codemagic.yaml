@@ -9,8 +9,10 @@ workflows:
       xcode: latest
       cocoapods: default
       ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.ubicorp.milkza
+        provisioning_profiles:
+          - milk_app_store
+        certificates:
+          - Milk Cert
     scripts:
       - name: Get Flutter packages
         script: flutter pub get
