@@ -45,15 +45,22 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<!-- Required usage descriptions (Apple rejects without these) -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Milk uses your location to find the nearest Pick n Pay, Woolworths, Checkers, and Shoprite stores so you can compare live prices near you.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Milk uses the camera to scan product barcodes for price comparison.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Milk needs access to your photo library to set a profile picture.</string>
 	<!-- Deep Link URL Scheme for OAuth callback -->
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
 			<key>CFBundleURLName</key>
-			<string>com.example.milk</string>
+			<string>com.ubicorp.milkza</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>com.example.milk</string>
+				<string>com.ubicorp.milkza</string>
 			</array>
 		</dict>
 	</array>
