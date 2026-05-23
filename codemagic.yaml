@@ -8,6 +8,8 @@ workflows:
       flutter: stable
       xcode: latest
       cocoapods: default
+      groups:
+        - milk
       ios_signing:
         provisioning_profiles:
           - milk_app_store
