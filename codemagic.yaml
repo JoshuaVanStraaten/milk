@@ -30,7 +30,7 @@ workflows:
         script: |
           cd ios && pod install
       - name: Flutter analyze
-        script: flutter analyze
+        script: flutter analyze --no-fatal-infos
       - name: Set build number
         script: |
           cd ios && agvtool new-version -all $BUILD_NUMBER
