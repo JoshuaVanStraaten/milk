@@ -50,6 +50,13 @@ workflows:
             <string>app-store</string>
             <key>teamID</key>
             <string>M9X8WYJ8H2</string>
+            <key>signingStyle</key>
+            <string>manual</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>com.ubicorp.milkza</key>
+              <string>Milk App Store</string>
+            </dict>
             <key>uploadBitcode</key>
             <false/>
             <key>uploadSymbols</key>
