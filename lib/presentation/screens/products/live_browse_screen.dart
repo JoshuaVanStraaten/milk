@@ -885,11 +885,13 @@ class _ActiveFilterBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return SizedBox(
-      height: 36,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: SizedBox(
+        height: 36,
+        child: ListView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
         children: [
           if (sortOption != SortOption.relevance)
             _FilterPill(
@@ -904,6 +906,7 @@ class _ActiveFilterBar extends StatelessWidget {
               isDark: isDark,
             ),
         ],
+        ),
       ),
     );
   }
