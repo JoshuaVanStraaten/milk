@@ -65,6 +65,15 @@
 				<string>com.ubicorp.milkza</string>
 			</array>
 		</dict>
+		<!-- Google Sign-In reverse client ID — required for iOS callback -->
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.google.reverseClientId</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.951991052846-kqgsi3vs83up96ha45tdi94ofkfitu46</string>
+			</array>
+		</dict>
 	</array>
 </dict>
 </plist>

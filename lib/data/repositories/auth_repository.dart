@@ -136,7 +136,12 @@ class AuthRepository {
         throw Exception('GOOGLE_WEB_CLIENT_ID not found in .env');
       }
 
-      final googleSignIn = GoogleSignIn(serverClientId: webClientId);
+      final iosClientId = dotenv.env['GOOGLE_IOS_CLIENT_ID'];
+
+      final googleSignIn = GoogleSignIn(
+        clientId: iosClientId, // required on iOS; ignored on Android
+        serverClientId: webClientId,
+      );
       final googleUser = await googleSignIn.signIn();
 
       if (googleUser == null) {
