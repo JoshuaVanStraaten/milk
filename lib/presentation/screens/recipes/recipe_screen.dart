@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lottie/lottie.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../providers/recipe_provider.dart';
@@ -21,6 +22,7 @@ import '../../widgets/common/ai_error_dialog.dart';
 // import '../../widgets/recipes/premium_paywall_sheet.dart';
 import '../../widgets/tutorial/tutorial_targets.dart';
 import '../../widgets/recipes/export_preparation_sheet.dart';
+import '../../widgets/recipes/recipe_edit_sheet.dart';
 
 /// Main screen for AI recipe generation
 class RecipeScreen extends ConsumerStatefulWidget {
@@ -100,9 +102,7 @@ class _GenerateRecipeTabState extends ConsumerState<_GenerateRecipeTab> {
       if (_modeSelectorKey.currentContext == null) return;
 
       _tutorialCoachMark = TutorialCoachMark(
-        targets: buildRecipesTutorialTargets(
-          modeSelectorKey: _modeSelectorKey,
-        ),
+        targets: buildRecipesTutorialTargets(modeSelectorKey: _modeSelectorKey),
         colorShadow: Colors.black,
         opacityShadow: 0.87,
         hideSkip: true,
@@ -155,11 +155,13 @@ class _GenerateRecipeTabState extends ConsumerState<_GenerateRecipeTab> {
                 children: [
                   Icon(Icons.check_circle, color: AppColors.primary, size: 20),
                   const SizedBox(width: 10),
-                  Expanded(child: Text(
-                    'Each ingredient is matched to a real product. '
-                    'Tap "Change" to swap it.',
-                    style: TextStyle(fontSize: 13, height: 1.4),
-                  )),
+                  Expanded(
+                    child: Text(
+                      'Each ingredient is matched to a real product. '
+                      'Tap "Change" to swap it.',
+                      style: TextStyle(fontSize: 13, height: 1.4),
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 12),
@@ -168,24 +170,32 @@ class _GenerateRecipeTabState extends ConsumerState<_GenerateRecipeTab> {
                 children: [
                   Icon(Icons.store, color: AppColors.primary, size: 20),
                   const SizedBox(width: 10),
-                  Expanded(child: Text(
-                    'Use the store chips to re-match all ingredients '
-                    'to a specific retailer.',
-                    style: TextStyle(fontSize: 13, height: 1.4),
-                  )),
+                  Expanded(
+                    child: Text(
+                      'Use the store chips to re-match all ingredients '
+                      'to a specific retailer.',
+                      style: TextStyle(fontSize: 13, height: 1.4),
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 12),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.add_shopping_cart, color: AppColors.primary, size: 20),
+                  Icon(
+                    Icons.add_shopping_cart,
+                    color: AppColors.primary,
+                    size: 20,
+                  ),
                   const SizedBox(width: 10),
-                  Expanded(child: Text(
-                    'Tap "Export to Shopping List" to add ingredients '
-                    'to a list.',
-                    style: TextStyle(fontSize: 13, height: 1.4),
-                  )),
+                  Expanded(
+                    child: Text(
+                      'Tap "Export to Shopping List" to add ingredients '
+                      'to a list.',
+                      style: TextStyle(fontSize: 13, height: 1.4),
+                    ),
+                  ),
                 ],
               ),
             ],
@@ -240,11 +250,14 @@ class _GenerateRecipeTabState extends ConsumerState<_GenerateRecipeTab> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     // Trigger recipes tutorial when mode selector is visible
-    final showModeSelector = state.currentStep == RecipeGenerationStep.input &&
+    final showModeSelector =
+        state.currentStep == RecipeGenerationStep.input &&
         !suggestionsState.isLoading &&
         suggestionsState.suggestions.isEmpty;
     if (showModeSelector) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _tryShowRecipesTutorial());
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _tryShowRecipesTutorial(),
+      );
     }
 
     return SingleChildScrollView(
@@ -458,10 +471,7 @@ class _GenerateRecipeTabState extends ConsumerState<_GenerateRecipeTab> {
           // Icon / animated indicator
           if (isMatching) ...[
             // Glow-pulsing progress ring
-            _GlowProgressRing(
-              percent: percent,
-              isDark: isDark,
-            ),
+            _GlowProgressRing(percent: percent, isDark: isDark),
           ] else ...[
             // Lottie cooking animation for recipe generation
             Lottie.asset(
@@ -571,7 +581,9 @@ class _GenerateRecipeTabState extends ConsumerState<_GenerateRecipeTab> {
             height: 44,
             child: isDark
                 ? FilledButton.icon(
-                    onPressed: () => ref.read(recipeGenerationProvider.notifier).cancelGeneration(),
+                    onPressed: () => ref
+                        .read(recipeGenerationProvider.notifier)
+                        .cancelGeneration(),
                     icon: const Icon(Icons.close_rounded, size: 18),
                     label: const Text('Cancel'),
                     style: FilledButton.styleFrom(
@@ -584,7 +596,9 @@ class _GenerateRecipeTabState extends ConsumerState<_GenerateRecipeTab> {
                     ),
                   )
                 : OutlinedButton.icon(
-                    onPressed: () => ref.read(recipeGenerationProvider.notifier).cancelGeneration(),
+                    onPressed: () => ref
+                        .read(recipeGenerationProvider.notifier)
+                        .cancelGeneration(),
                     icon: const Icon(Icons.close_rounded, size: 18),
                     label: const Text('Cancel'),
                     style: OutlinedButton.styleFrom(
@@ -885,14 +899,14 @@ class _SavedRecipesTab extends ConsumerWidget {
 }
 
 /// Card for displaying a saved recipe
-class _SavedRecipeCard extends StatelessWidget {
+class _SavedRecipeCard extends ConsumerWidget {
   final Recipe recipe;
   final VoidCallback onDelete;
 
   const _SavedRecipeCard({required this.recipe, required this.onDelete});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Dismissible(
@@ -916,7 +930,7 @@ class _SavedRecipeCard extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 12),
         child: InkWell(
           onTap: () {
-            _showRecipeDetailSheet(context, recipe, isDark);
+            _showRecipeDetailSheet(context, ref, recipe, isDark);
           },
           borderRadius: BorderRadius.circular(12),
           child: Padding(
@@ -1047,6 +1061,7 @@ class _SavedRecipeCard extends StatelessWidget {
 
   void _showRecipeDetailSheet(
     BuildContext context,
+    WidgetRef ref,
     Recipe recipe,
     bool isDark,
   ) {
@@ -1079,7 +1094,7 @@ class _SavedRecipeCard extends StatelessWidget {
             // Content
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 96),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -1245,10 +1260,69 @@ class _SavedRecipeCard extends StatelessWidget {
                 ),
               ),
             ),
+            _RecipeActionBar(
+              isDark: isDark,
+              onDelete: () {
+                Navigator.of(context).pop();
+                onDelete();
+              },
+              onSaveToList: () {
+                Navigator.of(context).pop();
+                if (!context.mounted) return;
+                showExportPreparationSheet(
+                  context: context,
+                  ref: ref,
+                  recipe: recipe,
+                );
+              },
+              onEdit: () {
+                Navigator.of(context).pop();
+                if (!context.mounted) return;
+                showRecipeEditSheet(context: context, ref: ref, recipe: recipe);
+              },
+              onShare: () => _shareRecipe(recipe),
+            ),
           ],
         ),
       ),
     );
+  }
+
+  void _shareRecipe(Recipe recipe) {
+    Share.share(_formatRecipeForShare(recipe));
+  }
+
+  String _formatRecipeForShare(Recipe recipe) {
+    final buffer = StringBuffer()
+      ..writeln(recipe.recipeName)
+      ..writeln()
+      ..writeln('Ingredients:');
+
+    for (final ingredient in recipe.ingredients) {
+      final quantity = ingredient.formattedQuantity;
+      final line = quantity.isEmpty
+          ? ingredient.ingredientName
+          : '$quantity ${ingredient.ingredientName}';
+      buffer.writeln('• $line');
+    }
+
+    buffer
+      ..writeln()
+      ..writeln('Instructions:');
+
+    for (final entry in recipe.instructions.asMap().entries) {
+      final instruction = entry.value.replaceFirst(
+        RegExp(r'^Step\s*\d+\s*[:\.]\s*', caseSensitive: false),
+        '',
+      );
+      buffer.writeln('${entry.key + 1}. $instruction');
+    }
+
+    buffer
+      ..writeln()
+      ..writeln('Generated by Milk');
+
+    return buffer.toString().trim();
   }
 
   Widget _buildInfoChip(IconData icon, String label, bool isDark) {
@@ -1277,6 +1351,107 @@ class _SavedRecipeCard extends StatelessWidget {
   }
 }
 
+class _RecipeActionBar extends StatelessWidget {
+  final bool isDark;
+  final VoidCallback onDelete;
+  final VoidCallback onSaveToList;
+  final VoidCallback onEdit;
+  final VoidCallback onShare;
+
+  const _RecipeActionBar({
+    required this.isDark,
+    required this.onDelete,
+    required this.onSaveToList,
+    required this.onEdit,
+    required this.onShare,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final borderColor = isDark ? AppColors.dividerDark : AppColors.divider;
+
+    return SafeArea(
+      top: false,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.backgroundDark : Colors.white,
+          border: Border(top: BorderSide(color: borderColor)),
+        ),
+        child: Row(
+          children: [
+            _RecipeActionButton(
+              icon: Icons.delete_outline,
+              label: 'Delete',
+              color: AppColors.error,
+              onTap: onDelete,
+            ),
+            _RecipeActionButton(
+              icon: Icons.playlist_add,
+              label: 'Save to List',
+              color: AppColors.primary,
+              onTap: onSaveToList,
+            ),
+            _RecipeActionButton(
+              icon: Icons.edit_outlined,
+              label: 'Edit',
+              color: AppColors.primary,
+              onTap: onEdit,
+            ),
+            _RecipeActionButton(
+              icon: Icons.share_outlined,
+              label: 'Share',
+              color: AppColors.primary,
+              onTap: onShare,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RecipeActionButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _RecipeActionButton({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: TextButton(
+        onPressed: onTap,
+        style: TextButton.styleFrom(
+          foregroundColor: color,
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 22),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 // -----------------------------------------------------------------------------
 // Glow-pulsing progress ring for ingredient matching
 // -----------------------------------------------------------------------------
@@ -1285,10 +1460,7 @@ class _GlowProgressRing extends StatefulWidget {
   final double percent;
   final bool isDark;
 
-  const _GlowProgressRing({
-    required this.percent,
-    required this.isDark,
-  });
+  const _GlowProgressRing({required this.percent, required this.isDark});
 
   @override
   State<_GlowProgressRing> createState() => _GlowProgressRingState();
@@ -1323,8 +1495,7 @@ class _GlowProgressRingState extends State<_GlowProgressRing>
         return AnimatedBuilder(
           animation: _glowController,
           builder: (context, child) {
-            final glowAlpha =
-                0.1 + (_glowController.value * 0.3);
+            final glowAlpha = 0.1 + (_glowController.value * 0.3);
             return Container(
               width: 88,
               height: 88,
@@ -1332,8 +1503,7 @@ class _GlowProgressRingState extends State<_GlowProgressRing>
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.primary
-                        .withValues(alpha: glowAlpha),
+                    color: AppColors.primary.withValues(alpha: glowAlpha),
                     blurRadius: 20 + (_glowController.value * 10),
                     spreadRadius: 2,
                   ),
@@ -1352,10 +1522,11 @@ class _GlowProgressRingState extends State<_GlowProgressRing>
                 child: CircularProgressIndicator(
                   value: 1.0,
                   strokeWidth: 5,
-                  color: (widget.isDark
-                          ? AppColors.textDisabledDark
-                          : AppColors.textDisabled)
-                      .withValues(alpha: 0.3),
+                  color:
+                      (widget.isDark
+                              ? AppColors.textDisabledDark
+                              : AppColors.textDisabled)
+                          .withValues(alpha: 0.3),
                 ),
               ),
               // Progress

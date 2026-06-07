@@ -244,8 +244,10 @@ class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
     if (preferredRetailer != null && Retailers.isGrocery(preferredRetailer)) {
       retailerName = preferredRetailer;
     } else {
-      retailerName = storeSelection.stores.keys
-          .firstWhere(Retailers.isGrocery, orElse: () => storeSelection.stores.keys.first);
+      retailerName = storeSelection.stores.keys.firstWhere(
+        Retailers.isGrocery,
+        orElse: () => storeSelection.stores.keys.first,
+      );
     }
 
     // Set total for progress tracking
@@ -490,9 +492,11 @@ class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
       final recipe = selectedIngredientIds != null
           ? state.generatedRecipe!.copyWith(
               ingredients: state.generatedRecipe!.ingredients
-                  .where((i) =>
-                      i.ingredientId != null &&
-                      selectedIngredientIds.contains(i.ingredientId))
+                  .where(
+                    (i) =>
+                        i.ingredientId != null &&
+                        selectedIngredientIds.contains(i.ingredientId),
+                  )
                   .toList(),
             )
           : state.generatedRecipe!;
@@ -555,11 +559,12 @@ class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
     );
 
     try {
-      if (saveRecipe && state.generatedRecipe?.recipeId == null) {
-        await this.saveRecipe();
-      }
+      final recipeForExport = saveRecipe && recipe.recipeId == null
+          ? await _repository.saveRecipe(recipe)
+          : recipe;
 
-      final storeName = recipe.ingredients
+      final storeName =
+          recipeForExport.ingredients
               .where((i) => i.matchedRetailer != null)
               .map((i) => i.matchedRetailer!)
               .fold<Map<String, int>>({}, (map, r) {
@@ -567,13 +572,15 @@ class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
                 return map;
               })
               .entries
-              .fold<MapEntry<String, int>?>(null,
-                  (best, e) => best == null || e.value > best.value ? e : best)
+              .fold<MapEntry<String, int>?>(
+                null,
+                (best, e) => best == null || e.value > best.value ? e : best,
+              )
               ?.key ??
           'Mixed Stores';
 
       final listId = await _repository.exportToShoppingList(
-        recipe: recipe,
+        recipe: recipeForExport,
         listName: listName,
         storeName: storeName,
       );
@@ -659,7 +666,6 @@ class RecipeGenerationNotifier extends StateNotifier<RecipeGenerationState> {
 
     return cleaned;
   }
-
 }
 
 /// Recipe generation provider
@@ -747,8 +753,9 @@ class IngredientMatchingNotifier
       } else {
         // Search grocery retailers only (exclude Makro, Dis-Chem, Clicks)
         final groceryStores = Map.fromEntries(
-          storeSelection.stores.entries
-              .where((e) => Retailers.isGrocery(e.key)),
+          storeSelection.stores.entries.where(
+            (e) => Retailers.isGrocery(e.key),
+          ),
         );
         final results = await api.compareProduct(
           productName: ingredientName,
@@ -789,7 +796,6 @@ class IngredientMatchingNotifier
   void clearMatches() {
     state = const IngredientMatchingState();
   }
-
 }
 
 /// Ingredient matching provider
@@ -946,7 +952,7 @@ class RetailerComparisonNotifier
   final Ref _ref;
 
   RetailerComparisonNotifier(this._ref)
-      : super(const RetailerComparisonState());
+    : super(const RetailerComparisonState());
 
   /// Search all 4 retailers in parallel for [selectedIngredients] and build
   /// a cost basket per retailer. Results stream in as each retailer completes.
@@ -960,20 +966,14 @@ class RetailerComparisonNotifier
 
     // Only compare grocery retailers — Makro/Dis-Chem/Clicks are excluded
     // because their limited product ranges produce poor ingredient matches.
-    final groceryNames = Retailers.all.keys
-        .where(Retailers.isGrocery)
-        .toList();
+    final groceryNames = Retailers.all.keys.where(Retailers.isGrocery).toList();
 
     // Initialise all baskets as loading
     final initialBaskets = Map.fromEntries(
       groceryNames.map(
         (name) => MapEntry(
           name,
-          RetailerBasket(
-            retailerName: name,
-            matches: {},
-            isLoading: true,
-          ),
+          RetailerBasket(retailerName: name, matches: {}, isLoading: true),
         ),
       ),
     );
@@ -987,9 +987,7 @@ class RetailerComparisonNotifier
       if (store == null) {
         final basket = RetailerBasket(
           retailerName: retailerName,
-          matches: {
-            for (final i in selectedIngredients) i.ingredientId!: null,
-          },
+          matches: {for (final i in selectedIngredients) i.ingredientId!: null},
           isLoading: false,
           error: 'Not available nearby',
         );
@@ -1008,19 +1006,22 @@ class RetailerComparisonNotifier
         if (ingredient.matchedRetailer == retailerName &&
             ingredient.matchedProductPrice != null &&
             ingredient.matchedProductPrice! > 0) {
-          results.add(MapEntry(
-            ingredient.ingredientId!,
-            IngredientProductMatch(
-              productIndex:
-                  '$retailerName:${ingredient.matchedProductName ?? ingredient.ingredientName}',
-              productName:
-                  ingredient.matchedProductName ?? ingredient.ingredientName,
-              productPrice: 'R${ingredient.matchedProductPrice!.toStringAsFixed(2)}',
-              productImageUrl: null,
-              retailer: retailerName,
-              similarityScore: 1.0,
+          results.add(
+            MapEntry(
+              ingredient.ingredientId!,
+              IngredientProductMatch(
+                productIndex:
+                    '$retailerName:${ingredient.matchedProductName ?? ingredient.ingredientName}',
+                productName:
+                    ingredient.matchedProductName ?? ingredient.ingredientName,
+                productPrice:
+                    'R${ingredient.matchedProductPrice!.toStringAsFixed(2)}',
+                productImageUrl: null,
+                retailer: retailerName,
+                similarityScore: 1.0,
+              ),
             ),
-          ));
+          );
           continue;
         }
 
@@ -1068,17 +1069,19 @@ class RetailerComparisonNotifier
           if (best == null) {
             results.add(MapEntry(ingredient.ingredientId!, null));
           } else {
-            results.add(MapEntry(
-              ingredient.ingredientId!,
-              IngredientProductMatch(
-                productIndex: '${best.retailer}:${best.name}',
-                productName: best.name,
-                productPrice: best.price,
-                productImageUrl: best.imageUrl,
-                retailer: best.retailer,
-                similarityScore: 1.0,
+            results.add(
+              MapEntry(
+                ingredient.ingredientId!,
+                IngredientProductMatch(
+                  productIndex: '${best.retailer}:${best.name}',
+                  productName: best.name,
+                  productPrice: best.price,
+                  productImageUrl: best.imageUrl,
+                  retailer: best.retailer,
+                  similarityScore: 1.0,
+                ),
               ),
-            ));
+            );
           }
         } catch (_) {
           results.add(MapEntry(ingredient.ingredientId!, null));
@@ -1089,9 +1092,7 @@ class RetailerComparisonNotifier
         matches: Map.fromEntries(results),
         isLoading: false,
       );
-      state = state.copyWith(
-        baskets: {...state.baskets, retailerName: basket},
-      );
+      state = state.copyWith(baskets: {...state.baskets, retailerName: basket});
     }
 
     await Future.wait(groceryNames.map(fetchRetailer));
@@ -1124,7 +1125,10 @@ class RetailerComparisonNotifier
   void reset() => state = const RetailerComparisonState();
 }
 
-final retailerComparisonProvider = StateNotifierProvider.autoDispose<
-    RetailerComparisonNotifier, RetailerComparisonState>((ref) {
-  return RetailerComparisonNotifier(ref);
-});
+final retailerComparisonProvider =
+    StateNotifierProvider.autoDispose<
+      RetailerComparisonNotifier,
+      RetailerComparisonState
+    >((ref) {
+      return RetailerComparisonNotifier(ref);
+    });

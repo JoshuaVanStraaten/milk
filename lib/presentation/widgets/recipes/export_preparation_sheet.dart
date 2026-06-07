@@ -33,10 +33,7 @@ class _ExportPreparationSheet extends ConsumerStatefulWidget {
   final Recipe recipe;
   final bool isDark;
 
-  const _ExportPreparationSheet({
-    required this.recipe,
-    required this.isDark,
-  });
+  const _ExportPreparationSheet({required this.recipe, required this.isDark});
 
   @override
   ConsumerState<_ExportPreparationSheet> createState() =>
@@ -63,8 +60,7 @@ class _ExportPreparationSheetState
     // Unmatched ones start false and are disabled.
     _selected = {
       for (final i in widget.recipe.ingredients)
-        if (i.ingredientId != null)
-          i.ingredientId!: i.isMatched,
+        if (i.ingredientId != null) i.ingredientId!: i.isMatched,
     };
   }
 
@@ -74,13 +70,13 @@ class _ExportPreparationSheetState
     super.dispose();
   }
 
-  int get _selectedCount =>
-      _selected.values.where((v) => v).length;
+  int get _selectedCount => _selected.values.where((v) => v).length;
 
-  List<RecipeIngredient> get _selectedIngredients =>
-      widget.recipe.ingredients
-          .where((i) => i.ingredientId != null && (_selected[i.ingredientId] ?? false))
-          .toList();
+  List<RecipeIngredient> get _selectedIngredients => widget.recipe.ingredients
+      .where(
+        (i) => i.ingredientId != null && (_selected[i.ingredientId] ?? false),
+      )
+      .toList();
 
   Future<void> _export({List<RecipeIngredient>? ingredientOverride}) async {
     if (_listNameController.text.trim().isEmpty) return;
@@ -99,11 +95,19 @@ class _ExportPreparationSheetState
         saveRecipe: _saveRecipe,
       );
     } else {
-      await notifier.exportToShoppingList(
+      final selectedRecipe = widget.recipe.copyWith(
+        ingredients: widget.recipe.ingredients
+            .where(
+              (i) =>
+                  i.ingredientId != null &&
+                  (_selected[i.ingredientId] ?? false),
+            )
+            .toList(),
+      );
+      await notifier.exportRecipeDirectly(
+        recipe: selectedRecipe,
         listName: _listNameController.text.trim(),
         saveRecipe: _saveRecipe,
-        selectedIngredientIds:
-            _selected.entries.where((e) => e.value).map((e) => e.key).toSet(),
       );
     }
 
@@ -164,7 +168,9 @@ class _ExportPreparationSheetState
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: isDark ? Colors.white.withValues(alpha: 0.12) : Colors.black.withValues(alpha: 0.12),
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.12)
+                          : Colors.black.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -181,8 +187,8 @@ class _ExportPreparationSheetState
                     Text(
                       'Export to List',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ],
                 ),
@@ -211,7 +217,9 @@ class _ExportPreparationSheetState
 
               Divider(
                 height: 1,
-                color: isDark ? Colors.white.withValues(alpha: 0.12) : Colors.black.withValues(alpha: 0.12),
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.12)
+                    : Colors.black.withValues(alpha: 0.12),
               ),
 
               // Section header
@@ -222,16 +230,18 @@ class _ExportPreparationSheetState
                     Text(
                       'Select items to include',
                       style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                            color: isDark ? Colors.white54 : Colors.black54,
-                            fontWeight: FontWeight.w600,
-                          ),
+                        color: isDark ? Colors.white54 : Colors.black54,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     const Spacer(),
                     Text(
                       '$_selectedCount of ${ingredients.where((i) => i.isMatched).length} matched',
                       style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: isDark ? Colors.white.withValues(alpha: 0.38) : Colors.black.withValues(alpha: 0.38),
-                          ),
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.38)
+                            : Colors.black.withValues(alpha: 0.38),
+                      ),
                     ),
                   ],
                 ),
@@ -252,7 +262,8 @@ class _ExportPreparationSheetState
                     return CheckboxListTile(
                       value: isChecked,
                       onChanged: isMatched && id != null
-                          ? (val) => setState(() => _selected[id] = val ?? false)
+                          ? (val) =>
+                                setState(() => _selected[id] = val ?? false)
                           : null,
                       dense: true,
                       title: Text(
@@ -261,7 +272,9 @@ class _ExportPreparationSheetState
                           fontSize: 13,
                           color: isMatched
                               ? null
-                              : (isDark ? Colors.white.withValues(alpha: 0.38) : Colors.black.withValues(alpha: 0.38)),
+                              : (isDark
+                                    ? Colors.white.withValues(alpha: 0.38)
+                                    : Colors.black.withValues(alpha: 0.38)),
                           decoration: isMatched ? null : TextDecoration.none,
                         ),
                         maxLines: 1,
@@ -293,14 +306,18 @@ class _ExportPreparationSheetState
                                 vertical: 3,
                               ),
                               decoration: BoxDecoration(
-                                color: isDark ? Colors.white.withValues(alpha: 0.12) : Colors.black.withValues(alpha: 0.08),
+                                color: isDark
+                                    ? Colors.white.withValues(alpha: 0.12)
+                                    : Colors.black.withValues(alpha: 0.08),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
                                 'Not found',
                                 style: TextStyle(
                                   fontSize: 10,
-                                  color: isDark ? Colors.white.withValues(alpha: 0.38) : Colors.black.withValues(alpha: 0.38),
+                                  color: isDark
+                                      ? Colors.white.withValues(alpha: 0.38)
+                                      : Colors.black.withValues(alpha: 0.38),
                                 ),
                               ),
                             ),
@@ -311,7 +328,9 @@ class _ExportPreparationSheetState
 
               Divider(
                 height: 1,
-                color: isDark ? Colors.white.withValues(alpha: 0.12) : Colors.black.withValues(alpha: 0.12),
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.12)
+                    : Colors.black.withValues(alpha: 0.12),
               ),
 
               // Save recipe toggle
