@@ -139,7 +139,7 @@ class AuthRepository {
       final iosClientId = dotenv.env['GOOGLE_IOS_CLIENT_ID'];
 
       final googleSignIn = GoogleSignIn(
-        clientId: iosClientId, // required on iOS; ignored on Android
+        clientId: iosClientId, // iOS only; ignored on Android
         serverClientId: webClientId,
       );
       final googleUser = await googleSignIn.signIn();
