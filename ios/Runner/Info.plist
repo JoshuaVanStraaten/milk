@@ -50,6 +50,8 @@
 	<!-- Required usage descriptions (Apple rejects without these) -->
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Milk uses your location to find the nearest Pick n Pay, Woolworths, Checkers, and Shoprite stores so you can compare live prices near you.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Milk uses your location to find the nearest Pick n Pay, Woolworths, Checkers, and Shoprite stores so you can compare live prices near you.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Milk uses the camera to scan product barcodes for price comparison.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
