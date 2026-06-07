@@ -16,6 +16,8 @@ import '../../data/services/product_name_parser.dart';
 import '../../core/constants/retailers.dart';
 import 'store_provider.dart'; // includes smartMatchingServiceProvider
 import 'subscription_provider.dart';
+import '../../data/services/review_service.dart';
+import 'theme_provider.dart'; // for sharedPreferencesProvider
 
 // =============================================================================
 // SERVICE PROVIDERS
@@ -29,6 +31,12 @@ final geminiServiceProvider = Provider<GeminiService>((ref) {
 /// Recipe repository provider
 final recipeRepositoryProvider = Provider<RecipeRepository>((ref) {
   return RecipeRepository(Supabase.instance.client);
+});
+
+/// Provides the ReviewService backed by the app-wide SharedPreferences.
+final reviewServiceProvider = Provider<ReviewService>((ref) {
+  final prefs = ref.watch(sharedPreferencesProvider);
+  return ReviewService(prefs);
 });
 
 // =============================================================================
