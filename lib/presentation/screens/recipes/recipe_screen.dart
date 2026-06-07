@@ -11,6 +11,7 @@ import '../../providers/store_provider.dart';
 import '../../providers/tutorial_provider.dart';
 import '../../../data/models/recipe.dart';
 import '../../widgets/common/glass_container.dart';
+import '../../widgets/common/review_prompt.dart';
 import '../../widgets/common/shimmer_text.dart';
 import '../../widgets/recipes/recipe_input_card.dart';
 import '../../widgets/recipes/recipe_result_card.dart';
@@ -431,7 +432,6 @@ class _GenerateRecipeTabState extends ConsumerState<_GenerateRecipeTab> {
                   .read(recipeGenerationProvider.notifier)
                   .saveRecipe();
               if (saved != null && context.mounted) {
-                // Refresh the saved recipes list
                 ref.invalidate(userRecipesProvider);
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
@@ -439,6 +439,7 @@ class _GenerateRecipeTabState extends ConsumerState<_GenerateRecipeTab> {
                     backgroundColor: AppColors.success,
                   ),
                 );
+                await showReviewPromptIfNeeded(context, ref);
               }
             },
             onReset: () {
