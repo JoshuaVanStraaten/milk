@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/recipe.dart';
 import '../../providers/recipe_provider.dart';
+import '../common/review_prompt.dart';
 
 Future<void> showRecipeEditSheet({
   required BuildContext context,
@@ -95,6 +96,7 @@ class _RecipeEditSheetState extends ConsumerState<RecipeEditSheet> {
           backgroundColor: AppColors.success,
         ),
       );
+      await showReviewPromptIfNeeded(context, ref);
     } catch (e) {
       if (!mounted) return;
       setState(() => _isSaving = false);
